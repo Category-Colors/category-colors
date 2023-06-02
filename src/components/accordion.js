@@ -4,22 +4,21 @@ import {
   AccordionPanel,
   AccordionIcon,
   Accordion as AccordionChakraUI,
-} from '@chakra-ui/react'
+} from "@chakra-ui/react";
 
-export default function Accordion({buttonChildren, panelChildren}) {
+export default function Accordion({ buttonChildren, panelChildren }) {
   return (
-    <AccordionChakraUI>
+    <AccordionChakraUI allowMultiple>
       <AccordionItem>
         <h2>
-          <AccordionButton>
+          <AccordionButton
+            sx={{ background: "gray", width: "400px" }}
+            _expanded={{ bg: "tomato", color: "#fff" }}>
             {buttonChildren}
-            <AccordionIcon />
           </AccordionButton>
         </h2>
-        <AccordionPanel pb={4}>
-          {panelChildren}
-        </AccordionPanel>
+        <AccordionPanel pb={4}>{panelChildren}</AccordionPanel>
       </AccordionItem>
     </AccordionChakraUI>
-  )
+  );
 }
