@@ -3,15 +3,28 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
-  SliderMark,
 } from "@chakra-ui/react";
 
-export default function Slider() {
+export default function Slider({ number, setNumber }) {
+  // event handler that to trigger number state change
+  const handleChange = (value) => {
+    setNumber((prev) => {
+      if (value < 0) {
+        return 0;
+      }
+      if (value > 100) {
+        return 100;
+      }
+      return value;
+    });
+  };
+
   return (
-    // add styling to the slider
     <SliderChakraUI
       aria-label="slider-ex-1"
-      defaultValue={30}
+      onChange={handleChange}
+      defaultValue={0}
+      value={number}
       sx={{ width: "250px" }}>
       <SliderTrack>
         <SliderFilledTrack />

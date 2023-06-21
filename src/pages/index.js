@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import Head from "next/head";
 import styles from "@component/styles/Home.module.css";
 import {
@@ -6,6 +7,9 @@ import {
   Textarea,
   NumberInput,
   NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
   FormControl,
   FormLabel,
   Switch,
@@ -15,11 +19,36 @@ import Accordion from "../components/accordion";
 import Slider from "../components/slider";
 
 export default function Home() {
+  // state for the number input and slider
+  const [number, setNumber] = useState(0);
+
   const buttonChildren = (
     <Box as="span" flex="1" textAlign="left">
       Panel Title
     </Box>
   );
+
+  // event handler to increment the value of the slider
+  function handleIncrement() {
+    console.log("increment");
+    setNumber((prev) => {
+      if (prev < 100) {
+        return prev + 1;
+      }
+      return prev;
+    });
+  }
+
+  // event handler to decrement the value of the slider
+  function handleDecrement() {
+    console.log("decrement");
+    setNumber((prev) => {
+      if (prev > 0) {
+        return prev - 1;
+      }
+      return prev;
+    });
+  }
 
   const panelChildren = (
     <>
@@ -31,9 +60,17 @@ export default function Home() {
           justifyContent: "space-between",
           marginBottom: "30px",
         }}>
-        <Slider />
-        <NumberInput width="20">
+        {/* slider */}
+        <Slider number={number} setNumber={setNumber} />
+
+        {/* number input */}
+        <NumberInput width="20" min={0} max={100} value={number}>
           <NumberInputField />
+          <NumberInputStepper>
+            {/* increment and decrement for the slider and number state */}
+            <NumberIncrementStepper onClick={handleIncrement} />
+            <NumberDecrementStepper onClick={handleDecrement} />
+          </NumberInputStepper>
         </NumberInput>
       </div>
       {/* container for toggle and text box */}
