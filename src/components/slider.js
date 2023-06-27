@@ -25,7 +25,8 @@ export default function Slider({ number, setNumber }) {
       onChange={handleChange}
       defaultValue={0}
       value={number}
-      sx={{ width: "250px" }}>
+      sx={{ width: "250px" }}
+    >
       <SliderTrack>
         <SliderFilledTrack />
       </SliderTrack>
