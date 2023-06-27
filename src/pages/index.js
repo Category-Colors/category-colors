@@ -59,7 +59,8 @@ export default function Home() {
           display: "flex",
           justifyContent: "space-between",
           marginBottom: "30px",
-        }}>
+        }}
+      >
         {/* slider */}
         <Slider number={number} setNumber={setNumber} />
 
@@ -77,7 +78,8 @@ export default function Home() {
       <FormControl
         display="flex"
         alignItems="center"
-        sx={{ justifyContent: "space-between", marginBottom: "40px" }}>
+        sx={{ justifyContent: "space-between", marginBottom: "40px" }}
+      >
         <FormLabel htmlFor="email-alerts" mb="0">
           Toggle Title
         </FormLabel>

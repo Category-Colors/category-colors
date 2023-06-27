@@ -13,7 +13,8 @@ export default function Accordion({ buttonChildren, panelChildren }) {
         <h2>
           <AccordionButton
             sx={{ background: "gray", width: "400px" }}
-            _expanded={{ bg: "tomato", color: "#fff" }}>
+            _expanded={{ bg: "tomato", color: "#fff" }}
+          >
             {buttonChildren}
           </AccordionButton>
         </h2>
