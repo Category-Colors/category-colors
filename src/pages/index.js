@@ -21,34 +21,29 @@ import Slider from "../components/slider";
 export default function Home() {
   // state for the number input and slider
   const [number, setNumber] = useState(0);
+  // state for the error message
+  const [numberError, setNumberError] = useState(0);
+
+  // event handler to trigger number state change
+  function handleChange(number) {
+    if (number < 0) {
+      setNumberError("Number cannot be less than 0");
+      return 0;
+    }
+    if (number > 100) {
+      setNumberError("Number cannot be greater than 100");
+      return 100;
+    }
+    setNumberError(false);
+    setNumber(number);
+    return number;
+  }
 
   const buttonChildren = (
     <Box as="span" flex="1" textAlign="left">
       Panel Title
     </Box>
   );
-
-  // event handler to increment the value of the slider
-  function handleIncrement() {
-    console.log("increment");
-    setNumber((prev) => {
-      if (prev < 100) {
-        return prev + 1;
-      }
-      return prev;
-    });
-  }
-
-  // event handler to decrement the value of the slider
-  function handleDecrement() {
-    console.log("decrement");
-    setNumber((prev) => {
-      if (prev > 0) {
-        return prev - 1;
-      }
-      return prev;
-    });
-  }
 
   const panelChildren = (
     <>
@@ -65,16 +60,27 @@ export default function Home() {
         <Slider number={number} setNumber={setNumber} />
 
         {/* number input */}
-        <NumberInput width="20" min={0} max={100} value={number}>
+        <NumberInput
+          width="20"
+          min={0}
+          max={100}
+          value={number}
+          onChange={handleChange}>
           <NumberInputField />
           <NumberInputStepper>
             {/* increment and decrement for the slider and number state */}
-            <NumberIncrementStepper onClick={handleIncrement} />
-            <NumberDecrementStepper onClick={handleDecrement} />
+            <NumberIncrementStepper />
+            <NumberDecrementStepper />
           </NumberInputStepper>
         </NumberInput>
       </div>
-      {/* container for toggle and text box */}
+      {/* error message if the number is higher or lower than the range */}
+      {numberError && (
+        <Text color="red" fontSize="sm" marginTop="-30px">
+          {numberError}
+        </Text>
+      )}
+      {/* container for toggle and text box  */}
       <FormControl
         display="flex"
         alignItems="center"

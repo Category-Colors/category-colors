@@ -6,7 +6,7 @@ import {
 } from "@chakra-ui/react";
 
 export default function Slider({ number, setNumber }) {
-  // event handler that to trigger number state change
+  // event handler that to trigger number state  change
   const handleChange = (value) => {
     setNumber((prev) => {
       if (value < 0) {
@@ -22,11 +22,12 @@ export default function Slider({ number, setNumber }) {
   return (
     <SliderChakraUI
       aria-label="slider-ex-1"
+      flex="1"
+      focusThumbOnChange={false}
       onChange={handleChange}
       defaultValue={0}
       value={number}
-      sx={{ width: "250px" }}
-    >
+      sx={{ width: "210px" }}>
       <SliderTrack>
         <SliderFilledTrack />
       </SliderTrack>
