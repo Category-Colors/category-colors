@@ -17,6 +17,7 @@ import {
 
 import Accordion from "../components/accordion";
 import Slider from "../components/slider";
+import LandingPage from "../components/LandingPage";
 
 export default function Home() {
   // state for the number input and slider
@@ -108,6 +109,7 @@ export default function Home() {
           boxShadow: "0 0 0 2px gray",
         }}
       />
+      <LandingPage />
     </>
   );
 
