@@ -54,6 +54,7 @@ export default function Home() {
         style={{
           display: "flex",
           justifyContent: "space-between",
+
           marginBottom: "30px",
         }}
       >
@@ -109,7 +110,6 @@ export default function Home() {
           boxShadow: "0 0 0 2px gray",
         }}
       />
-      <LandingPage />
     </>
   );
 
@@ -124,11 +124,12 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className={`${styles.main}`}>
-        <Accordion
+      <main>
+        {/* <Accordion
           buttonChildren={buttonChildren}
           panelChildren={panelChildren}
-        />
+        /> */}
+        <LandingPage />
       </main>
     </>
   );
