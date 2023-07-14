@@ -1,6 +1,7 @@
 import React from "react";
 import { Grid } from "@chakra-ui/react";
 import Navigation from "./Navigation";
+import LeftUpperCard from "./LeftUpperCard";
 
 function LandingPage() {
   return (
@@ -18,6 +19,8 @@ function LandingPage() {
       h={"100vh"}>
       {/* Navigation */}
       <Navigation />
+      {/* Left Upper Card */}
+      <LeftUpperCard />
     </Grid>
   );
 }
