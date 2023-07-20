@@ -4,6 +4,7 @@ import Navigation from "./Navigation";
 import LeftUpperCard from "./LeftUpperCard";
 import LeftBottomCard from "./LeftBottomCard";
 
+
 function LandingPage() {
   return (
     <Grid
