@@ -5,20 +5,7 @@ import {
   SliderThumb,
 } from "@chakra-ui/react";
 
-export default function Slider({ number, setNumber }) {
-  // event handler that to trigger number state  change
-  const handleChange = (value) => {
-    setNumber((prev) => {
-      if (value < 0) {
-        return 0;
-      }
-      if (value > 100) {
-        return 100;
-      }
-      return value;
-    });
-  };
-
+export default function Slider({ value, handleChange }) {
   return (
     <SliderChakraUI
       aria-label="slider-ex-1"
@@ -26,8 +13,10 @@ export default function Slider({ number, setNumber }) {
       focusThumbOnChange={false}
       onChange={handleChange}
       defaultValue={0}
-      value={number}
-      sx={{ width: "210px" }}>
+      min={0}
+      max={100}
+      value={value}
+    >
       <SliderTrack>
         <SliderFilledTrack />
       </SliderTrack>
