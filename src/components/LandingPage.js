@@ -16,9 +16,9 @@ function LandingPage() {
       gridTemplateRows={"4.1% 2fr 50% 0px"}
       gridTemplateColumns={"27% 1fr"}
       color="blackAlpha.700"
-      fontWeight="bold"
       w={"100wh"}
-      h={"100vh"}>
+      h={"100vh"}
+    >
       <Navigation />
 
       <LeftUpperCard />
