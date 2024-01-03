@@ -22,7 +22,7 @@ function LeftBottomCard() {
   });
 
   return (
-    <Box gridArea="leftBottomCard" p={4} mb={5}>
+    <Box p={4} mb={5}>
       <Heading as="h2" size="md" mb={5}>
         Algorithm Parameters
       </Heading>
