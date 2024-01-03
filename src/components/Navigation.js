@@ -18,7 +18,8 @@ function Navigation() {
         mw={"100wv"}
         p={2}
         fontSize={"1rem"}
-        borderBottom="1px solid gray">
+        borderBottom="1px solid gray"
+      >
         <Box>
           <Heading size="sm">Category Colors</Heading>
         </Box>

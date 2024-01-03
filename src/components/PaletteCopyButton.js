@@ -13,7 +13,7 @@ async function copyToClipboard() {
 
     setTimeout(() => {
       document.querySelector(".tooltipText").style.display = "none";
-    }, 3000);
+    }, 30000);
   } catch (err) {
     console.error("Failed to copy: ", err);
   }
