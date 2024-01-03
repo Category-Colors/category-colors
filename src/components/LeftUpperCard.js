@@ -24,7 +24,7 @@ function LeftUpperCard() {
   });
 
   return (
-    <Box gridArea="leftUpperCard" borderBottom={"1px solid gray"} p={4}>
+    <Box borderBottom={"1px solid gray"} p={4}>
       <Heading as="h2" size="md" mb={5}>
         Palette Parameters
       </Heading>

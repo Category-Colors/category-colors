@@ -6,7 +6,7 @@ import PaletteHeader from "./PaletteHeader";
 
 function PaletteMainCard() {
   return (
-    <Box gridArea="main" borderLeft={"1px solid gray"} p={4}>
+    <Box gridArea="main" h={"100%"} p={4} overflow={"scroll"}>
       <Flex>
         {/* Palette Header with date and id # */}
         <PaletteHeader />
