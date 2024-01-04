@@ -13,7 +13,7 @@ async function copyToClipboard() {
       document.querySelector(".tooltipText").style.display = "none";
     }, 30000);
   } catch (err) {
-    console.error("Failed to copy: ", err);
+    throw new Error("Failed to copy: ", err);
   }
 }
 
@@ -23,6 +23,7 @@ function PaletteCopyButton() {
       <Button
         onClick={copyToClipboard}
         size="sm"
+        mt={4}
         variant="outline"
         colorScheme="gray"
         leftIcon={<CopyIcon />}
@@ -36,7 +37,7 @@ function PaletteCopyButton() {
           color: "red",
           position: "absolute",
           right: "1%",
-          top: "12%",
+          top: "18%",
         }}
       >
         Hex Values Copied!

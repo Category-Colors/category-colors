@@ -1,10 +1,8 @@
 import React from "react";
 import { Grid } from "@chakra-ui/react";
-import Navigation from "./Navigation";
-import LeftUpperCard from "./LeftUpperCard";
-import LeftBottomCard from "./LeftBottomCard";
-import PaletteMainCard from "./PaletteMainCard";
-import SidebarContainer from "./SidebarContainer";
+import Navigation from "./sections/navigation/Navigation";
+import PaletteMainCard from "./sections/main/PaletteMainCard";
+import SidebarContainer from "./sections/sidebar/SidebarContainer";
 
 function LandingPage() {
   return (
