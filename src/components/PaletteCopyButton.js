@@ -7,8 +7,6 @@ async function copyToClipboard() {
 
   try {
     await navigator.clipboard.writeText(headerHexText);
-    console.log("Copied Hex text, test");
-
     document.querySelector(".tooltipText").style.display = "block";
 
     setTimeout(() => {
