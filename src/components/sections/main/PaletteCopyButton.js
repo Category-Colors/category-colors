@@ -1,47 +1,32 @@
 import React from "react";
-import { Button } from "@chakra-ui/react";
+import { Button, useClipboard } from "@chakra-ui/react";
 import { CopyIcon } from "@chakra-ui/icons";
+import chipColorsData from "../../../utils/chipColorsDummyData";
 
-async function copyToClipboard() {
-  const headerHexText = document.querySelector(".headerHexText").textContent;
+function PaletteCopyButton({ id }) {
+  const [hexValues, setHexValues] = React.useState("");
+  const { hasCopied, onCopy } = useClipboard(hexValues);
 
-  try {
-    await navigator.clipboard.writeText(headerHexText);
-    document.querySelector(".tooltipText").style.display = "block";
+  React.useEffect(() => {
+    const newPalette = chipColorsData.find((item) => item.id === id);
 
-    setTimeout(() => {
-      document.querySelector(".tooltipText").style.display = "none";
-    }, 30000);
-  } catch (err) {
-    throw new Error("Failed to copy: ", err);
-  }
-}
+    if (newPalette) {
+      setHexValues(newPalette.color.join(", "));
+    }
+  }, [id]);
 
-function PaletteCopyButton() {
   return (
     <>
       <Button
-        onClick={copyToClipboard}
+        onClick={onCopy}
         size="sm"
         mt={4}
         variant="outline"
         colorScheme="gray"
         leftIcon={<CopyIcon />}
       >
-        Copy hex values
+        {hasCopied ? `copied palette #${id}` : "Copy hex values"}
       </Button>
-      <span
-        className="tooltipText"
-        style={{
-          display: "none",
-          color: "red",
-          position: "absolute",
-          right: "1%",
-          top: "18%",
-        }}
-      >
-        Hex Values Copied!
-      </span>
     </>
   );
 }

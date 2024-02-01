@@ -1,8 +1,16 @@
 import React from "react";
 import { Box, IconButton, Text } from "@chakra-ui/react";
-import chipColors from "../../../utils/chipColorsDummyData";
+import chipColorsData from "../../../utils/chipColorsDummyData";
 
-function PaletteColors() {
+function PaletteColors({ id }) {
+  const [palette, setPalette] = React.useState(null);
+
+  React.useEffect(() => {
+    setPalette(chipColorsData.find((item) => item.id === id));
+  }, [id]);
+
+  if (!palette) return null;
+
   return (
     <Box
       flex="5"
@@ -11,13 +19,13 @@ function PaletteColors() {
       alignItems={"center"}
       color={"#000000"}
     >
-      {chipColors.map((item) => {
+      {palette.color.map((item) => {
         return (
           <IconButton
-            key={item.id}
+            key={item}
             isRound={true}
             variant="solid"
-            background={item.color}
+            background={item}
             aria-label="Done"
             fontSize="20px"
             marginLeft="8px"
@@ -30,12 +38,10 @@ function PaletteColors() {
         sx={{ lineHeight: "21px" }}
         color="gray"
         display="none"
-        className="headerHexText"
       >
-        {chipColors.map((item) => item.color).join(", ")}
+        {palette.color.join(", ")}
       </Text>
     </Box>
   );
 }
-
 export default PaletteColors;
