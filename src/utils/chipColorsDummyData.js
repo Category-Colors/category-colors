@@ -1,12 +1,45 @@
 const chipColors = [
-  { id: 1, color: "#054849" },
-  { id: 2, color: "#8ef08a" },
-  { id: 3, color: "#0081ec" },
-  { id: 4, color: "#f9c2f5" },
-  { id: 5, color: "#0ae2ff" },
-  { id: 6, color: "#f5be01" },
-  { id: 7, color: "#ff6c37" },
-  { id: 8, color: "#744012" },
+  {
+    id: 1,
+    color: [
+      "#054849",
+      "#8ef08a",
+      "#0081ec",
+      "#f9c2f5",
+      "#0ae2ff",
+      "#f5be01",
+      "#ff6c37",
+      "#744012",
+    ],
+  },
+
+  {
+    id: 2,
+    color: [
+      "#f5be01",
+      "#ff6c37",
+      "#744012",
+      "#054849",
+      "#8ef08a",
+      "#0081ec",
+      "#f9c2f5",
+      "#0ae2ff",
+    ],
+  },
+
+  {
+    id: 3,
+    color: [
+      "#0081ec",
+      "#f9c2f5",
+      "#0ae2ff",
+      "#f5be01",
+      "#ff6c37",
+      "#744012",
+      "#054849",
+      "#8ef08a",
+    ],
+  },
 ];
 
 export default chipColors;
