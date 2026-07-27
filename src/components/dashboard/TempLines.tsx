@@ -15,8 +15,10 @@ export function TempLines({
   colors: string[]
 }) {
   const all = cities.flatMap((c) => c.hourlyTemp)
-  const lo = Math.floor(Math.min(...all) / 5) * 5
-  const hi = Math.ceil(Math.max(...all) / 5) * 5
+  const rawLo = Math.floor(Math.min(...all) / 5) * 5
+  const rawHi = Math.ceil(Math.max(...all) / 5) * 5
+  const lo = rawLo === rawHi ? rawLo - 5 : rawLo
+  const hi = rawLo === rawHi ? rawHi + 5 : rawHi
   const step = hi - lo > 25 ? 10 : 5
   const plotW = WIDTH - PAD.left - PAD.right
   const plotH = HEIGHT - PAD.top - PAD.bottom

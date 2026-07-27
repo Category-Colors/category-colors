@@ -1,4 +1,6 @@
 import { createContext, use } from 'react'
+import { converter } from 'culori'
+import { parseCssColor, valueToCss } from './color'
 
 // The whole UI is drawn from three neutrals plus one accent. Text, borders,
 // hover states and raised surfaces are all `ink` at some alpha over `bg`,
@@ -62,6 +64,7 @@ export interface ThemeState {
 }
 
 const DEFAULT_PRESET = THEME_PRESETS[0]
+const toRgb = converter('rgb')
 
 export const neutralsOf = ({ bg, panel, ink }: ThemeTokens): ThemeNeutrals => ({ bg, panel, ink })
 
@@ -75,10 +78,11 @@ export const DEFAULT_THEME: ThemeState = {
 
 /** Rough relative luminance of a background, for picking a polarity. */
 export function polarityOf(bg: string): ThemeMode {
-  const hex = bg.replace('#', '')
-  if (hex.length < 6) return 'dark'
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-  return 0.299 * r + 0.587 * g + 0.114 * b > 0.5 ? 'light' : 'dark'
+  const color = toRgb(bg)
+  if (!color) return 'dark'
+  return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b > 0.5
+    ? 'light'
+    : 'dark'
 }
 
 export function resolveTokens(state: ThemeState): ThemeTokens {
@@ -127,9 +131,20 @@ export function loadTheme(): ThemeState {
 
     const known = parsed.preset === CUSTOM || THEME_PRESETS.some((p) => p.id === parsed.preset)
     const custom = parsed.custom
+    const parsedNeutrals = custom
+      ? (['bg', 'panel', 'ink'] as const).map((key) => {
+          const value = custom[key]
+          const color = typeof value === 'string' ? parseCssColor(value) : null
+          return color ? valueToCss(color) : null
+        })
+      : []
     const neutrals =
-      custom && (['bg', 'panel', 'ink'] as const).every((k) => typeof custom[k] === 'string')
-        ? neutralsOf(custom as ThemeTokens)
+      parsedNeutrals.length === 3 && parsedNeutrals.every((value) => value !== null)
+        ? {
+            bg: parsedNeutrals[0],
+            panel: parsedNeutrals[1],
+            ink: parsedNeutrals[2],
+          }
         : DEFAULT_THEME.custom
 
     return {

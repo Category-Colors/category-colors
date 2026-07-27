@@ -27,7 +27,7 @@ export function ColorRow({
   value: ColorValue
   onValueChange?: (value: ColorValue) => void
   onRemove?: () => void
-  onCopy?: () => void
+  onCopy?: () => boolean | Promise<boolean>
   fixedColor?: boolean
   onFixedColorChange?: (fixed: boolean) => void
   fixedOrder?: boolean
@@ -114,8 +114,9 @@ export function ColorRow({
             className="color-row-icon"
             data-active={String(copied)}
             aria-label="Copy value"
-            onClick={() => {
-              onCopy()
+            onClick={async () => {
+              const success = await onCopy()
+              if (!success) return
               setCopied(true)
               if (copiedTimer.current) clearTimeout(copiedTimer.current)
               copiedTimer.current = setTimeout(() => setCopied(false), 1000)

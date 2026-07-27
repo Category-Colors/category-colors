@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fetchWeather, type WeatherData } from '@/lib/weather'
 import {
   Card,
@@ -19,10 +19,25 @@ export function Dashboard({ colors }: { colors: string[] }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
     fetchWeather()
-      .then(setData)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .then((next) => {
+        if (active) setData(next)
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      active = false
+    }
   }, [])
+
+  // Preserve the city-array identity while colors change but their count does
+  // not, so chart path memoization survives live palette edits.
+  const cities = useMemo(
+    () => data?.cities.slice(0, colors.length) ?? [],
+    [data, colors.length]
+  )
 
   if (colors.length === 0) {
     return (
@@ -41,8 +56,6 @@ export function Dashboard({ colors }: { colors: string[] }) {
   if (!data) {
     return <p className="pt-6 tabular-nums text-[12px] text-ink/50">Fetching live conditions…</p>
   }
-
-  const cities = data.cities.slice(0, colors.length)
 
   return (
     <div className="flex flex-col gap-5">

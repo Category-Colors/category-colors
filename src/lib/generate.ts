@@ -15,50 +15,61 @@ type WorkerReply =
   | { ok: true; requestId: number; result: GenerateResult }
   | { ok: false; requestId: number; error: string }
 
-// One persistent worker. It processes messages serially, so overlapping
-// requests queue rather than run in parallel — the request id is what keeps
-// each caller's listener from resolving on someone else's reply.
+interface PendingRequest {
+  resolve: (result: GenerateResult) => void
+  reject: (error: Error) => void
+}
+
+// One persistent worker and one listener set. It processes messages serially,
+// while the request map routes replies and lets a worker-level failure reject
+// every queued caller instead of leaving later promises pending forever.
 let worker: Worker | null = null
 let nextRequestId = 1
+const pending = new Map<number, PendingRequest>()
+
+const retireWorker = (error: Error) => {
+  worker?.terminate()
+  worker = null
+  for (const request of pending.values()) request.reject(error)
+  pending.clear()
+}
 
 const getWorker = () => {
-  worker ??= new Worker(new URL('./generate-worker.ts', import.meta.url), { type: 'module' })
-  return worker
+  if (worker) return worker
+
+  const next = new Worker(new URL('./generate-worker.ts', import.meta.url), { type: 'module' })
+  next.addEventListener('message', (event: MessageEvent<WorkerReply>) => {
+    const request = pending.get(event.data.requestId)
+    if (!request) return
+    pending.delete(event.data.requestId)
+    if (event.data.ok) {
+      request.resolve(event.data.result)
+    } else {
+      // The worker caught an input/algorithm error and is still healthy. Reject
+      // only this request so any already-queued runs can finish normally.
+      request.reject(new Error(event.data.error))
+    }
+  })
+  next.addEventListener('error', (event) => {
+    event.preventDefault()
+    retireWorker(event.error instanceof Error ? event.error : new Error(event.message))
+  })
+  next.addEventListener('messageerror', () => {
+    retireWorker(new Error('The generation worker returned an unreadable response.'))
+  })
+  worker = next
+  return next
 }
 
 export function generatePaletteAsync(params: PaletteParams): Promise<GenerateResult> {
   return new Promise((resolve, reject) => {
-    const w = getWorker()
     const requestId = nextRequestId++
-    const cleanup = () => {
-      w.removeEventListener('message', onMessage)
-      w.removeEventListener('error', onError)
+    pending.set(requestId, { resolve, reject })
+    try {
+      getWorker().postMessage({ ...params, requestId } satisfies GenerateRequest)
+    } catch (error) {
+      pending.delete(requestId)
+      reject(error instanceof Error ? error : new Error(String(error)))
     }
-    // After any failure, retire the worker: a fresh one re-imports current
-    // modules on the next run (recovers from e.g. a stale dev-server bundle)
-    const retire = () => {
-      worker?.terminate()
-      worker = null
-    }
-    const onMessage = (e: MessageEvent<WorkerReply>) => {
-      if (e.data.requestId !== requestId) return
-      cleanup()
-      if (e.data.ok) {
-        resolve(e.data.result)
-      } else {
-        retire()
-        reject(new Error(e.data.error))
-      }
-    }
-    // An error event carries no request id — the worker is dead either way,
-    // so every in-flight caller is right to reject on it.
-    const onError = (e: ErrorEvent) => {
-      cleanup()
-      retire()
-      reject(e.error instanceof Error ? e.error : new Error(e.message))
-    }
-    w.addEventListener('message', onMessage)
-    w.addEventListener('error', onError)
-    w.postMessage({ ...params, requestId } satisfies GenerateRequest)
   })
 }

@@ -50,7 +50,9 @@ export function Slider({
   const wrapperRectRef = useRef<DOMRect | null>(null);
   const scaleRef = useRef(1);
 
-  const percentage = ((value - min) / (max - min)) * 100;
+  const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const percentageRef = useRef(percentage);
+  percentageRef.current = percentage;
   const isActive = isInteracting || isHovered;
 
   // Motion values for imperative animation
@@ -77,6 +79,13 @@ export function Slider({
       fillPercent.jump(percentage);
     }
   }, [percentage, isInteracting, fillPercent]);
+
+  useEffect(
+    () => () => {
+      animRef.current?.stop();
+    },
+    []
+  );
 
   const positionToValue = useCallback(
     (clientX: number) => {
@@ -117,7 +126,7 @@ export function Slider({
     (e: React.PointerEvent) => {
       if (showInput) return;
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
       pointerDownPos.current = { x: e.clientX, y: e.clientY };
       isClickRef.current = true;
       setIsInteracting(true);
@@ -193,16 +202,20 @@ export function Slider({
           ? Math.max(min, Math.min(max, min + Math.round((rawValue - min) / step) * step))
           : snapToDecile(rawValue, min, max);
 
-        const newPct = percentFromValue(snappedValue);
+        const finalValue = roundValue(snappedValue, step);
+        const newPct = percentFromValue(finalValue);
 
         if (animRef.current) {
           animRef.current.stop();
         }
         animRef.current = animate(fillPercent, newPct, {
           ...SPRING.snap,
-          onComplete: () => { animRef.current = null; },
+          onComplete: () => {
+            animRef.current = null;
+            fillPercent.jump(percentageRef.current);
+          },
         });
-        onChange(roundValue(snappedValue, step));
+        onChange(finalValue);
       }
 
       // Spring rubber band back
@@ -227,6 +240,15 @@ export function Slider({
     ]
   );
 
+  const handlePointerCancel = useCallback(() => {
+    animRef.current?.stop();
+    animRef.current = null;
+    rubberStretchPx.jump(0);
+    setIsInteracting(false);
+    setIsDragging(false);
+    pointerDownPos.current = null;
+  }, [rubberStretchPx]);
+
   // Focus input when it appears
   useEffect(() => {
     if (showInput && inputRef.current) {
@@ -240,8 +262,8 @@ export function Slider({
   };
 
   const handleInputSubmit = () => {
-    const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
+    const parsed = Number(inputValue);
+    if (Number.isFinite(parsed)) {
       const clamped = Math.max(min, Math.min(max, parsed));
       onChange(roundValue(clamped, step));
     }
@@ -271,6 +293,39 @@ export function Slider({
   };
 
   const displayValue = value.toFixed(decimalsForStep(step));
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    let next: number | null = null;
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        next = value - step;
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        next = value + step;
+        break;
+      case 'PageDown':
+        next = value - step * 10;
+        break;
+      case 'PageUp':
+        next = value + step * 10;
+        break;
+      case 'Home':
+        next = min;
+        break;
+      case 'End':
+        next = max;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    const clamped = roundValue(Math.max(min, Math.min(max, next)), step);
+    fillPercent.jump(percentFromValue(clamped));
+    onChange(clamped);
+  };
 
   // Handle opacity: not active → 0, active → 0.5, dragging → 0.9
   // Value dodge: fade when handle overlaps label (left) or value (right)
@@ -330,8 +385,16 @@ export function Slider({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onKeyDown={handleKeyDown}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        role="slider"
+        tabIndex={0}
+        aria-label={label}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
         style={{ width: rubberBandWidth, x: rubberBandX }}
       >
         <div className="dialkit-slider-hashmarks">{hashMarks}</div>

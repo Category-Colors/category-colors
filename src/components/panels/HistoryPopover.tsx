@@ -224,14 +224,19 @@ export function HistoryPopover({ ref }: { ref: Ref<HistoryPopoverHandle> }) {
 
   // stranded fixed-position popover on scroll: drop it immediately
   useEffect(() => {
+    const popoverState = state.current
     const onScroll = () => {
-      const s = state.current
-      window.clearTimeout(s.hideTimer)
-      window.clearTimeout(s.moveTimer)
+      window.clearTimeout(popoverState.hideTimer)
+      window.clearTimeout(popoverState.moveTimer)
       hideNow()
     }
     window.addEventListener('scroll', onScroll, { passive: true, capture: true })
-    return () => window.removeEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.clearTimeout(popoverState.hideTimer)
+      window.clearTimeout(popoverState.moveTimer)
+      popoverState.anchorEl?.removeAttribute('data-active')
+    }
   }, [])
 
   return createPortal(

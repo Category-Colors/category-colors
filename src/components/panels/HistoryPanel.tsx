@@ -37,6 +37,7 @@ interface PaletteItem {
 }
 
 let nextItemId = 1
+const MAX_PALETTE_BYTES = 5_000_000
 
 const COLOR_FORMATS: { value: Space; label: string }[] = [
   { value: 'hex', label: 'Hex' },
@@ -170,6 +171,10 @@ export function HistoryPanel({
   const fileRef = useRef<HTMLInputElement>(null)
   const importPalette = (file: File | undefined) => {
     if (!file) return
+    if (file.size > MAX_PALETTE_BYTES) {
+      alert('That palette file is too large.')
+      return
+    }
     file.text().then(
       (text) => {
         const colors = parsePalette(text)
@@ -199,9 +204,10 @@ export function HistoryPanel({
   // version colors are css strings that already carry each color's format
   const formatted = current?.colors ?? []
 
-  const copy = () => {
+  const copy = async () => {
     if (!current) return
-    copyText(formatPalette(formatted, format))
+    const success = await copyText(formatPalette(formatted, format))
+    if (!success) return
     setCopied(true)
     if (copyTimer.current) clearTimeout(copyTimer.current)
     copyTimer.current = setTimeout(() => setCopied(false), 1000)

@@ -1,3 +1,4 @@
+/* eslint-disable react/only-export-components -- this is the Vite entry point, not a refresh boundary */
 import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@/components/dialkit/theme.css'
@@ -13,8 +14,10 @@ const DesignSystemPage = lazy(() =>
 
 const story = new URLSearchParams(location.search).get('story')
 const designSystem = location.pathname === '/design-system'
+const root = document.getElementById('root')
+if (!root) throw new Error('Missing #root application mount point')
 
-createRoot(document.getElementById('root')!).render(
+createRoot(root).render(
   <StrictMode>
     {story !== null ? (
       <Suspense fallback={null}>

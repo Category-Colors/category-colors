@@ -47,6 +47,8 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
         onClick={() => setIsOpen(!isOpen)}
         data-open={String(isOpen && !disabled)}
         disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen && !disabled}
       >
         <span className="dialkit-select-label">{label}</span>
         <div className="dialkit-select-right">
@@ -73,6 +75,8 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
             <motion.div
               ref={warmRef}
               className="dialkit-select-dropdown"
+              role="listbox"
+              aria-label={label}
               initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
@@ -90,6 +94,8 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
                   key={option.value}
                   className="dialkit-select-option"
                   data-selected={String(option.value === value)}
+                  role="option"
+                  aria-selected={option.value === value}
                   onClick={() => {
                     onChange(option.value);
                     setIsOpen(false);

@@ -68,9 +68,10 @@ export function ScrollOverlay({
     }
     const onUp = (e: PointerEvent) => {
       thumb.removeAttribute('data-dragging')
-      thumb.releasePointerCapture(e.pointerId)
+      if (thumb.hasPointerCapture(e.pointerId)) thumb.releasePointerCapture(e.pointerId)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
     const onDown = (e: PointerEvent) => {
       e.preventDefault()
@@ -80,6 +81,7 @@ export function ScrollOverlay({
       thumb.setPointerCapture(e.pointerId)
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
     }
     thumb.addEventListener('pointerdown', onDown)
 
@@ -87,8 +89,10 @@ export function ScrollOverlay({
       el.removeEventListener('scroll', sync)
       ro.disconnect()
       thumb.removeEventListener('pointerdown', onDown)
+      thumb.removeAttribute('data-dragging')
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
   }, [scrollerRef, watch])
 

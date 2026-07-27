@@ -121,7 +121,7 @@ export function ColorPicker({
       if (m) applyValue(hexValue(`#${m[1].toUpperCase()}`))
     } else {
       const def = CHANNELS[value.space].find((d) => d.key === draft.key)
-      const n = parseFloat(draft.text)
+      const n = Number(draft.text)
       if (def && Number.isFinite(n)) {
         const p = 10 ** def.decimals
         const clamped = Math.round(Math.max(def.min, Math.min(def.max, n)) * p) / p

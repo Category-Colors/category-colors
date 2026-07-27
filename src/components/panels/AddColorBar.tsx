@@ -13,6 +13,8 @@ interface Extracted {
   selected: string[]
 }
 
+const MAX_IMAGE_BYTES = 25_000_000
+
 // Add-row for color lists: plain add, add-from-image (popover with a drop
 // zone that extracts a palette from a picture), and a presets menu that
 // swaps the whole list. `ghost` renders the same three actions as small
@@ -61,15 +63,24 @@ export function AddColorBar({
   // Every preview url is revoked exactly once — when it's replaced, cleared,
   // or the bar unmounts — so a session of retries can't strand blobs.
   const previewUrl = useRef<string | null>(null)
+  const extractionId = useRef(0)
   const setPreview = useCallback((url: string | null) => {
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current)
     previewUrl.current = url
   }, [])
-  useEffect(() => () => setPreview(null), [setPreview])
+  useEffect(
+    () => () => {
+      extractionId.current += 1
+      setPreview(null)
+    },
+    [setPreview]
+  )
 
   const clearExtracted = useCallback(() => {
+    extractionId.current += 1
     setPreview(null)
     setExtracted(null)
+    setBusy(false)
     setFailed(false)
   }, [setPreview])
 
@@ -105,10 +116,19 @@ export function AddColorBar({
   // doing nothing.
   const openImage = async (file: File | undefined) => {
     if (!file) return
+    if (file.size > MAX_IMAGE_BYTES) {
+      clearExtracted()
+      setFailed(true)
+      return
+    }
+    const requestId = ++extractionId.current
+    setPreview(null)
+    setExtracted(null)
     setBusy(true)
     setFailed(false)
     try {
       const colors = await extractColors(file, 8)
+      if (requestId !== extractionId.current) return
       if (colors.length) {
         const url = URL.createObjectURL(file)
         setPreview(url)
@@ -117,9 +137,9 @@ export function AddColorBar({
         setFailed(true)
       }
     } catch {
-      setFailed(true)
+      if (requestId === extractionId.current) setFailed(true)
     } finally {
-      setBusy(false)
+      if (requestId === extractionId.current) setBusy(false)
     }
   }
 

@@ -25,11 +25,17 @@ export default function App() {
   const [rightMinimized, setRightMinimized] = useState(false)
   const nextId = useRef(2)
   const paramsRef = useRef(params)
+  const generating = useRef(false)
   paramsRef.current = params
 
   const generate = () => {
+    // State updates are asynchronous, so two clicks in the same frame can both
+    // observe busy=false. The ref closes that small window and keeps the UI's
+    // single-run contract honest.
+    if (generating.current) return
+    generating.current = true
     setBusy(true)
-    const snapshot = paramsRef.current
+    const snapshot = structuredClone(paramsRef.current)
     // annealing runs in a web worker, so the UI stays live throughout
     generatePaletteAsync(snapshot)
       .then((result) => {
@@ -46,7 +52,10 @@ export default function App() {
         console.error('Palette generation failed:', err)
         alert('Palette generation failed — see the console for details.')
       })
-      .finally(() => setBusy(false))
+      .finally(() => {
+        generating.current = false
+        setBusy(false)
+      })
   }
 
   const current = versions.find((v) => v.id === currentId) ?? null
@@ -85,7 +94,7 @@ export default function App() {
   const addPalette = (colors: string[]) => {
     const version: PaletteVersion = {
       id: nextId.current++,
-      params: paramsRef.current,
+      params: structuredClone(paramsRef.current),
       colors,
       cost: 0,
       iterations: 0,

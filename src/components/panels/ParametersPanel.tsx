@@ -31,6 +31,7 @@ type SectionKey = (typeof SECTIONS)[number]
 // While the worker anneals, the button cycles through the stages of the
 // craft every 5s so long runs feel alive
 const BUSY_VERBS = ['Annealing…', 'Heating…', 'Cooling…', 'Tempering…', 'Quenching…', 'Polishing…']
+const MAX_CONFIG_BYTES = 1_000_000
 
 const replaceAt = <T,>(list: T[], index: number, item: T) =>
   list.map((entry, i) => (i === index ? item : entry))
@@ -101,6 +102,10 @@ export function ParametersPanel({
 
   const importConfig = (file: File | undefined) => {
     if (!file) return
+    if (file.size > MAX_CONFIG_BYTES) {
+      alert('That configuration file is too large.')
+      return
+    }
     file.text().then(
       (text) => {
         const parsed = parseParams(text)

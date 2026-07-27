@@ -61,13 +61,21 @@ export function TooltipLayer() {
       }
     }
 
+    const onOut = (e: PointerEvent) => {
+      if (!e.relatedTarget) hide()
+    }
+
     document.addEventListener('pointerover', onOver, true)
+    document.addEventListener('pointerout', onOut, true)
     document.addEventListener('pointerdown', hide, true)
+    window.addEventListener('blur', hide)
     window.addEventListener('scroll', hide, { passive: true, capture: true })
     return () => {
       window.clearTimeout(state.timer)
       document.removeEventListener('pointerover', onOver, true)
+      document.removeEventListener('pointerout', onOut, true)
       document.removeEventListener('pointerdown', hide, true)
+      window.removeEventListener('blur', hide)
       window.removeEventListener('scroll', hide, true)
     }
   }, [])

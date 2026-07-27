@@ -19,6 +19,10 @@ const MIN_DELTA_E = 0.08
 // weighted by popularity, subject to a minimum pairwise ΔE. Returns fewer
 // than `count` when the image doesn't contain that many distinct colors.
 export async function extractColors(file: File, count = 8): Promise<string[]> {
+  const limit = Number.isFinite(count)
+    ? Math.max(0, Math.min(256, Math.floor(count)))
+    : 0
+  if (limit === 0) return []
   const bitmap = await createImageBitmap(file)
   let data: Uint8ClampedArray
   try {
@@ -74,7 +78,7 @@ export async function extractColors(file: File, count = 8): Promise<string[]> {
 
   // Most popular color first, then greedy maximin with the ΔE floor
   const picked = [candidates[0]]
-  while (picked.length < count) {
+  while (picked.length < limit) {
     let best: (typeof candidates)[number] | null = null
     let bestScore = 0
     for (const cand of candidates) {

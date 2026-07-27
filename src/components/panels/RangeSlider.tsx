@@ -56,7 +56,8 @@ export function RangeSlider({
   const valueAt = (clientX: number) => {
     const rect = trackRef.current!.getBoundingClientRect()
     const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    return Math.round((min + p * (max - min)) / step) * step
+    const raw = min + p * (max - min)
+    return min + Math.round((raw - min) / step) * step
   }
 
   const apply = (raw: number) => {
@@ -87,7 +88,7 @@ export function RangeSlider({
 
   const commitInput = () => {
     if (editing !== null) {
-      const parsed = parseFloat(inputValue)
+      const parsed = Number(inputValue)
       if (Number.isFinite(parsed)) {
         const next = clampToBound(editing, parsed)
         if (next[0] !== value[0] || next[1] !== value[1]) onChange(next)
@@ -131,6 +132,8 @@ export function RangeSlider({
         onPointerCancel={endDrag}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        role="group"
+        aria-label={label}
       >
         <div className="dialkit-slider-hashmarks">
           {marks.map((p) => (
@@ -189,9 +192,14 @@ export function RangeSlider({
                   onClick={stop}
                 />
               ) : (
-                <span className="range-slider-num" onClick={() => startEdit(i)}>
+                <button
+                  type="button"
+                  className="range-slider-num"
+                  aria-label={`Edit ${i === 0 ? 'lower' : 'upper'} ${label.toLowerCase()} bound`}
+                  onClick={() => startEdit(i)}
+                >
                   {fmt(value[i])}
-                </span>
+                </button>
               )}
             </Fragment>
           ))}

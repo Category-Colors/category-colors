@@ -53,12 +53,13 @@ export function ColorControl({ label, value, onChange }: ColorControlProps) {
             autoFocus
           />
         ) : (
-          <span
+          <button
+            type="button"
             className="dialkit-color-hex"
             onClick={() => setIsEditing(true)}
           >
             {(value ?? '').toUpperCase()}
-          </span>
+          </button>
         )}
         <button
           className="dialkit-color-swatch"

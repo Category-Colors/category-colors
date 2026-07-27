@@ -260,12 +260,18 @@ function PairPopover({
   // a fixed popover left behind by scrolling would hover over the wrong
   // cells now that it's interactive — drop it immediately
   useEffect(() => {
+    const popoverState = state.current
     const onScroll = () => {
       cancelHide()
       hideNow()
     }
     window.addEventListener('scroll', onScroll, { passive: true, capture: true })
-    return () => window.removeEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.clearTimeout(popoverState.hideTimer)
+      window.clearTimeout(popoverState.moveTimer)
+      popoverState.anchorEl?.removeAttribute('data-active')
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

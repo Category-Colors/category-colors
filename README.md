@@ -1,32 +1,47 @@
-# React + TypeScript + Vite
+# Category Colors
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A browser-based categorical palette optimizer. It generates palettes with simulated annealing, evaluates pairwise distinguishability (including color-vision-deficiency simulations), and previews the result against live weather visualizations.
 
-Currently, two official plugins are available:
+## What it includes
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Configurable RGB, HSL, OKHSL, OKLCH, and OKLAB search spaces
+- Energy, range, JND, CVD, similarity, avoidance, contrast, and saliency evaluators
+- Fixed seed colors and optional order optimization
+- Editable palette history with raw, CSS, and DTCG JSON export
+- Palette extraction from images and a set of established starting palettes
+- Pairwise JND/WCAG reporting, loss history, and color-space visualization
+- Persistent light, dark, and custom themes
 
-## React Compiler
+The optimizer runs in a Web Worker so generation does not block the interface. The large reporting code is loaded only when the Report tab is opened.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the Oxlint configuration
+Requires Node.js `^20.19.0` or `>=22.12.0`. The sibling [`category-colors`](../category-colors) package must be present because this app links it through a local `file:` dependency.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Useful checks:
+
+```sh
+npm test
+npm run lint
+npm run build
+```
+
+The app also contains two development-only reference surfaces:
+
+- `/?story=` lists focused component stories.
+- `/design-system` shows the component and token reference.
+
+## Preset regeneration
+
+The initial palette and its recorded loss curve are checked in so the first load is instant. After changing optimizer defaults, regenerate them with:
+
+```sh
+node scripts/regen-preset.cjs
+```
+
+That script updates the values documented in `src/lib/palette.ts` and `src/lib/preset-history.ts`.

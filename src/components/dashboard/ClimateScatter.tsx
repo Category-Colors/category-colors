@@ -21,9 +21,12 @@ export function ClimateScatter({
 }) {
   const temps = cities.flatMap((c) => c.hourlyTemp)
   const hums = cities.flatMap((c) => c.hourlyHumidity)
-  const xLo = Math.floor(Math.min(...temps) / 5) * 5
-  const xHi = Math.ceil(Math.max(...temps) / 5) * 5
-  const yLo = Math.max(0, Math.floor(Math.min(...hums) / 10) * 10)
+  const rawXLo = Math.floor(Math.min(...temps) / 5) * 5
+  const rawXHi = Math.ceil(Math.max(...temps) / 5) * 5
+  const xLo = rawXLo === rawXHi ? rawXLo - 5 : rawXLo
+  const xHi = rawXLo === rawXHi ? rawXHi + 5 : rawXHi
+  const rawYLo = Math.max(0, Math.floor(Math.min(...hums) / 10) * 10)
+  const yLo = rawYLo >= 100 ? 90 : rawYLo
   const yHi = 100
   const xStep = xHi - xLo > 25 ? 10 : 5
 

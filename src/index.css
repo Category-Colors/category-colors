@@ -432,8 +432,13 @@ body {
 }
 
 .range-slider-num {
+  appearance: none;
   cursor: text;
+  border: 0;
   border-bottom: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   padding-bottom: 1px;
   transition: border-color var(--dial-anim-fast);
 }

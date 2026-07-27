@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react'
 import {
   getDialKitPortalRoot,
   getDropdownPosition,
@@ -103,14 +103,37 @@ export function useAnchoredPortal(
   const [pos, setPos] = useState<DropdownPosition | null>(null)
   const { dropdownHeight, gap, allowAbove, anchor } = options
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPortalTarget(getDialKitPortalRoot(triggerRef.current) ?? document.body)
   }, [triggerRef])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = anchor?.() ?? triggerRef.current
-    if (!open || !el || !portalTarget) return
-    setPos(getDropdownPosition(el, portalTarget, { dropdownHeight, gap, allowAbove }))
+    if (!open || !el || !portalTarget) {
+      setPos(null)
+      return
+    }
+
+    const measure = () => {
+      setPos(getDropdownPosition(el, portalTarget, { dropdownHeight, gap, allowAbove }))
+    }
+    measure()
+
+    // Panel content can scroll beneath an open portaled dropdown. Keep its
+    // anchor attached, and remeasure when the viewport changes. Collapse bursts
+    // of scroll events into one layout read per frame.
+    let frame = 0
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+    window.addEventListener('resize', scheduleMeasure)
+    window.addEventListener('scroll', scheduleMeasure, { passive: true, capture: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', scheduleMeasure)
+      window.removeEventListener('scroll', scheduleMeasure, true)
+    }
     // `anchor` is typically an inline closure; it's read only at open time
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, portalTarget, triggerRef, dropdownHeight, gap, allowAbove])

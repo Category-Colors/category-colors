@@ -7,10 +7,10 @@
     "dev": "vite --force",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node scripts/test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base-ui/react": "^1.6.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@tailwindcss/vite": "^4.3.2",
     "categorycolors": "file:../category-colors",

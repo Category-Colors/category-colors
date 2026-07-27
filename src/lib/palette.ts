@@ -1,4 +1,4 @@
-import { hexValue, type ColorValue } from '@/lib/color'
+import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
 import { isWorkingSpace, spaceChannels, spaceInitialRanges, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
 import { PRESET_COST_HISTORY } from './preset-history'
@@ -149,6 +149,31 @@ export const PRESET_PALETTE = {
   costHistory: PRESET_COST_HISTORY,
 }
 
+const IMPORT_LIMITS = {
+  textLength: 1_000_000,
+  initColors: 20,
+  targets: 100,
+  evaluators: 50,
+  avoidColors: 100,
+} as const
+
+const boundedNumber = (
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+) =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(min, Math.min(max, value))
+    : fallback
+
+const normalizedHex = (value: unknown, fallback: string) => {
+  const color = normalizeColorValue(
+    typeof value === 'string' ? { space: 'hex', hex: value } : null
+  )
+  return color?.space === 'hex' ? color.hex : fallback
+}
+
 // A space is only honored when its mode is known and it carries one range per
 // channel of that mode; each bound is clamped to the channel's own limits so a
 // hand-edited file can't put the annealer outside the space.
@@ -176,6 +201,7 @@ function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpa
 // Parse an exported configuration file. Entries get fresh ids so imports
 // can't collide with rows created afterwards; malformed entries are dropped.
 export function parseParams(text: string): PaletteParams | null {
+  if (text.length > IMPORT_LIMITS.textLength) return null
   try {
     const raw = JSON.parse(text) as Partial<PaletteParams> | null
     if (!raw || typeof raw !== 'object') return null
@@ -187,37 +213,50 @@ export function parseParams(text: string): PaletteParams | null {
       return null
     }
     const d = DEFAULT_PARAMS
-    const num = (v: unknown, fallback: number) =>
-      typeof v === 'number' && Number.isFinite(v) ? v : fallback
     // Evaluator fields reach the algorithm directly, so a hand-edited file
     // must not be able to seed it with strings, NaN, or nulls.
     const evaluatorOverrides = (e: Partial<EvaluatorSpec>): Partial<EvaluatorSpec> => ({
-      weight: num(e.weight, SPEC_DEFAULTS.weight),
+      weight: boundedNumber(e.weight, SPEC_DEFAULTS.weight, 0, 1),
       cvd: CVD_TYPES.includes(e.cvd as CvdType) ? (e.cvd as CvdType) : SPEC_DEFAULTS.cvd,
-      cvdSeverity: num(e.cvdSeverity, SPEC_DEFAULTS.cvdSeverity),
-      background:
-        typeof e.background === 'string' ? e.background : SPEC_DEFAULTS.background,
-      ratio: num(e.ratio, SPEC_DEFAULTS.ratio),
+      cvdSeverity: boundedNumber(e.cvdSeverity, SPEC_DEFAULTS.cvdSeverity, 0, 1),
+      background: normalizedHex(e.background, SPEC_DEFAULTS.background),
+      ratio: boundedNumber(e.ratio, SPEC_DEFAULTS.ratio, 1, 7),
       checkAdjacent: e.checkAdjacent === true,
-      avoidRadius: num(e.avoidRadius, SPEC_DEFAULTS.avoidRadius),
+      avoidRadius: boundedNumber(e.avoidRadius, SPEC_DEFAULTS.avoidRadius, 0.05, 0.5),
     })
     const space = raw.colorSpace
     return {
-      colorCount: num(raw.colorCount, d.colorCount),
-      jnd: num(raw.jnd, d.jnd),
-      maxIterations: num(raw.maxIterations, d.maxIterations),
+      colorCount: Math.round(boundedNumber(raw.colorCount, d.colorCount, 2, 20)),
+      jnd: boundedNumber(raw.jnd, d.jnd, 5, 40),
+      maxIterations: Math.round(
+        boundedNumber(raw.maxIterations, d.maxIterations, 1_000, 100_000)
+      ),
       orderOptimization: raw.orderOptimization !== false,
       initColors: raw.initColors
-        .filter((c) => !!c?.value?.space)
-        .map((c) => ({ ...newInitColor(c.value), fixedColor: !!c.fixedColor, fixedOrder: !!c.fixedOrder })),
-      targets: raw.targets.filter((t) => !!t?.value?.space).map((t) => newTargetColor(t.value)),
+        .slice(0, IMPORT_LIMITS.initColors)
+        .flatMap((c) => {
+          const value = normalizeColorValue(c?.value)
+          return value
+            ? [{ ...newInitColor(value), fixedColor: !!c.fixedColor, fixedOrder: !!c.fixedOrder }]
+            : []
+        }),
+      targets: raw.targets
+        .slice(0, IMPORT_LIMITS.targets)
+        .flatMap((t) => {
+          const value = normalizeColorValue(t?.value)
+          return value ? [newTargetColor(value)] : []
+        }),
       evaluators: raw.evaluators
+        .slice(0, IMPORT_LIMITS.evaluators)
         .filter((e) => EVALUATOR_TYPES.includes(e?.type))
         .map((e: EvaluatorSpec) =>
           newEvaluatorSpec(e.type, {
             ...evaluatorOverrides(e),
             avoidColors: Array.isArray(e.avoidColors)
-              ? e.avoidColors.filter((c) => !!c?.value?.space).map((c) => newTargetColor(c.value))
+              ? e.avoidColors.slice(0, IMPORT_LIMITS.avoidColors).flatMap((c) => {
+                  const value = normalizeColorValue(c?.value)
+                  return value ? [newTargetColor(value)] : []
+                })
               : [],
           })
         ),

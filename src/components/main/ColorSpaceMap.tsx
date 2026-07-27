@@ -133,15 +133,15 @@ export function ColorSpaceMap({
     return pts
   }, [space])
 
-  const pts = useMemo(() => {
+  const swatches = useMemo(() => {
     const convert = converter(space)
-    const swatches: Pt[] = []
+    const next: Pt[] = []
     for (const hex of colors) {
       const c = convert(hex)
-      if (c) swatches.push({ ...toXYZ(space, c), css: hex, palette: true })
+      if (c) next.push({ ...toXYZ(space, c), css: hex, palette: true })
     }
-    return [...cloud, ...swatches]
-  }, [cloud, colors, space])
+    return next
+  }, [colors, space])
 
   const axis = useMemo(() => achromaticAxis(space), [space])
 
@@ -161,6 +161,10 @@ export function ColorSpaceMap({
       canvas.width = canvas.clientWidth * dpr
       canvas.height = canvas.clientHeight * dpr
       dirty = true
+      if (reduced) {
+        render()
+        dirty = false
+      }
     }
     const ro = new ResizeObserver(resize)
     ro.observe(canvas)
@@ -195,31 +199,38 @@ export function ColorSpaceMap({
       ctx.lineTo(axisB.sx, axisB.sy)
       ctx.stroke()
 
-      const proj = pts
-        .map((p) => ({ p, ...project(p) }))
+      // The cloud is translucent texture, so a full 4k-element depth sort every
+      // frame adds substantial work without useful information. Draw it in its
+      // stable sample order, then depth-sort only the handful of palette rings
+      // and keep those rings visibly above the cloud.
+      for (const point of cloud) {
+        const q = project(point)
+        const r = 1 + ((q.z + 1.2) / 2.4) * 0.9
+        ctx.fillStyle = point.css
+        ctx.fillRect(q.sx - r / 2, q.sy - r / 2, r, r)
+      }
+      const projectedSwatches = swatches
+        .map((point) => ({ point, ...project(point) }))
         .sort((a, b) => a.z - b.z)
-      for (const q of proj) {
-        if (q.p.palette) {
-          ctx.beginPath()
-          ctx.arc(q.sx, q.sy, 5, 0, Math.PI * 2)
-          ctx.fillStyle = q.p.css
-          ctx.fill()
-          ctx.strokeStyle = withAlpha(tokens.ink, 0.9)
-          ctx.lineWidth = 1.5
-          ctx.stroke()
-        } else {
-          // farther points draw smaller for a cheap depth cue
-          const r = 1 + ((q.z + 1.2) / 2.4) * 0.9
-          ctx.fillStyle = q.p.css
-          ctx.fillRect(q.sx - r / 2, q.sy - r / 2, r, r)
-        }
+      for (const q of projectedSwatches) {
+        ctx.beginPath()
+        ctx.arc(q.sx, q.sy, 5, 0, Math.PI * 2)
+        ctx.fillStyle = q.point.css
+        ctx.fill()
+        ctx.strokeStyle = withAlpha(tokens.ink, 0.9)
+        ctx.lineWidth = 1.5
+        ctx.stroke()
       }
     }
 
-    const tick = () => {
-      if (!dragging && !reduced) {
-        view.current.yaw += 0.0035
+    let lastAutoFrame = 0
+    const tick = (time: number) => {
+      // 30 visual updates per second is ample for the slow ambient rotation and
+      // halves the canvas work while retaining a requestAnimationFrame clock.
+      if (!dragging && time - lastAutoFrame >= 32) {
+        view.current.yaw += 0.007
         dirty = true
+        lastAutoFrame = time
       }
       if (dirty) {
         render()
@@ -227,7 +238,12 @@ export function ColorSpaceMap({
       }
       raf = requestAnimationFrame(tick)
     }
-    raf = requestAnimationFrame(tick)
+    if (reduced) {
+      render()
+      dirty = false
+    } else {
+      raf = requestAnimationFrame(tick)
+    }
 
     let lastX = 0
     let lastY = 0
@@ -247,6 +263,10 @@ export function ColorSpaceMap({
       lastX = e.clientX
       lastY = e.clientY
       dirty = true
+      if (reduced) {
+        render()
+        dirty = false
+      }
     }
     const up = () => {
       dragging = false
@@ -264,7 +284,7 @@ export function ColorSpaceMap({
       canvas.removeEventListener('pointerup', up)
       canvas.removeEventListener('pointercancel', up)
     }
-  }, [pts, axis, tokens.ink])
+  }, [cloud, swatches, axis, tokens.ink])
 
   return (
     // dialkit-root brings the --dial-* tokens into scope (they're defined on

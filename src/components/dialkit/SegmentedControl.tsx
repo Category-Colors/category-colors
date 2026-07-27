@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({
   hasAnimated.current = true;
 
   return (
-    <div className="dialkit-segmented" ref={containerRef}>
+    <div className="dialkit-segmented" ref={containerRef} role="group">
       {pillStyle && (
         <div
           className="dialkit-segmented-pill"
@@ -61,6 +61,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className="dialkit-segmented-button"
             data-active={String(isActive)}
+            aria-pressed={isActive}
           >
             {option.label}
           </button>

@@ -212,6 +212,12 @@
   user-select: none;
 }
 
+.dialkit-folder-title-row:focus-visible {
+  outline: 1px solid var(--dial-border-hover);
+  outline-offset: 2px;
+  border-radius: var(--dial-radius);
+}
+
 .dialkit-folder-header-top {
   display: flex;
   align-items: center;
@@ -237,9 +243,17 @@
 }
 
 .dialkit-folder-title-row {
+  appearance: none;
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -411,6 +425,11 @@
   background: var(--dial-surface);
   border-radius: var(--dial-radius);
   touch-action: none;
+}
+
+.dialkit-slider:focus-visible {
+  outline: 1px solid var(--dial-border-hover);
+  outline-offset: 2px;
 }
 
 .dialkit-slider-hashmarks {
@@ -1021,6 +1040,10 @@
 }
 
 .dialkit-color-hex {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-size: 13px;
   font-weight: 500;
   font-family: 'Geist Variable', sans-serif;

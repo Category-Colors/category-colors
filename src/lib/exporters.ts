@@ -57,8 +57,18 @@ export function parsePalette(text: string): string[] {
   } catch {
     // not JSON — fall through to token scanning
   }
-  const tokens = text.match(/#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?|oklch|oklab|color)\([^)]*\)/g) ?? []
-  return tokens.map(tokenToHex).filter((hex): hex is string => hex !== null)
+  const tokens =
+    text.match(
+      /#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab|color)\([^)]*\)/g
+    ) ?? []
+  const scanned = tokens.map(tokenToHex).filter((hex): hex is string => hex !== null)
+  if (scanned.length > 0) return scanned
+
+  const directValues = [
+    ...text.split(/\r?\n/).map((line) => line.trim().replace(/[,;]$/, '')),
+    ...[...text.matchAll(/:\s*([^;{}\n]+)\s*;?/g)].map((match) => match[1].trim()),
+  ]
+  return directValues.map(tokenToHex).filter((hex): hex is string => hex !== null)
 }
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [
@@ -103,18 +113,49 @@ export function downloadText(filename: string, text: string, type = 'text/plain'
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  link.hidden = true
+  document.body.append(link)
   link.click()
+  link.remove()
   // revoking in the same task can cancel the download before it starts in
   // some browsers; let the current task finish first
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-// Clipboard writes reject on insecure origins and denied permissions; the
-// caller's "Copied" feedback is optimistic, so swallow the failure rather
-// than surfacing an unhandled rejection.
-export const copyText = (text: string) =>
-  void navigator.clipboard?.writeText(text).catch(() => {})
+// Clipboard writes reject on insecure origins and denied permissions. Report
+// the actual outcome so callers never show a false "Copied" confirmation, and
+// retain the older synchronous path for browsers without Clipboard API access.
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Fall through to the selection-based fallback.
+  }
+
+  const input = document.createElement('textarea')
+  input.value = text
+  input.readOnly = true
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  document.body.append(input)
+  input.select()
+  try {
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    input.remove()
+  }
+}
 
 export function downloadPalette(colors: string[], format: ExportFormat) {
-  downloadText(`palette.${EXTENSIONS[format]}`, formatPalette(colors, format))
+  const mime: Record<ExportFormat, string> = {
+    raw: 'text/plain',
+    css: 'text/css',
+    json: 'application/json',
+  }
+  downloadText(`palette.${EXTENSIONS[format]}`, formatPalette(colors, format), mime[format])
 }

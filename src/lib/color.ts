@@ -105,6 +105,60 @@ export function parseCssColor(text: string): ColorValue | null {
   return fromCulori(space, parsed)
 }
 
+const finiteChannel = (
+  value: unknown,
+  min: number,
+  max: number,
+  decimals?: number
+): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const clamped = Math.max(min, Math.min(max, value))
+  return decimals === undefined ? clamped : round(clamped, decimals)
+}
+
+// ColorValue objects cross two untrusted boundaries: configuration imports and
+// structured-clone messages to the worker. Validate the discriminant and every
+// channel in one place so malformed objects cannot turn into NaN inside culori
+// or the optimizer.
+export function normalizeColorValue(input: unknown): ColorValue | null {
+  if (!input || typeof input !== 'object') return null
+  const value = input as Record<string, unknown>
+
+  switch (value.space) {
+    case 'hex': {
+      if (typeof value.hex !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(value.hex)) return null
+      const parsed = parseCssColor(value.hex)
+      return parsed ? convertValue(parsed, 'hex') : null
+    }
+    case 'rgb': {
+      const r = finiteChannel(value.r, 0, 255, 0)
+      const g = finiteChannel(value.g, 0, 255, 0)
+      const b = finiteChannel(value.b, 0, 255, 0)
+      return r === null || g === null || b === null ? null : { space: 'rgb', r, g, b }
+    }
+    case 'hsl': {
+      const h = finiteChannel(value.h, 0, 360, 1)
+      const s = finiteChannel(value.s, 0, 100, 1)
+      const l = finiteChannel(value.l, 0, 100, 1)
+      return h === null || s === null || l === null ? null : { space: 'hsl', h, s, l }
+    }
+    case 'oklch': {
+      const l = finiteChannel(value.l, 0, 1, 3)
+      const c = finiteChannel(value.c, 0, 0.5, 3)
+      const h = finiteChannel(value.h, 0, 360, 1)
+      return l === null || c === null || h === null ? null : { space: 'oklch', l, c, h }
+    }
+    case 'oklab': {
+      const l = finiteChannel(value.l, 0, 1, 3)
+      const a = finiteChannel(value.a, -0.4, 0.4, 3)
+      const b = finiteChannel(value.b, -0.4, 0.4, 3)
+      return l === null || a === null || b === null ? null : { space: 'oklab', l, a, b }
+    }
+    default:
+      return null
+  }
+}
+
 export function valueToHsv(value: ColorValue): Hsv {
   const { h, s, v } = toHsvMode(clampRgb(toRgbMode(resolve(toCulori(value)))))
   return [h ?? 0, s, v]

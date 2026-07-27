@@ -41,6 +41,8 @@ export function SpaceSelect<T extends string>({
         className="picker-space-trigger"
         data-open={String(open)}
         aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         {current?.label ?? value.toUpperCase()}
@@ -62,6 +64,8 @@ export function SpaceSelect<T extends string>({
           <motion.div
             ref={warmRef}
             className="dialkit-select-dropdown picker-space-dropdown"
+            role="listbox"
+            aria-label={label}
             initial={{ opacity: 0, y: -6, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
@@ -72,6 +76,8 @@ export function SpaceSelect<T extends string>({
                 key={option.value}
                 className="dialkit-select-option"
                 data-selected={String(option.value === value)}
+                role="option"
+                aria-selected={option.value === value}
                 onClick={() => {
                   onChange(option.value)
                   setOpen(false)

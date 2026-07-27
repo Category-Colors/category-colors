@@ -39,7 +39,7 @@ export function SolarStream({
   // window every city covers.
   const ref = Math.max(...cities.map((c) => c.startUtcMs))
   const lead = cities.map((c) => Math.round((ref - c.startUtcMs) / 3600_000))
-  const m = Math.min(...lead.map((l) => 168 - l))
+  const m = Math.min(...lead.map((l, i) => cities[i].hourlyRadiation.length - l))
 
   const { paths, dayTicks } = useMemo(() => {
     const series = cities.map((c, i) =>

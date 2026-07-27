@@ -38,16 +38,20 @@ export function Folder({
       className={`dialkit-folder ${isRoot ? 'dialkit-folder-root' : ''}`}
       data-open={String(isOpen)}
     >
-      <div
-        className={`dialkit-folder-header ${isRoot ? 'dialkit-panel-header' : ''}`}
-        onClick={handleToggle}
-      >
+      <div className={`dialkit-folder-header ${isRoot ? 'dialkit-panel-header' : ''}`}>
         <div className="dialkit-folder-header-top">
-          <div className="dialkit-folder-title-row">
-            <span className={`dialkit-folder-title ${isRoot ? 'dialkit-folder-title-root' : ''}`}>
-              {title}
-            </span>
-            {!isRoot && (
+          {isRoot ? (
+            <div className="dialkit-folder-title-row">
+              <span className="dialkit-folder-title dialkit-folder-title-root">{title}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="dialkit-folder-title-row"
+              aria-expanded={isOpen}
+              onClick={handleToggle}
+            >
+              <span className="dialkit-folder-title">{title}</span>
               <motion.svg
                 className="dialkit-folder-icon"
                 viewBox="0 0 24 24"
@@ -62,12 +66,10 @@ export function Folder({
               >
                 <path d={ICON_CHEVRON} />
               </motion.svg>
-            )}
-          </div>
+            </button>
+          )}
           {actions && (
-            <div className="dialkit-folder-actions" onClick={(e) => e.stopPropagation()}>
-              {actions}
-            </div>
+            <div className="dialkit-folder-actions">{actions}</div>
           )}
         </div>
       </div>

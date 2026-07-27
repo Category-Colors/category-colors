@@ -215,7 +215,7 @@ export function DesignSystemPage() {
               Color rows — editable and read-only
             </p>
             <div className="flex flex-col">
-              <ColorRow value={hexValue('#5ec896')} onValueChange={() => {}} onRemove={() => {}} onCopy={() => {}} />
+              <ColorRow value={hexValue('#5ec896')} onValueChange={() => {}} onRemove={() => {}} onCopy={() => true} />
               <ColorRow value={hexValue('#e47094')} />
             </div>
             <p className="text-[10px] font-medium tracking-[0.08em] text-ink/35 uppercase">
