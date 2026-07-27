@@ -1,31 +1,35 @@
 {
   "name": "category-colors",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite --force",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@chakra-ui/icons": "^2.1.1",
-    "@chakra-ui/react": "^2.5.5",
-    "@emotion/react": "^11.10.6",
-    "@emotion/styled": "^11.10.6",
-    "eslint": "8.39.0",
-    "eslint-config-next": "13.3.1",
-    "framer-motion": "^10.12.4",
-    "next": "13.3.1",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "@base-ui/react": "^1.6.0",
+    "@fontsource-variable/geist": "^5.2.9",
+    "@tailwindcss/vite": "^4.3.2",
+    "categorycolors": "file:../category-colors",
+    "clsx": "^2.1.1",
+    "culori": "^4.0.2",
+    "motion": "^12.42.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
-    "husky": "^8.0.3",
-    "lint-staged": "^13.2.2",
-    "prettier": "2.8.8"
-  },
-  "lint-staged": {
-    "**/*": "prettier --write --ignore-unknown"
+    "@types/culori": "^4.0.1",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
   }
 }

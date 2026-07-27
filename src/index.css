@@ -1,0 +1,1384 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+/* The one variant this app used from shadcn/tailwind.css, inlined verbatim so
+   the package (a CLI, plus 24 unused utilities) isn't a dependency. Marks the
+   active tab and the popover-anchored grid cells. */
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    /* The app favors tabular-numeral sans over mono; keep font-mono pointed
+       at the same face so any stray usage matches */
+    --font-mono: 'Geist Variable', sans-serif;
+
+    /* Every chrome colour in the app is one of these four, or one of them at
+       an alpha. `ink` is the workhorse: text, borders and raised surfaces are
+       all ink over the page, which is what lets a single pair of values flip
+       the whole UI between light and dark. */
+    --color-ink: var(--theme-ink);
+    --color-page: var(--theme-bg);
+    --color-panel: var(--theme-panel);
+    --color-danger: var(--theme-danger);
+
+    /* shadcn names, kept only where components still reference them */
+    --color-background: var(--theme-bg);
+    --color-foreground: var(--theme-ink);
+    --color-card: var(--theme-panel);
+    --color-card-foreground: var(--theme-ink);
+    --color-muted-foreground: color-mix(in oklab, var(--theme-ink) 55%, transparent);
+    --color-border: color-mix(in oklab, var(--theme-ink) 10%, transparent);
+    --color-ring: color-mix(in oklab, var(--theme-ink) 45%, transparent);
+    --color-destructive: var(--theme-danger);
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* Theme tokens. lib/theme.ts rewrites these on :root at runtime; the values
+   here are the Backbreeze dark preset so the first paint is already correct. */
+:root {
+    --theme-bg: #131316;
+    --theme-panel: #212121;
+    --theme-ink: #ffffff;
+    --theme-danger: #fb2c36;
+    --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+/* ── App layout ─────────────────────────────────────────────── */
+
+:root {
+  --surface-page: var(--theme-bg);
+  --panel-width: 292px;
+  --panel-gap: 16px;
+
+  /* Shadow weight scales with the page. The same 50%-black drop that reads as
+     depth over a dark canvas is a grey smudge over a light one, so every
+     chrome shadow multiplies its alpha by this rather than being tuned twice.
+     ThemeProvider sets data-polarity from the resolved background, which
+     covers custom themes as well as the presets' light/dark modes. */
+  --shadow-strength: 1;
+}
+
+:root[data-polarity='light'] {
+  --shadow-strength: 0.18;
+}
+
+body {
+  background: var(--surface-page);
+}
+
+:root {
+  /* Canvas glide curves: spring-like ease with NO overshoot — a viewport-wide
+     surface shouldn't visibly bounce even when the panel's spring does.
+     Durations pair with SPRING.morphIn / SPRING.morphOut. */
+  --ease-canvas-in: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-canvas-out: cubic-bezier(0.22, 1, 0.4, 1);
+}
+
+.app-main {
+  min-height: 100svh;
+  padding: 24px calc(var(--panel-width) + var(--panel-gap) * 2 + 16px);
+  /* expand direction: pairs with SPRING.morphIn; per-side collapse overrides
+     below pair with SPRING.morphOut */
+  transition-property: padding-left, padding-right;
+  transition-duration: 0.32s, 0.32s;
+  transition-timing-function: var(--ease-canvas-in), var(--ease-canvas-in);
+}
+
+/* Minimized panels: the canvas extends toward that viewport edge */
+.app-main-left-min {
+  padding-left: 88px;
+  transition-duration: 0.22s, 0.32s;
+  transition-timing-function: var(--ease-canvas-out), var(--ease-canvas-in);
+}
+
+.app-main-right-min {
+  padding-right: 88px;
+  transition-duration: 0.32s, 0.22s;
+  transition-timing-function: var(--ease-canvas-in), var(--ease-canvas-out);
+}
+
+.app-main-left-min.app-main-right-min {
+  transition-duration: 0.22s, 0.22s;
+  transition-timing-function: var(--ease-canvas-out), var(--ease-canvas-out);
+}
+
+/* Morphing glass container: full panel ↔ 42px rounded rect */
+.panel-morph {
+  position: relative; /* keeps popLayout-exiting content inside the clip */
+  display: flex;
+  width: var(--panel-width);
+  max-height: calc(100vh - var(--panel-gap) * 2);
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--dial-glass-bg);
+  border: 1px solid var(--dial-border);
+  box-shadow: var(--dial-shadow);
+  backdrop-filter: blur(var(--dial-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--dial-backdrop-blur));
+  transition:
+    background-color var(--dial-anim-reveal),
+    border-color var(--dial-anim-reveal),
+    box-shadow var(--dial-anim-reveal),
+    backdrop-filter var(--dial-anim-reveal);
+}
+
+/* Collapsed: bare icon — no chrome at all */
+.panel-morph[data-min] {
+  cursor: pointer;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0) saturate(1);
+  -webkit-backdrop-filter: blur(0) saturate(1);
+}
+
+/* The persistent panel toggle: sits at top-right of the open panel, which is
+   exactly the center of the 42px collapsed rect — it never moves, the
+   container morphs around it while the chevrons rotate 180° */
+.panel-toggle {
+  position: absolute;
+  top: 6px; /* aligns with the header icon row open, and centers collapsed */
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  /* opaque stroke + element-level translucency (see header icons note) */
+  color: var(--theme-ink);
+  opacity: 0.25;
+  cursor: pointer;
+  transition: opacity var(--dial-anim-fast);
+}
+
+.panel-toggle:hover {
+  opacity: 0.55;
+  background: var(--dial-surface);
+}
+
+.panel-morph[data-min] .panel-toggle {
+  opacity: 0.55;
+}
+
+.panel-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Sticky panel header: same translucent glass + fade treatment as
+   .panel-footer, mirrored (content scrolls out under its bottom edge) */
+.panel-morph .dialkit-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: 0 -6px;
+  /* owns the panel's top padding — the scroller has none, so no content
+     strip can paint above the stuck header */
+  padding: 10px 6px 14px;
+  border-bottom: none;
+}
+
+/* The glass lives on a ::before layer so its fade mask can't clip
+   descendants that pop out of the header box (the … menu) */
+.panel-morph .dialkit-panel-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--dial-glass-bg) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  mask-image: linear-gradient(to top, transparent, #000 12px);
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 12px);
+}
+
+/* The output panel's content sits tighter under its header */
+.panel-dock-right .dialkit-panel-header {
+  padding-bottom: 0;
+}
+
+/* Header icon buttons: +4px hit/hover area per side (visual rhythm kept via
+   negative margins and a widened gap); scoped to the root panel header so
+   evaluator-row actions are unaffected */
+.dialkit-panel-header .color-row-icon {
+  width: 30px;
+  height: 30px;
+  margin: -4px;
+  border-radius: 7px;
+}
+
+.dialkit-panel-header .color-row-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.dialkit-panel-header .dialkit-folder-actions {
+  gap: 10px;
+  /* reserve the persistent toggle's slot at the end of the row, spaced to
+     match the 32px center rhythm of the other header icons */
+  padding-right: 34px;
+}
+
+/* Content keeps its full width while the container clips during the morph */
+.panel-morph-content {
+  width: var(--panel-width);
+  min-width: var(--panel-width);
+}
+
+/* Title hover strips bleed only as far as the tightened panel padding */
+.panel-morph .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row {
+  margin-left: -6px;
+}
+
+.panel-morph .dialkit-panel-inner {
+  padding-top: 0;
+  padding-left: 6px;
+  padding-right: 6px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Header overflow menu */
+.panel-menu {
+  position: relative;
+}
+
+.panel-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: max-content;
+}
+
+/* Docked DialKit-style panels. The dock keeps its full width while the
+   panel inside morphs down to 42px, so the dock itself must not intercept
+   clicks — otherwise it invisibly blocks the nav once the main area
+   expands under it. */
+.panel-dock {
+  position: fixed;
+  top: var(--panel-gap);
+  z-index: 40;
+  width: var(--panel-width);
+  max-height: calc(100vh - var(--panel-gap) * 2);
+  display: flex;
+  pointer-events: none;
+}
+
+/* …but every direct child is interactive: the morphing panel itself AND any
+   dropdowns that portal into the dock root (presets menu, color picker) */
+.panel-dock > * {
+  pointer-events: auto;
+}
+
+.panel-dock-left {
+  left: var(--panel-gap);
+}
+
+.panel-dock-right {
+  right: var(--panel-gap);
+  /* the morph shrinks anchored to the viewport edge */
+  justify-content: flex-end;
+}
+
+.panel-dock .dialkit-panel,
+.panel-dock .dialkit-panel-inner {
+  width: 100%;
+}
+
+.panel-dock .dialkit-panel-inner {
+  max-height: calc(100vh - var(--panel-gap) * 2);
+  overflow-y: auto;
+}
+
+/* One scroller only (the PanelShell wrapper), so .panel-footer can stick to
+   its bottom; the root Folder's inline wrapper must not scroll internally */
+.panel-dock .dialkit-panel-inline {
+  max-height: none;
+  overflow-y: visible;
+}
+
+.panel-status {
+  margin: 6px 2px 0;
+  font-family: 'Geist Variable', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--dial-text-secondary);
+}
+
+/* Sticky panel footer: translucent glass with a top fade so content scrolls
+   out underneath it; multiple buttons sit side by side */
+.panel-footer .dialkit-button-group {
+  flex-direction: row;
+}
+
+.panel-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 4px -6px 0;
+  padding: 28px 6px 12px;
+  background: color-mix(in srgb, var(--dial-glass-bg) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  mask-image: linear-gradient(to bottom, transparent, #000 12px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12px);
+}
+
+/* Dual-thumb range slider, visually matching .dialkit-slider */
+.range-slider-wrapper {
+  position: relative;
+  height: var(--dial-row-height);
+}
+
+.range-slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+  background: var(--dial-surface);
+  border-radius: var(--dial-radius);
+  touch-action: none;
+}
+
+.range-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--dial-surface-active);
+  transition: background var(--dial-anim-fast);
+  pointer-events: none;
+}
+
+.range-slider-active .range-slider-fill {
+  background: var(--dial-border-hover);
+}
+
+.range-slider-handle {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--dial-text-primary);
+  pointer-events: none;
+}
+
+/* Reused DialKit hashmarks light up while the range slider is active */
+.range-slider-active .dialkit-slider-hashmark {
+  background: var(--dial-border-hover);
+}
+
+.range-slider-label {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(calc(-50% - 0.5px));
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dial-text-label);
+  pointer-events: none;
+}
+
+.range-slider-value {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(calc(-50% + 0.5px));
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Geist Variable', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--dial-text-label);
+}
+
+.range-slider-active .range-slider-value {
+  color: var(--dial-text-focus);
+}
+
+.range-slider-num {
+  cursor: text;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: border-color var(--dial-anim-fast);
+}
+
+.range-slider-num:hover {
+  border-bottom-color: var(--dial-text-label);
+}
+
+/* Inline within the value row so the other bound stays visible while editing */
+.range-slider-input {
+  min-width: 2ch;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Geist Variable', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--dial-text-label);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.range-slider-input:focus {
+  color: var(--dial-text-focus);
+}
+
+/* Add-color bar: main button + image + presets */
+.add-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.add-bar-main {
+  flex: 1;
+}
+
+.add-bar .add-bar-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--theme-ink);
+  opacity: 0.7;
+}
+
+.add-bar-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Presets menu: palette name over a swatch strip */
+.preset-menu {
+  width: 216px;
+}
+
+.preset-option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.preset-swatches {
+  display: flex;
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.preset-swatches i {
+  flex: 1;
+}
+
+/* Add-from-image popover */
+.image-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.image-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 110px;
+  border: 1px dashed var(--dial-border-hover);
+  border-radius: 8px;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 12px;
+  color: var(--dial-text-secondary);
+  transition:
+    border-color var(--dial-anim-fast),
+    background var(--dial-anim-fast);
+}
+
+.image-drop[data-over='true'] {
+  border-color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
+  background: var(--dial-surface);
+}
+
+.image-pick-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 12px;
+  color: var(--dial-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.image-preview {
+  max-height: 120px;
+  width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--dial-surface);
+}
+
+.image-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.image-swatch {
+  height: 30px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--theme-ink) 18%, transparent);
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity var(--dial-anim-fast);
+}
+
+.image-swatch[data-selected='true'] {
+  opacity: 1;
+  outline: 2px solid color-mix(in oklab, var(--theme-ink) 70%, transparent);
+  outline-offset: 1px;
+}
+
+.image-actions {
+  flex-direction: row;
+}
+
+/* Group heading inside dropdown menus */
+.menu-group-heading {
+  padding: 10px 10px 4px;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--dial-text-tertiary);
+}
+
+/* De-emphasized config values inside folder titles ("JND 0.15") */
+.folder-title-meta {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--dial-text-secondary);
+}
+
+/* Descriptive hint text (evaluator descriptions) — sans, unlike data status */
+.panel-hint {
+  margin: 2px 2px 0;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 11px;
+  color: var(--dial-text-secondary);
+}
+
+/* Top-level section folders get 4px more air above and below their dividers
+   (padding, not margin, so the adjacent-folder margin collapse stays intact) */
+.dialkit-folder-inner > .dialkit-folder:not(.dialkit-folder-root) {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* A section folder sitting directly under the panel header drops its top
+   divider and spacing so both panels open with the same rhythm (the config
+   panel's first child is a plain row with no divider) */
+.panel-morph
+  .dialkit-folder-root
+  > .dialkit-folder-content
+  > .dialkit-folder-inner
+  > .dialkit-folder:not(.dialkit-folder-root):first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Open evaluator rows keep the hover treatment as an active state: title
+   chip background and chevron stay visible while expanded */
+.panel-list .dialkit-folder[data-open='true'] > .dialkit-folder-header .dialkit-folder-icon {
+  opacity: 0.6;
+}
+
+.panel-list
+  .dialkit-folder[data-open='true']
+  > .dialkit-folder-header
+  .dialkit-folder-title-row {
+  background: var(--dial-surface);
+}
+
+/* Expanded evaluator rows get 4px more air below their content than the
+   10px folder default; it lives inside the height-animated content so it
+   eases with the expansion */
+.panel-list
+  .dialkit-folder:not(.dialkit-folder-root)
+  > .dialkit-folder-content
+  > .dialkit-folder-inner {
+  padding-bottom: 14px;
+}
+
+/* Item lists (colors, targets, evaluators) inside a section folder */
+.panel-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 6px;
+}
+
+/* Generate button: spinner + cycling verb while the worker anneals */
+.generate-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.button-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty-state slot standing in for a list's rows: text plus ghost buttons
+   for the initial add */
+.list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+  padding: 12px 6px;
+  border: 1px dashed var(--dial-border);
+  border-radius: 6px;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 11px;
+  color: var(--dial-text-tertiary);
+}
+
+.list-empty-text {
+  display: flex;
+  align-items: center;
+}
+
+/* Ghost add actions inside empty states */
+.add-bar-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  gap: 2px;
+}
+
+.ghost-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border: none;
+  background: none;
+  border-radius: 5px;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 11px;
+  color: var(--dial-text-secondary);
+  cursor: pointer;
+}
+
+.ghost-button svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.ghost-button:hover,
+.ghost-button[data-open='true'] {
+  background: var(--dial-surface);
+  color: var(--dial-text-primary);
+}
+
+/* Folders used as list rows lose their HR dividers and divider spacing
+   (the `> * >` variants reach folders wrapped in a ListRow animation div) */
+.panel-list > .dialkit-folder:not(.dialkit-folder-root),
+.panel-list > * > .dialkit-folder:not(.dialkit-folder-root) {
+  border-top: none;
+  border-bottom: none;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.panel-list
+  > .dialkit-folder:not(.dialkit-folder-root)
+  + .dialkit-folder:not(.dialkit-folder-root) {
+  margin-top: 0;
+}
+
+/* Row height matches .color-row (30px) instead of the 36px section rows */
+.panel-list > .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header,
+.panel-list > * > .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header {
+  height: 30px;
+}
+
+/* Directly-editable color rows */
+.color-row {
+  display: flex;
+  align-items: center;
+  height: 30px;
+}
+
+.color-row-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.color-row-chip:hover,
+.color-row-chip[data-open='true'],
+.color-row-chip:focus-within {
+  background: var(--dial-surface);
+}
+
+.color-row-swatch {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--theme-ink) 18%, transparent);
+}
+
+.color-row-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 12px;
+  color: var(--dial-text-primary);
+}
+
+.color-row-input:focus {
+  outline: none;
+}
+
+.color-row-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+.color-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  /* opaque stroke; translucency at the element level so overlapping svg
+     lines (the ×'s cross, the lock's shackle) don't double up */
+  color: var(--theme-ink);
+  opacity: 0.25;
+  cursor: pointer;
+}
+
+.color-row-icon:hover {
+  opacity: 0.55;
+  background: var(--dial-surface);
+}
+
+.color-row-icon[data-active='true'] {
+  opacity: 0.95;
+  background: var(--dial-surface);
+}
+
+.color-row-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Drag-to-reorder rows: grip floats in the card's left padding gutter */
+.reorder-row {
+  position: relative;
+}
+
+.drag-handle {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dial-text-tertiary);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity var(--dial-anim-reveal);
+}
+
+.reorder-row:hover .drag-handle,
+.drag-handle:active {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Icon-button tooltip: one fixed chip, repositioned imperatively */
+.tooltip-chip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  pointer-events: none;
+  padding: 3px 8px;
+  background: var(--theme-panel);
+  border: 1px solid color-mix(in oklab, var(--theme-ink) 10%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.4 * var(--shadow-strength, 1)));
+  font-size: 11px;
+  color: color-mix(in oklab, var(--theme-ink) 85%, transparent);
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    transform 180ms cubic-bezier(0.3, 1, 0.35, 1);
+  will-change: transform;
+}
+
+/* Floating popovers (pair grid, history) share the DialKit dropdown chrome;
+   they portal to <body>, outside .dialkit-root, so the token values are
+   restated here (--dial-glass-bg, --dial-border, --dial-shadow-dropdown) */
+.popover-surface {
+  background: var(--theme-panel);
+  border: 1px solid color-mix(in oklab, var(--theme-ink) 10%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / calc(0.4 * var(--shadow-strength, 1)));
+}
+
+/* Color picker popover (Untitled UI-inspired) */
+.color-picker-popover {
+  background: var(--dial-glass-bg);
+  border: 1px solid var(--dial-border);
+  border-radius: var(--dial-radius);
+  box-shadow: var(--dial-shadow-dropdown);
+  z-index: 10000;
+}
+
+.color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.picker-sv {
+  position: relative;
+  height: 140px;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, var(--theme-ink), var(--picker-hue));
+}
+
+.picker-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--theme-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.picker-hue {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  cursor: ew-resize;
+  touch-action: none;
+  background: linear-gradient(
+    to right,
+    #f00,
+    #ff0 17%,
+    #0f0 33%,
+    #0ff 50%,
+    #00f 67%,
+    #f0f 83%,
+    #f00
+  );
+}
+
+.picker-io {
+  display: flex;
+  gap: 6px;
+}
+
+.picker-eyedropper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--dial-border);
+  /* opaque stroke + element opacity: the pipette's strokes overlap */
+  color: var(--theme-ink);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.picker-eyedropper:hover {
+  opacity: 0.95;
+  background: var(--dial-surface);
+}
+
+.picker-eyedropper svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Per-channel value inputs in the color's own space */
+.picker-channels {
+  display: flex;
+  gap: 6px;
+}
+
+.picker-channel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.picker-channel input {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--dial-border);
+  background: var(--dial-surface);
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 12px;
+  color: var(--dial-text-primary);
+  text-align: center;
+}
+
+.picker-channel input:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--theme-ink) 35%, transparent);
+}
+
+.picker-channel span {
+  text-align: center;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dial-text-tertiary);
+}
+
+/* Color-space select: DialKit dropdown chrome, anchored inside the picker */
+.picker-space {
+  position: relative;
+  flex: 1;
+}
+
+.picker-space-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.picker-space-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 6px 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--dial-border);
+  background: var(--dial-surface);
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 12px;
+  color: var(--dial-text-primary);
+  cursor: pointer;
+}
+
+.picker-space-trigger:hover,
+.picker-space-trigger[data-open='true'] {
+  border-color: color-mix(in oklab, var(--theme-ink) 35%, transparent);
+}
+
+.picker-space-trigger svg {
+  width: 10px;
+  height: 10px;
+  color: var(--dial-text-secondary);
+}
+
+.picker-space-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  transform-origin: top;
+}
+
+/* Same select overlaid on the 3D map card: shrink-wrapped in the top-right
+   corner, tinted so it stays legible over the gamut cloud, and opening
+   right-aligned so the menu can't spill past the card's clipped edge. */
+.space-select-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  flex: none;
+}
+
+.space-select-overlay .picker-space-trigger {
+  width: auto;
+  height: 24px;
+  padding: 0 4px 0 7px;
+  font-size: 11px;
+  color: var(--dial-text-secondary);
+  /* the panel colour rather than a fixed dark tint: this chip floats over the
+     gamut cloud, which is full-colour in either polarity, so it needs to read
+     as chrome in both */
+  background: color-mix(in srgb, var(--theme-panel) 82%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.space-select-overlay .picker-space-trigger:hover,
+.space-select-overlay .picker-space-trigger[data-open='true'] {
+  color: var(--dial-text-primary);
+}
+
+.space-select-overlay .picker-space-dropdown {
+  left: auto;
+  right: 0;
+}
+
+/* History rows */
+.version-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* History rows share the color-row anatomy: a restore chip (facepile
+   inside) with the actions outside it. Active = the chip keeps its surface
+   background, exactly like an open folder title — no border. */
+.version-row {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+}
+
+.version-row .color-row-chip {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  /* padding-driven height (7px around the 16px chips = 30px single-row)
+     so a wrapping facepile grows the background instead of escaping it */
+  height: auto;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.version-row .color-row-chip:hover,
+.version-row .color-row-chip[data-open='true'],
+.version-row .color-row-chip:focus-visible {
+  background: var(--dial-surface);
+}
+
+.version-row .color-row-chip:focus-visible {
+  outline: none;
+}
+
+/* the anchor row keeps its highlight while the pointer is on the popover */
+.version-row[data-active] .color-row-chip {
+  background: var(--dial-surface);
+}
+
+/* The palette as a row of chips (same swatch atom as the color rows:
+   16px, 5px radius) */
+.version-facepile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.version-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+/* Export preview */
+.export-preview-frame {
+  position: relative;
+  margin: 6px 0;
+}
+
+.export-preview {
+  margin: 0;
+  padding: 8px;
+  /* room for the copy button and the scrollbar lane beside it */
+  padding-right: 42px;
+  max-height: 108px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--dial-surface);
+  font-family: 'Geist Variable', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--dial-text-primary);
+  /* the native bar is replaced by .scroll-overlay so it can't reserve a
+     gutter when the OS is set to always-visible scrollbars */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.export-preview::-webkit-scrollbar {
+  display: none;
+}
+
+.export-preview:focus-visible {
+  outline: 1px solid var(--dial-border-hover);
+  outline-offset: -1px;
+}
+
+/* Copy sits inside the frame it acts on. It floats over content that can
+   scroll beneath it, so unlike the other icon buttons it always carries a
+   backdrop rather than growing one on hover. */
+/* Floating scrollbar: overlays the text instead of reserving a gutter, so the
+   preview looks the same whether the OS draws overlay or classic scrollbars.
+   Sized and placed here; the thumb itself is driven by ScrollOverlay. */
+.scroll-overlay {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  bottom: 5px;
+  width: 5px;
+  pointer-events: none;
+}
+
+.scroll-overlay[data-scrollable='false'] {
+  display: none;
+}
+
+.scroll-overlay-thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--theme-ink) 22%, transparent);
+  pointer-events: auto;
+  transition: background var(--dial-anim-fast);
+}
+
+.export-preview-frame:hover .scroll-overlay-thumb {
+  background: color-mix(in oklab, var(--theme-ink) 36%, transparent);
+}
+
+.scroll-overlay-thumb[data-dragging] {
+  background: color-mix(in oklab, var(--theme-ink) 55%, transparent);
+}
+
+/* clears the scrollbar's lane at the right edge */
+.export-copy {
+  position: absolute;
+  top: 5px;
+  right: 13px;
+  opacity: 0.4;
+}
+
+.export-copy,
+.export-copy:hover,
+.export-copy[data-active='true'] {
+  background: color-mix(in srgb, var(--dial-glass-bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.export-copy:hover {
+  opacity: 0.8;
+}
+
+.export-copy[data-active='true'] {
+  opacity: 1;
+}
+
+/* Panels stack around the dashboard on narrow viewports */
+@media (max-width: 1279px) {
+  .app {
+    display: flex;
+    flex-direction: column;
+    gap: var(--panel-gap);
+    padding: var(--panel-gap);
+  }
+
+  .app-main {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .panel-dock {
+    position: static;
+    width: 100%;
+    max-height: none;
+  }
+
+  .panel-dock-left {
+    order: -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ── Theme menu ──────────────────────────────────────────────── */
+
+.theme-menu {
+  position: relative;
+}
+
+/* Sits in the tab row, so it matches the tabs' height, padding and weight
+   rather than the panel buttons'. */
+.theme-trigger {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--theme-ink) 40%, transparent);
+  cursor: pointer;
+  transition: color var(--dial-anim-fast), background var(--dial-anim-fast);
+}
+
+.theme-trigger:hover,
+.theme-trigger[data-open='true'] {
+  color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
+  background: var(--dial-surface);
+}
+
+.theme-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 268px;
+  padding: 10px 12px 12px;
+  transform-origin: top right;
+}
+
+.theme-blurb {
+  padding: 2px 2px 0;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 11px;
+  color: var(--dial-text-tertiary);
+}
+
+.theme-tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dial-surface-subtle);
+}
+
+/* label above the row rather than beside it: the colour rows are already a
+   swatch + value + picker and have no room for a leading label */
+.theme-token {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.theme-token > span {
+  padding-left: 2px;
+  font-family: 'Geist Variable', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--dial-text-tertiary);
+}

@@ -1,38 +1,32 @@
-## Getting Started
+# React + TypeScript + Vite
 
-First, check your node version. This project supports v16.8.0 or later.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-If this is your first time running this project, run:
+Currently, two official plugins are available:
 
-```bash
-npm install
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the Oxlint configuration
+
+If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+
+```json
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  }
+}
 ```
 
-Then, run the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-## Setup
-
-This project uses [Prettier](https://prettier.io/docs/en/index.html) to ensure consistent code formatting.
-
-We use a pre-commit hook to run prettier on every commit. To install it run:
-
-```bash
-npm pkg set scripts.prepare="husky install"
-npx husky add .husky/pre-commit "npx lint-staged"
-```
-
-To get the most out of Prettier, it’s recommended to run it from your editor as well. Check out the [docs here](https://prettier.io/docs/en/editors.html) for editor specific information.
-
-## Other
-
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
