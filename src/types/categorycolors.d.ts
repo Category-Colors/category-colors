@@ -1,3 +1,12 @@
+// The JND report reached directly rather than through the package barrel. The
+// barrel pulls in `evaluators`, and with it a ~470 kB saliency dataset; this
+// module needs only cvd simulation and deltaE, which is what lets the Report
+// tab's issue count live in the main bundle without that weight.
+declare module 'categorycolors/src/report/jnd' {
+  import type { JndReport, JndReportOptions } from 'categorycolors/src'
+  export function reportJndIssues(palette: unknown[], options?: JndReportOptions): JndReport
+}
+
 declare module 'categorycolors/src' {
   export interface PaletteConfig {
     colorCount: number

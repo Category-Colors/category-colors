@@ -10,7 +10,7 @@ import { hexValue } from '@/lib/color'
 
 const COLOR_TOKENS: { name: string; value: string; css: string; note?: string }[] = [
   { name: 'Page', value: '#131316', css: '#131316', note: '--surface-page' },
-  { name: 'Panel / popover glass', value: '#212121', css: '#212121', note: '--dial-glass-bg · .popover-surface' },
+  { name: 'Panel / popover glass', value: '#212124', css: '#212124', note: '--dial-glass-bg · .popover-surface' },
   { name: 'Surface', value: 'white 5%', css: 'rgba(255,255,255,0.05)', note: 'rows, active tabs' },
   { name: 'Surface hover', value: 'white 10%', css: 'rgba(255,255,255,0.1)' },
   { name: 'Card', value: 'white 3%', css: 'rgba(255,255,255,0.03)', note: 'main-area cards' },

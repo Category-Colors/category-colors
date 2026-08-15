@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
+import { popoverMotion } from '@/components/dialkit'
 import { useAnchoredPortal, useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 import { CVD_OPTIONS, TYPE_OPTIONS } from '@/lib/evaluators'
 import type { CvdType, EvaluatorType } from '@/lib/palette'
@@ -54,10 +54,7 @@ export function AddEvaluatorMenu({
               <motion.div
                 ref={warmRef}
                 className="dialkit-select-dropdown"
-                initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
-                transition={SPRING.pop}
+                {...popoverMotion(pos.above ? 8 : -8)}
                 style={{
                   position: 'absolute',
                   left: pos.left,

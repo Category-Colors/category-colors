@@ -151,21 +151,21 @@ export function StatsPanel({ version }: { version: PaletteVersion }) {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-[10px] font-medium tracking-[0.08em] text-ink/30 uppercase">
+              <tr className="text-[11px] font-medium text-ink/30">
                 <th className="pb-1.5 text-left font-medium">Evaluator</th>
-                <th className="pb-1.5 text-right font-medium">wt</th>
-                <th className="pb-1.5 text-right font-medium">score</th>
-                <th className="pb-1.5 text-right font-medium">share</th>
+                <th className="pb-1.5 text-right font-medium">Weight</th>
+                <th className="pb-1.5 text-right font-medium">Score</th>
+                <th className="pb-1.5 text-right font-medium">Share</th>
               </tr>
             </thead>
             <tbody>
               {stats.evaluators.map((e, i) => (
                 <tr key={i} className="border-t border-ink/5">
-                  <td className="py-1 pr-2 text-[12px] whitespace-nowrap text-ink/80">{e.label}</td>
-                  <td className="py-1 pl-2 text-right tabular-nums text-[11px] text-ink/50">
+                  <td className="py-1 pr-2 text-[13px] whitespace-nowrap text-ink/80">{e.label}</td>
+                  <td className="py-1 pl-2 text-right tabular-nums text-[12px] text-ink/50">
                     {e.weight.toFixed(2)}
                   </td>
-                  <td className="py-1 pl-2 text-right tabular-nums text-[11px] text-ink/70">
+                  <td className="py-1 pl-2 text-right tabular-nums text-[12px] text-ink/70">
                     {fmt(e.score)}
                   </td>
                   <td className="py-1 pl-3">
@@ -176,7 +176,7 @@ export function StatsPanel({ version }: { version: PaletteVersion }) {
                           style={{ width: `${(e.share / maxShare) * 100}%` }}
                         />
                       </span>
-                      <span className="w-7 text-right tabular-nums text-[11px] text-ink/45">
+                      <span className="w-7 text-right tabular-nums text-[12px] text-ink/45">
                         {Math.round(e.share * 100)}%
                       </span>
                     </span>
@@ -184,9 +184,9 @@ export function StatsPanel({ version }: { version: PaletteVersion }) {
                 </tr>
               ))}
               <tr className="border-t border-ink/10">
-                <td className="py-1 pr-2 text-[12px] text-ink/95">Total cost</td>
+                <td className="py-1 pr-2 text-[13px] text-ink/95">Total cost</td>
                 <td />
-                <td className="py-1 pl-2 text-right tabular-nums text-[11px] text-ink/95">
+                <td className="py-1 pl-2 text-right tabular-nums text-[12px] text-ink/95">
                   {fmt(stats.totalCost, 4)}
                 </td>
                 <td />
@@ -196,8 +196,8 @@ export function StatsPanel({ version }: { version: PaletteVersion }) {
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {summary.map(([label, value]) => (
               <div key={label} className="flex items-baseline justify-between gap-3">
-                <span className="text-[11px] text-ink/45">{label}</span>
-                <span className="tabular-nums text-[11px] text-ink/70">{value}</span>
+                <span className="text-[12px] text-ink/45">{label}</span>
+                <span className="tabular-nums text-[12px] text-ink/70">{value}</span>
               </div>
             ))}
           </div>

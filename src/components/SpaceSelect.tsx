@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
+import { SPRING, popoverMotion } from '@/components/dialkit'
 import { ICON_CHEVRON } from '@/components/dialkit/icons'
 import { useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 
@@ -66,10 +66,7 @@ export function SpaceSelect<T extends string>({
             className="dialkit-select-dropdown picker-space-dropdown"
             role="listbox"
             aria-label={label}
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={SPRING.pop}
+            {...popoverMotion()}
           >
             {options.map((option) => (
               <button

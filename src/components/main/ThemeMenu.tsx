@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
-import { SelectControl } from '@/components/dialkit'
+import { SelectControl, popoverMotion } from '@/components/dialkit'
 import { useDismiss } from '@/components/dialkit/use-dropdown'
 import { ColorRow } from '@/components/panels/ColorRow'
 import { hexValue, parseCssColor, valueToCss, type ColorValue } from '@/lib/color'
@@ -36,7 +35,6 @@ export function ThemeMenu() {
   useDismiss(open, useCallback(() => setOpen(false), []), [ref])
 
   const isCustom = state.preset === CUSTOM
-  const blurb = THEME_PRESETS.find((p) => p.id === state.preset)?.blurb
 
   const pickPreset = (preset: string) =>
     setState(
@@ -67,10 +65,7 @@ export function ThemeMenu() {
         {open && (
           <motion.div
             className="theme-popover popover-surface"
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={SPRING.pop}
+            {...popoverMotion()}
           >
             <SelectControl
               label="Preset"
@@ -87,7 +82,7 @@ export function ThemeMenu() {
               disabled={isCustom}
               onChange={(mode) => setState({ ...state, mode: mode as ThemeMode })}
             />
-            {isCustom ? (
+            {isCustom && (
               <div className="theme-tokens">
                 {TOKEN_FIELDS.map((field) => (
                   <label key={field.key} className="theme-token">
@@ -99,8 +94,6 @@ export function ThemeMenu() {
                   </label>
                 ))}
               </div>
-            ) : (
-              blurb && <p className="theme-blurb">{blurb}</p>
             )}
           </motion.div>
         )}

@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
+import { SPRING, prefersReducedMotion } from '@/components/dialkit'
 
 // Tabler layout-sidebar-collapse glyph; the frame stays put while the chevron
 // morphs between pointing toward the panel's edge (collapse) and away from
@@ -70,9 +70,20 @@ export function MorphPanel({
             if (minimized) onMinimizedChange(false)
             else minimize()
           }}
-          animate={{ right: minimized ? 6 : 8 }}
-          transition={{ right: minimized ? SPRING.morphOut : SPRING.morphIn }}
-          whileTap={{ scale: 0.9 }}
+          // the 2px inset shift rides the container morph as a transform;
+          // animating `right` relayouts the panel on every frame of it. A raw
+          // transform string is invisible to MotionConfig's reducedMotion, so
+          // the shift lands instantly there rather than gliding.
+          animate={{ transform: `translateX(${minimized ? 2 : 0}px)` }}
+          transition={
+            prefersReducedMotion()
+              ? { duration: 0 }
+              : minimized
+                ? SPRING.morphOut
+                : SPRING.morphIn
+          }
+          // carries the inset shift, or the tap would snap it back 2px
+          whileTap={{ transform: `translateX(${minimized ? 2 : 0}px) scale(0.97)` }}
         >
           <SidebarToggleIcon side={side} minimized={minimized} />
         </motion.button>

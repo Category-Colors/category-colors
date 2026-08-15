@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { buildJndReport, testTitles } from '@/lib/report'
+import { testTitles } from '@/lib/report'
+import type { JndReport } from '@/lib/report'
 import type { PaletteVersion } from '@/lib/palette'
 import { ColorSpaceMap } from './ColorSpaceMap'
 import { PairGrid } from './PairGrid'
@@ -9,9 +9,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-[12px] font-medium tracking-[-0.01em] text-ink">{children}</p>
 }
 
-export function ReportView({ version }: { version: PaletteVersion }) {
-  const report = useMemo(() => buildJndReport(version), [version])
-
+// The report arrives already scored: MainTabs needs it for the tab badge on
+// every palette change, so computing it again here would be the same work twice.
+export function ReportView({
+  version,
+  report,
+}: {
+  version: PaletteVersion
+  report: JndReport | null
+}) {
   if (!report) {
     return (
       <p className="pt-6 tabular-nums text-[12px] text-ink/50">
@@ -23,8 +29,12 @@ export function ReportView({ version }: { version: PaletteVersion }) {
   const titles = testTitles(report.tests)
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-3">
+    // a query container, because the report's width is set by the side panels
+    // (.app-main pads by --panel-width, and either panel can collapse) rather
+    // than by the viewport — a viewport breakpoint reads a width this column
+    // never has
+    <div className="@container flex flex-col gap-5">
+      <section className="flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionLabel>Pairs</SectionLabel>
           <div className="flex flex-wrap items-center gap-4">
@@ -44,11 +54,17 @@ export function ReportView({ version }: { version: PaletteVersion }) {
             ))}
           </div>
         </div>
-        <PairGrid report={report} colors={version.colors} threshold={version.params.jnd} />
+        <div className="rounded-[10px] bg-ink/5 p-5">
+          <PairGrid report={report} colors={version.colors} threshold={version.params.jnd} />
+        </div>
       </section>
 
-      <div className="flex flex-col gap-5 xl:flex-row">
-        <section className="flex flex-col gap-2.5 xl:w-[308px] xl:shrink-0">
+      {/* 680px = the map's 308 + the 20 gap + the stats card's 307 floor (its
+          table's min-content plus padding), rounded up for headroom. Splitting
+          any earlier hands the stats column less than its table can occupy and
+          the card grows out past the pair grid. */}
+      <div className="flex flex-col gap-5 @min-[680px]:flex-row">
+        <section className="flex flex-col gap-2.5 @min-[680px]:w-[308px] @min-[680px]:shrink-0">
           <SectionLabel>Map</SectionLabel>
           <div className="relative aspect-square overflow-hidden rounded-[10px] bg-ink/5">
             <ColorSpaceMap

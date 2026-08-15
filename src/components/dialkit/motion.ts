@@ -23,6 +23,45 @@ export const SPRING = {
 /** Plain opacity fade for elements that shouldn't spring */
 export const FADE: Transition = { duration: 0.12 }
 
+// MediaQueryList is live, so `.matches` is current without a listener.
+const REDUCED = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+
+/**
+ * Whether the user asked for less motion.
+ *
+ * App.tsx sets `MotionConfig reducedMotion="user"`, which covers motion's own
+ * `x`/`y`/`scale`/layout props — but NOT a raw `transform` string, which it
+ * treats as an ordinary value. Anything animating `transform` directly has to
+ * ask for itself.
+ */
+export const prefersReducedMotion = () => REDUCED?.matches ?? false
+
+/**
+ * Enter/exit props shared by every popover and dropdown. `offset` is where it
+ * slides in from: negative when the surface hangs below its trigger, positive
+ * when it sits above.
+ *
+ * The movement is a full `transform` string rather than motion's `y`/`scale`
+ * shorthands. The shorthands animate on the main thread through
+ * requestAnimationFrame, so they stutter while the generate worker posts
+ * annealing results; `transform` is one of the few values motion can hand
+ * straight to the compositor.
+ */
+export function popoverMotion(offset = -6) {
+  // Reduced motion keeps the fade — it's what explains that a surface arrived
+  // — and drops only the travel.
+  if (prefersReducedMotion()) {
+    return { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: SPRING.pop }
+  }
+  const away = `translateY(${offset}px) scale(0.97)`
+  return {
+    initial: { opacity: 0, transform: away },
+    animate: { opacity: 1, transform: 'translateY(0px) scale(1)' },
+    exit: { opacity: 0, transform: away },
+    transition: SPRING.pop,
+  }
+}
+
 /** Segmented-control pill slide (CSS transition string; element must sit inside .dialkit-root) */
 export const PILL_TRANSITION =
   'left var(--dial-anim-reveal) cubic-bezier(0.25, 1, 0.5, 1), width var(--dial-anim-reveal) cubic-bezier(0.25, 1, 0.5, 1)'

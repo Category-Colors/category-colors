@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
+import { popoverMotion } from '@/components/dialkit'
 import { useAnchoredPortal, useDismiss } from '@/components/dialkit/use-dropdown'
 import { parseCssColor, valueToCss, type ColorValue } from '@/lib/color'
 import { ColorPicker } from './ColorPicker'
@@ -139,10 +139,7 @@ export function ColorRow({
               <motion.div
                 ref={popRef}
                 className="color-picker-popover"
-                initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.97 }}
-                transition={SPRING.pop}
+                {...popoverMotion(pos.above ? 8 : -8)}
                 style={{
                   position: 'absolute',
                   left: pos.left,

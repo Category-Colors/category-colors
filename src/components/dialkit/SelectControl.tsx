@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { SPRING } from './motion';
+import { SPRING, popoverMotion } from './motion';
 import { useAnchoredPortal, useDismiss, useWarmHover } from './use-dropdown';
 import { ICON_CHEVRON } from './icons';
 
@@ -77,10 +77,7 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
               className="dialkit-select-dropdown"
               role="listbox"
               aria-label={label}
-              initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
-              transition={SPRING.pop}
+              {...popoverMotion(pos.above ? 8 : -8)}
               style={{
                 position: 'absolute',
                 left: pos.left,

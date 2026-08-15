@@ -1,0 +1,6 @@
+<!-- Silhouette only. This is consumed as a CSS mask (.app-mark in index.css),
+     so the fill is never painted — the ramp comes from the theme's ink token.
+     Path is the Figma export's verbatim; only the dead gradient defs are gone. -->
+<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+<path d="M9.01074 0C13.7897 0 17.6973 3.71618 18 8.41309H12.791V5.92969C12.7908 5.57473 12.5034 5.28638 12.1484 5.28613H5.87305C5.51809 5.28638 5.23071 5.57473 5.23047 5.92969V12.1953C5.23063 12.5503 5.51804 12.8376 5.87305 12.8379H12.1484C12.5034 12.8376 12.7909 12.5503 12.791 12.1953V9.58496H18C17.6981 14.2826 13.7902 18 9.01074 18C4.03454 17.9999 0.000131578 13.9703 0 9C0 4.02961 4.03446 6.07307e-05 9.01074 0Z" fill="#000"/>
+</svg>

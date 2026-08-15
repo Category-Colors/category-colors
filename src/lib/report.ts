@@ -1,4 +1,8 @@
-import categorycolors from 'categorycolors/src'
+// Imported from the module rather than the package barrel: the barrel reaches
+// `evaluators` and its ~470 kB saliency dataset, which would follow this file
+// into whatever chunk imports it — and the tab bar imports it now, to badge the
+// Report tab with its issue count.
+import { reportJndIssues } from 'categorycolors/src/report/jnd'
 import type { JndReport } from 'categorycolors/src'
 import type { PaletteVersion } from './palette'
 
@@ -35,7 +39,7 @@ export function colorVsBackground(
       const [type, severity] = t.label.split(':')
       return { type, severity: Number(severity) }
     })
-  return categorycolors.reports.reportJndIssues([color, background], {
+  return reportJndIssues([color, background], {
     jndThreshold: threshold,
     cvdSimulations,
   }).tests
@@ -59,7 +63,7 @@ export function buildJndReport(version: PaletteVersion): JndReport | null {
       return true
     })
 
-  return categorycolors.reports.reportJndIssues(colors, {
+  return reportJndIssues(colors, {
     jndThreshold: params.jnd,
     cvdSimulations,
   })

@@ -27,18 +27,21 @@ export type ThemeMode = 'dark' | 'light'
 export interface ThemePreset {
   id: string
   name: string
-  blurb: string
   modes: Record<ThemeMode, ThemeTokens>
 }
 
+// Within a mode, `bg` and `panel` share one hue and chroma — only lightness
+// separates them. A panel that's tinted differently from the page reads as a
+// different material rather than the same surface lifted, and the chart cards
+// make it obvious: they're ink at 3% over `bg`, so they sit between the two.
+// The background anchors the tint; new presets should match panel to it.
 export const THEME_PRESETS: ThemePreset[] = [
   {
     // "tail wind" → "back breeze"
     id: 'backbreeze',
     name: 'Backbreeze',
-    blurb: 'Tailwind neutrals',
     modes: {
-      dark: { bg: '#131316', panel: '#212121', ink: '#ffffff', danger: '#fb2c36' },
+      dark: { bg: '#131316', panel: '#212124', ink: '#ffffff', danger: '#fb2c36' },
       light: { bg: '#fafafa', panel: '#ffffff', ink: '#18181b', danger: '#e7000b' },
     },
   },
@@ -46,10 +49,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     // "anthropic" → "humane"
     id: 'humane',
     name: 'Humane',
-    blurb: 'Warm greys and clay',
     modes: {
-      dark: { bg: '#1f1e1d', panel: '#2b2a27', ink: '#f0eee6', danger: '#e0806a' },
-      light: { bg: '#f0eee6', panel: '#faf9f5', ink: '#1f1e1d', danger: '#bc4b32' },
+      dark: { bg: '#1f1e1d', panel: '#2b2a29', ink: '#f0eee6', danger: '#e0806a' },
+      light: { bg: '#f0eee6', panel: '#fbf9f1', ink: '#1f1e1d', danger: '#bc4b32' },
     },
   },
 ]

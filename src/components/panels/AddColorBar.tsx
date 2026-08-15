@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
+import { popoverMotion } from '@/components/dialkit'
 import { useAnchoredPortal, useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 import { extractColors } from '@/lib/extract-colors'
 import { PRESET_PALETTES } from '@/lib/presets'
@@ -223,10 +223,7 @@ export function AddColorBar({
               <motion.div
                 ref={warmMenuRef}
                 className="dialkit-select-dropdown preset-menu"
-                initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                transition={SPRING.pop}
+                {...popoverMotion()}
                 style={{ position: 'absolute', top: menuPos.top, right: menuPos.right }}
               >
                 {PRESET_PALETTES.map((preset) => (
@@ -260,10 +257,7 @@ export function AddColorBar({
               <motion.div
                 ref={imagePopRef}
                 className="color-picker-popover image-popover"
-                initial={{ opacity: 0, y: imagePos.above ? 8 : -8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: imagePos.above ? 8 : -8, scale: 0.97 }}
-                transition={SPRING.pop}
+                {...popoverMotion(imagePos.above ? 8 : -8)}
                 style={{
                   position: 'absolute',
                   left: imagePos.left,

@@ -49,7 +49,7 @@
    here are the Backbreeze dark preset so the first paint is already correct. */
 :root {
     --theme-bg: #131316;
-    --theme-panel: #212121;
+    --theme-panel: #212124;
     --theme-ink: #ffffff;
     --theme-danger: #fb2c36;
     --radius: 0.625rem;
@@ -64,6 +64,13 @@
     }
   html {
     @apply font-sans;
+    /* One rasterisation for the whole app. Geist is a light-stemmed grotesque
+       and the UI is mostly pale text on dark, where macOS's default subpixel
+       smoothing over-thickens it; antialiased keeps the 500s honest. Inherited,
+       so nothing below needs to restate it — DialKit already sets the same
+       pair on .dialkit-root to stay self-contained. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     }
 }
 
@@ -71,8 +78,15 @@
 
 :root {
   --surface-page: var(--theme-bg);
-  --panel-width: 292px;
+  /* Now that both docks float, they'd meet in the middle of a narrow viewport.
+     Capping the width at half the space (minus the gap beside each and one
+     between) keeps them apart; above ~630px this resolves to the flat 292. */
+  --panel-width: min(292px, calc((100vw - var(--panel-gap) * 3) / 2));
   --panel-gap: 16px;
+
+  /* Mirrors the DialKit token of the same name (theme.css), for the chrome
+     that portals to <body> and so falls outside .dialkit-root. */
+  --dial-anim-press: 0.16s;
 
   /* Shadow weight scales with the page. The same 50%-black drop that reads as
      depth over a dark canvas is a grey smudge over a light one, so every
@@ -88,6 +102,25 @@
 
 body {
   background: var(--surface-page);
+}
+
+/* The mark was the last piece of chrome carrying baked-in greys, so it stayed
+   put while the rest of the app changed theme — and read as a dark smudge on a
+   light page. The file supplies the silhouette and the ink ladder supplies the
+   ramp, the same split DialKit uses for --dial-check-mask. The two stops are
+   the mock's #565656 → #666666 solved back into ink alphas over the default
+   dark bg, so the default theme still renders the design's greys. */
+.app-mark {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--theme-ink) 28%, transparent),
+    color-mix(in oklab, var(--theme-ink) 35%, transparent)
+  );
+  -webkit-mask: url('./assets/mark.svg') center / contain no-repeat;
+  mask: url('./assets/mark.svg') center / contain no-repeat;
 }
 
 :root {
@@ -177,12 +210,21 @@ body {
   color: var(--theme-ink);
   opacity: 0.25;
   cursor: pointer;
+  /* transform is driven by motion (MorphPanel), including the press — a CSS
+     transition on it would fight the spring frame for frame */
   transition: opacity var(--dial-anim-fast);
 }
 
-.panel-toggle:hover {
-  opacity: 0.55;
-  background: var(--dial-surface);
+/* Every :hover in this file is gated on a real pointer. A tap fires :hover
+   and leaves it applied until the next tap elsewhere, so an affordance that
+   only exists on hover — this toggle, the drag handles — latches on screen
+   with no way to dismiss it. DialKit does the same by collapsing
+   --dial-surface-hover onto --dial-surface (theme.css). */
+@media (hover: hover) and (pointer: fine) {
+  .panel-toggle:hover {
+    opacity: 0.55;
+    background: var(--dial-surface);
+  }
 }
 
 .panel-morph[data-min] .panel-toggle {
@@ -443,8 +485,10 @@ body {
   transition: border-color var(--dial-anim-fast);
 }
 
-.range-slider-num:hover {
-  border-bottom-color: var(--dial-text-label);
+@media (hover: hover) and (pointer: fine) {
+  .range-slider-num:hover {
+    border-bottom-color: var(--dial-text-label);
+  }
 }
 
 /* Inline within the value row so the other bound stays visible while editing */
@@ -678,7 +722,7 @@ body {
   border: 1.5px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: button-spin 0.8s linear infinite;
+  animation: button-spin 0.6s linear infinite;
 }
 
 @keyframes button-spin {
@@ -738,10 +782,16 @@ body {
   flex-shrink: 0;
 }
 
-.ghost-button:hover,
 .ghost-button[data-open='true'] {
   background: var(--dial-surface);
   color: var(--dial-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ghost-button:hover {
+    background: var(--dial-surface);
+    color: var(--dial-text-primary);
+  }
 }
 
 /* Folders used as list rows lose their HR dividers and divider spacing
@@ -785,10 +835,15 @@ body {
   cursor: pointer;
 }
 
-.color-row-chip:hover,
 .color-row-chip[data-open='true'],
 .color-row-chip:focus-within {
   background: var(--dial-surface);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .color-row-chip:hover {
+    background: var(--dial-surface);
+  }
 }
 
 .color-row-swatch {
@@ -835,9 +890,11 @@ body {
   cursor: pointer;
 }
 
-.color-row-icon:hover {
-  opacity: 0.55;
-  background: var(--dial-surface);
+@media (hover: hover) and (pointer: fine) {
+  .color-row-icon:hover {
+    opacity: 0.55;
+    background: var(--dial-surface);
+  }
 }
 
 .color-row-icon[data-active='true'] {
@@ -875,9 +932,22 @@ body {
   transition: opacity var(--dial-anim-reveal);
 }
 
-.reorder-row:hover .drag-handle,
 .drag-handle:active {
   opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reorder-row:hover .drag-handle {
+    opacity: 1;
+  }
+}
+
+/* The handle's resting state is invisible because hover reveals it. Touch has
+   no hover, so it would be undiscoverable — it stays quietly visible instead. */
+@media (hover: none), (pointer: coarse) {
+  .drag-handle {
+    opacity: 0.5;
+  }
 }
 
 .drag-handle:active {
@@ -996,9 +1066,11 @@ body {
   cursor: pointer;
 }
 
-.picker-eyedropper:hover {
-  opacity: 0.95;
-  background: var(--dial-surface);
+@media (hover: hover) and (pointer: fine) {
+  .picker-eyedropper:hover {
+    opacity: 0.95;
+    background: var(--dial-surface);
+  }
 }
 
 .picker-eyedropper svg {
@@ -1073,9 +1145,14 @@ body {
   cursor: pointer;
 }
 
-.picker-space-trigger:hover,
 .picker-space-trigger[data-open='true'] {
   border-color: color-mix(in oklab, var(--theme-ink) 35%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .picker-space-trigger:hover {
+    border-color: color-mix(in oklab, var(--theme-ink) 35%, transparent);
+  }
 }
 
 .picker-space-trigger svg {
@@ -1118,9 +1195,14 @@ body {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.space-select-overlay .picker-space-trigger:hover,
 .space-select-overlay .picker-space-trigger[data-open='true'] {
   color: var(--dial-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .space-select-overlay .picker-space-trigger:hover {
+    color: var(--dial-text-primary);
+  }
 }
 
 .space-select-overlay .picker-space-dropdown {
@@ -1154,10 +1236,15 @@ body {
   padding-bottom: 7px;
 }
 
-.version-row .color-row-chip:hover,
 .version-row .color-row-chip[data-open='true'],
 .version-row .color-row-chip:focus-visible {
   background: var(--dial-surface);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .version-row .color-row-chip:hover {
+    background: var(--dial-surface);
+  }
 }
 
 .version-row .color-row-chip:focus-visible {
@@ -1190,17 +1277,23 @@ body {
 }
 
 .export-preview {
+  display: block;
+  width: 100%;
   margin: 0;
   padding: 8px;
   /* room for the copy button and the scrollbar lane beside it */
   padding-right: 42px;
+  /* the height a textarea can't infer on its own; @supports below hands it
+     back to the content wherever field-sizing exists */
+  height: 108px;
   max-height: 108px;
   overflow: auto;
+  resize: none;
   border-radius: 6px;
   background: var(--dial-surface);
   font-family: 'Geist Variable', sans-serif;
   font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--dial-text-primary);
   /* the native bar is replaced by .scroll-overlay so it can't reserve a
@@ -1211,6 +1304,16 @@ body {
 
 .export-preview::-webkit-scrollbar {
   display: none;
+}
+
+/* Restores what the <pre> did for free: shrink to the palette's own line
+   count, and only start scrolling once it passes max-height. Firefox has no
+   field-sizing yet and keeps the fixed height above. */
+@supports (field-sizing: content) {
+  .export-preview {
+    field-sizing: content;
+    height: auto;
+  }
 }
 
 .export-preview:focus-visible {
@@ -1247,8 +1350,10 @@ body {
   transition: background var(--dial-anim-fast);
 }
 
-.export-preview-frame:hover .scroll-overlay-thumb {
-  background: color-mix(in oklab, var(--theme-ink) 36%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .export-preview-frame:hover .scroll-overlay-thumb {
+    background: color-mix(in oklab, var(--theme-ink) 36%, transparent);
+  }
 }
 
 .scroll-overlay-thumb[data-dragging] {
@@ -1271,36 +1376,32 @@ body {
   -webkit-backdrop-filter: blur(6px);
 }
 
-.export-copy:hover {
-  opacity: 0.8;
+@media (hover: hover) and (pointer: fine) {
+  .export-copy:hover {
+    opacity: 0.8;
+  }
 }
 
 .export-copy[data-active='true'] {
   opacity: 1;
 }
 
-/* Panels stack around the dashboard on narrow viewports */
+/* Below this the canvas can't spare a column per panel. The docks stay fixed
+   and simply stop being reserved for: the same glass panels now float over the
+   content instead of folding the page into a vertical stack. Collapsing a
+   panel is what reveals what sits under it — which is why the collapse targets
+   stay pinned to the viewport edges at every width. */
 @media (max-width: 1279px) {
-  .app {
-    display: flex;
-    flex-direction: column;
-    gap: var(--panel-gap);
-    padding: var(--panel-gap);
-  }
-
-  .app-main {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .panel-dock {
-    position: static;
-    width: 100%;
-    max-height: none;
-  }
-
-  .panel-dock-left {
-    order: -1;
+  .app-main,
+  .app-main-left-min,
+  .app-main-right-min {
+    /* the same 88px the collapsed state reserves at full width: enough to
+       clear the 42px pucks the docks shrink to, and no more. An expanded
+       panel is 292 wide, so it still lies over the canvas — which is the
+       point — but the header's title and Theme button never end up under a
+       toggle they can't be clicked through. */
+    padding-left: 88px;
+    padding-right: 88px;
   }
 }
 
@@ -1308,8 +1409,22 @@ body {
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    /* Reduced motion means gentler, not none. Anything that moves — transform,
+       the panel's padding glide, height — lands instantly, while opacity and
+       colour keep easing: those carry the explanation of what just changed and
+       cause none of the vestibular trouble that movement does. !important
+       because the segmented-control pill sets its transition inline.
+       motion/react is handled separately by MotionConfig reducedMotion="user"
+       in App.tsx, which drops transform and layout animations on the same
+       signal. */
+    transition-property: opacity, color, background-color, border-color, fill,
+      stroke !important;
+  }
+
+  /* The one CSS keyframe animation in the app. Frozen, it reads as a broken
+     control rather than a calm one, so it keeps turning — just slower. */
+  .button-spinner {
+    animation-duration: 1.6s !important;
   }
 }
 
@@ -1329,18 +1444,27 @@ body {
   border: none;
   border-radius: 6px;
   background: transparent;
+  /* the trigger is wrapped in a .dialkit-root only so the popover it opens
+     gets DialKit's tokens; it reads as a header control, so it opts back out
+     of the kit's system font */
   font-family: 'Geist Variable', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: color-mix(in oklab, var(--theme-ink) 40%, transparent);
   cursor: pointer;
   transition: color var(--dial-anim-fast), background var(--dial-anim-fast);
 }
 
-.theme-trigger:hover,
 .theme-trigger[data-open='true'] {
   color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
   background: var(--dial-surface);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .theme-trigger:hover {
+    color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
+    background: var(--dial-surface);
+  }
 }
 
 .theme-popover {
@@ -1354,13 +1478,6 @@ body {
   width: 268px;
   padding: 10px 12px 12px;
   transform-origin: top right;
-}
-
-.theme-blurb {
-  padding: 2px 2px 0;
-  font-family: 'Geist Variable', sans-serif;
-  font-size: 11px;
-  color: var(--dial-text-tertiary);
 }
 
 .theme-tokens {
@@ -1387,3 +1504,86 @@ body {
   font-weight: 500;
   color: var(--dial-text-tertiary);
 }
+
+/* ── Chart loading skeletons ─────────────────────────────────── */
+
+/* The placeholder charts are drawn in ink at 6–9%; this sweeps a slightly
+   brighter band across them so a card reads as loading rather than as an empty
+   or broken chart. transform-only, and CSS rather than motion/react, so it
+   stays off the main thread while the weather request and the palette worker
+   are both in flight — which is exactly when it's on screen. */
+.chart-skeleton {
+  position: relative;
+  overflow: hidden;
+  /* Like --shadow-strength, the weight has to be dialed per polarity: a 6%
+     lift that reads as a sweep over a dark canvas is invisible as a 6%
+     darkening over a light one. */
+  --shimmer-weight: 6%;
+}
+
+:root[data-polarity='light'] .chart-skeleton {
+  --shimmer-weight: 10%;
+}
+
+.chart-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--theme-ink) var(--shimmer-weight), transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: chart-shimmer 1.6s linear infinite;
+}
+
+@keyframes chart-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* the sweep is pure movement and carries no information the light shapes
+     don't already carry, so it goes rather than slows */
+  .chart-skeleton::after {
+    display: none;
+  }
+}
+
+/* ── Press feedback ──────────────────────────────────────────── */
+
+/* A background swap says the pointer is over the control; only a scale says
+   the press landed. Grouped at the end of the file so the one value governs
+   every pressable surface outside DialKit (which does the same in theme.css).
+   Deliberately excluded: .color-row-chip and .range-slider-num wrap text
+   inputs, and .drag-handle is already carrying the pointer during a drag. */
+.ghost-button,
+.color-row-icon,
+.picker-eyedropper,
+.export-copy {
+  transition: transform var(--dial-anim-press);
+}
+
+/* Popover triggers are excluded too, hence :not([data-open]) — the attribute
+   every trigger in the app renders. Pressing one doesn't complete an action,
+   it reveals a surface, and the popover's own entrance is the feedback; a
+   press scale under it is a second, competing animation. (.theme-trigger and
+   .picker-space-trigger are absent for the same reason.) */
+.ghost-button:active:not([data-open]),
+.color-row-icon:active:not([data-open]),
+.picker-eyedropper:active,
+.export-copy:active {
+  transform: scale(0.97);
+}
+
+/* The "…" overflow trigger is a popover trigger in icon-button clothing: it
+   marks itself with data-active like the lock and pin toggles beside it, so
+   the attribute can't tell them apart — its wrapper can. */
+.panel-menu .color-row-icon:active {
+  transform: none;
+}
+

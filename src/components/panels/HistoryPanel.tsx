@@ -105,7 +105,7 @@ export function HistoryPanel({
 }) {
   const [format, setFormat] = useState<ExportFormat>('raw')
   const [copied, setCopied] = useState(false)
-  const previewRef = useRef<HTMLPreElement>(null)
+  const previewRef = useRef<HTMLTextAreaElement>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const popover = useRef<HistoryPopoverHandle>(null)
 
@@ -310,11 +310,17 @@ export function HistoryPanel({
             // copy is an inset affordance on the preview it acts on, which
             // leaves download as the panel's single primary action
             <div className="export-preview-frame">
-              {/* tabIndex keeps the region reachable by keyboard now that the
-                  native scrollbar is hidden */}
-              <pre ref={previewRef} className="export-preview" tabIndex={0}>
-                {formatPalette(formatted, format)}
-              </pre>
+              {/* A read-only textarea rather than a <pre>: it's focusable and
+                  selectable on its own, so the platform's select-all works
+                  here without the app owning a shortcut. */}
+              <textarea
+                ref={previewRef}
+                className="export-preview"
+                aria-label="Palette export"
+                readOnly
+                spellCheck={false}
+                value={formatPalette(formatted, format)}
+              />
               <ScrollOverlay scrollerRef={previewRef} watch={`${format}:${formatted.length}`} />
               <button
                 className="color-row-icon export-copy"

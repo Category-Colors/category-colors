@@ -451,7 +451,7 @@ export function PairGrid({
                     className="flex h-[34px] cursor-default flex-col items-center justify-center rounded-md leading-tight hover:bg-ink/[0.04] data-active:bg-ink/[0.04]"
                   >
                     <span
-                      className={`tabular-nums text-[13px] ${
+                      className={`tabular-nums text-[12px] ${
                         failing ? 'font-medium text-danger/90' : 'text-ink/70'
                       }`}
                     >

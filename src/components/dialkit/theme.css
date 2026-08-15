@@ -7,6 +7,9 @@
   /* Animation timing tokens (motion springs live in motion.ts) */
   --dial-anim-fast: 0.1s;    /* hover/press feedback */
   --dial-anim-reveal: var(--dial-anim-fast); /* opacity reveals, pill slides */
+  /* Press scale runs slightly slower than the colour it accompanies: at 0.1s
+     the scale reads as a flinch, and the release is what sells the press. */
+  --dial-anim-press: 0.16s;
 
   /* Everything below is the theme's ink at an alpha, or one of its two
      surface colours — so a theme change is four values, not forty. */
@@ -53,6 +56,19 @@
   font-family: system-ui, -apple-system, 'SF Pro Display', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Touch fires :hover on tap and leaves it applied until the next tap
+   elsewhere. Every hover surface in this file is `background:
+   var(--dial-surface-hover)`, so collapsing that one token onto the resting
+   surface neutralises all of them at once — no per-rule media queries. The
+   affordances that reveal with opacity instead are gated individually below.
+   (Three rules also brighten their text on hover; that shift survives here
+   and is subtle enough to leave.) */
+@media (hover: none), (pointer: coarse) {
+  .dialkit-root {
+    --dial-surface-hover: var(--dial-surface);
+  }
 }
 
 .dialkit-panel {
@@ -649,7 +665,8 @@
   border: none;
   border-radius: var(--dial-radius);
   cursor: pointer;
-  transition: background var(--dial-anim-fast), color var(--dial-anim-fast);
+  transition: background var(--dial-anim-fast), color var(--dial-anim-fast),
+    transform var(--dial-anim-press);
 }
 
 .dialkit-button:hover {
@@ -672,7 +689,18 @@
   color: var(--dial-text-secondary);
 }
 
-.dialkit-button:active {
+/* :not([data-open]) skips the popover triggers wearing button chrome — the
+   add-bar's image and presets icons, the ghost "Add evaluator". Pressing one
+   doesn't complete an action, it reveals a surface, and that surface's own
+   entrance is the feedback; a press scale under it is a second, competing
+   animation. The trigger also holds an open state for as long as the popover
+   lives, which a momentary scale contradicts. */
+.dialkit-button:active:not([data-open]) {
+  background: var(--dial-surface-active);
+  transform: scale(0.97);
+}
+
+.dialkit-button:active[data-open] {
   background: var(--dial-surface-active);
 }
 
@@ -686,6 +714,11 @@
   padding: 2px 10px 2px 12px;
   background: var(--dial-surface);
   border-radius: var(--dial-radius);
+  /* Same clip the slider rows use for their fill: now that the pill reaches
+     the row's edge, it has to follow the row's corners. It also absorbs the
+     sub-pixel overhang from SegmentedControl measuring with offsetWidth,
+     which rounds to whole pixels while the button itself is fractional. */
+  overflow: hidden;
 }
 
 .dialkit-labeled-control-label {
@@ -698,9 +731,31 @@
   line-height: 17px;
 }
 
+/* Local mod: every other control in the panel fills its row — the slider's
+   fill runs edge to edge, the select trigger IS the row — so the segmented
+   pill does too. Stretching to the row's border box (the negative margins
+   cancel its padding) lets the pill span the full row height and square up
+   with the row's own radius; inset 2px top and bottom it read as a shorter
+   control sitting inside a taller one, which is what it looked like next to
+   the sliders. Scoped to the labeled row: a bare SegmentedControl (the export
+   format switch) has no row to fill and keeps its inset pill. */
 .dialkit-labeled-control .dialkit-segmented {
   flex-shrink: 0;
-  margin-right: -6px;
+  align-self: stretch;
+  margin: -2px -10px -2px 0;
+  padding: 0;
+}
+
+/* the row's padding no longer sets the label's inset, so the button does —
+   at the 10px the slider's value sits at */
+.dialkit-labeled-control .dialkit-segmented-button {
+  padding: 6px 10px;
+}
+
+.dialkit-labeled-control .dialkit-segmented-pill {
+  top: 0;
+  bottom: 0;
+  border-radius: var(--dial-radius);
 }
 
 .dialkit-action-button {
@@ -715,7 +770,8 @@
   border: none;
   border-radius: var(--dial-radius);
   cursor: pointer;
-  transition: background var(--dial-anim-fast), color var(--dial-anim-fast);
+  transition: background var(--dial-anim-fast), color var(--dial-anim-fast),
+    transform var(--dial-anim-press);
 }
 
 .dialkit-action-button:hover {
@@ -725,6 +781,7 @@
 
 .dialkit-action-button:active {
   background: var(--dial-surface-active);
+  transform: scale(0.97);
 }
 
 .dialkit-actions-group {
@@ -1081,9 +1138,12 @@
   transition: transform var(--dial-anim-fast);
 }
 
-.dialkit-color-swatch:hover {
-  transform: scale(1.1);
+@media (hover: hover) and (pointer: fine) {
+  .dialkit-color-swatch:hover {
+    transform: scale(1.1);
+  }
 }
+
 
 .dialkit-color-picker-native {
   position: absolute;
@@ -1206,8 +1266,17 @@
   flex-shrink: 0;
 }
 
-.dialkit-preset-item:hover .dialkit-preset-delete {
-  opacity: 0.6;
+@media (hover: hover) and (pointer: fine) {
+  .dialkit-preset-item:hover .dialkit-preset-delete {
+    opacity: 0.6;
+  }
+}
+
+/* No hover to reveal it on touch, so the delete stays quietly visible. */
+@media (hover: none), (pointer: coarse) {
+  .dialkit-preset-delete {
+    opacity: 0.5;
+  }
 }
 
 .dialkit-preset-delete:hover {
@@ -1447,8 +1516,10 @@
   transition: opacity var(--dial-anim-fast);
 }
 
-.dialkit-folder-header:hover .dialkit-folder-icon {
-  opacity: 0.6;
+@media (hover: hover) and (pointer: fine) {
+  .dialkit-folder-header:hover .dialkit-folder-icon {
+    opacity: 0.6;
+  }
 }
 
 /* Local mod: title + chevron hover as one chip-like unit (non-root) */
