@@ -1,10 +1,21 @@
-// Regenerates PRESET_PALETTE with DEFAULT_PARAMS, now recording cost history.
-// Mirrors buildConfig/generatePalette in src/lib/palette.ts exactly.
-const fs = require('fs');
-const path = require('path');
-const cc = require('categorycolors/src');
+// Regenerates PRESET_PALETTE with DEFAULT_PARAMS, recording cost history.
+// Mirrors buildConfig/generatePalette in src/lib/algorithm.ts exactly.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  createDefaultConfig,
+  createDefaultState,
+  energy,
+  jnd,
+  prepareInitialState,
+  range,
+  runWithOrderOptimization,
+} from 'category-colors';
 
-const config = cc.config.createDefaultConfig();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const config = createDefaultConfig();
 config.logProgress = false;
 config.colorCount = 8;
 config.jnd = 20;
@@ -12,19 +23,19 @@ config.maxIterations = 20000;
 config.colorSpace = { mode: 'okhsl', ranges: [[0, 360], [0.2, 0.8], [0.3, 0.9]] };
 config.similarityTarget = [];
 config.evalFunctions = [
-  { function: cc.evaluators.energy, weight: 0.15 },
-  { function: cc.evaluators.range, weight: 0.15 },
-  { function: cc.evaluators.jnd, weight: 0.15 },
-  { function: cc.evaluators.jnd, weight: 0.15, cvd: { type: 'protanomaly', severity: 0.5 } },
-  { function: cc.evaluators.jnd, weight: 0.5, cvd: { type: 'deuteranomaly', severity: 0.5 } },
+  { function: energy, weight: 0.15 },
+  { function: range, weight: 0.15 },
+  { function: jnd, weight: 0.15 },
+  { function: jnd, weight: 0.15, cvd: { type: 'protanomaly', severity: 0.5 } },
+  { function: jnd, weight: 0.5, cvd: { type: 'deuteranomaly', severity: 0.5 } },
 ];
 config.recordHistory = true;
 
-const state = cc.config.createDefaultState();
+const state = createDefaultState();
 state.colors = []; // random initialization — the defaults carry no seeds
 
-const init = cc.core.prepareInitialState(state, config);
-const final = cc.core.runWithOrderOptimization(init, config);
+const init = prepareInitialState(state, config);
+const final = runWithOrderOptimization(init, config);
 
 const history = final.costHistory.map(([i, c]) => [i, Number(c.toFixed(4))]);
 const lines = [];

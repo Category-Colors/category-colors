@@ -1,16 +1,25 @@
-import categorycolors from 'categorycolors/src'
+import {
+  createDefaultConfig,
+  createDefaultState,
+  evaluators,
+  prepareInitialState,
+  runSimulatedAnnealing,
+  runWithOrderOptimization,
+  type Config,
+  type StateInput,
+} from 'category-colors'
 import { toCulori } from '@/lib/color'
 import type { CostSample, EvaluatorSpec, PaletteParams } from './palette'
 
-// The bridge between the app's serializable params and the categorycolors
+// The bridge between the app's serializable params and the category-colors
 // algorithm. Kept apart from palette.ts so importing the parameter types and
-// defaults doesn't drag the algorithm (and its ~470 kB saliency dataset) onto
-// the initial load — only the worker and the report tab reach for this.
+// defaults doesn't drag the algorithm (and the saliency lookup table) onto the
+// initial load — only the worker and the report tab reach for this.
 
 function toEvalFunction(spec: EvaluatorSpec) {
   // 'cvd' is the jnd evaluator scored on a CVD-simulated copy of the palette
   const entry: Record<string, unknown> = {
-    function: categorycolors.evaluators[spec.type === 'cvd' ? 'jnd' : spec.type],
+    function: evaluators[spec.type === 'cvd' ? 'jnd' : spec.type],
     weight: spec.weight,
   }
   if (spec.type === 'cvd') {
@@ -30,8 +39,8 @@ function toEvalFunction(spec: EvaluatorSpec) {
 
 // The algorithm config a set of params describes; shared by generation (in
 // the worker) and the stats breakdown (on the main thread).
-export function buildConfig(params: PaletteParams) {
-  const config = categorycolors.config.createDefaultConfig()
+export function buildConfig(params: PaletteParams): Config {
+  const config = createDefaultConfig()
   config.logProgress = false
   config.colorCount = params.colorCount
   config.jnd = params.jnd
@@ -41,7 +50,9 @@ export function buildConfig(params: PaletteParams) {
     ranges: params.colorSpace.ranges.map((r) => [...r]),
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
-  config.evalFunctions = params.evaluators.filter((spec) => spec.weight > 0).map(toEvalFunction)
+  config.evalFunctions = params.evaluators
+    .filter((spec) => spec.weight > 0)
+    .map(toEvalFunction) as Config['evalFunctions']
   return config
 }
 
@@ -49,17 +60,15 @@ export function generatePalette(params: PaletteParams) {
   const config = buildConfig(params)
   config.recordHistory = true
 
-  const state = categorycolors.config.createDefaultState()
+  const state: StateInput = createDefaultState()
   state.colors = params.initColors.map((c) => ({
     color: toCulori(c.value),
     fixedColor: c.fixedColor,
     fixedOrder: c.fixedOrder,
   }))
 
-  const initialState = categorycolors.core.prepareInitialState(state, config)
-  const run = params.orderOptimization
-    ? categorycolors.core.runWithOrderOptimization
-    : categorycolors.core.runSimulatedAnnealing
+  const initialState = prepareInitialState(state, config)
+  const run = params.orderOptimization ? runWithOrderOptimization : runSimulatedAnnealing
   const finalState = run(initialState, config)
 
   return {

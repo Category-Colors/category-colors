@@ -5,10 +5,11 @@ import { Dashboard } from '@/components/dashboard/Dashboard'
 import { ThemeMenu } from './ThemeMenu'
 
 // The report's rendering stays split out — the map, the pair grid and the stats
-// panel between them still pull categorycolors' ~470 kB saliency dataset, and
-// that weight waits for the tab to be opened. The scoring itself moved here,
-// because the tab badge has to know the issue count before you go there;
-// lib/report reaches past the package barrel so it brings no dataset with it.
+// panel between them reach lib/algorithm, and with it category-colors' saliency
+// lookup table, so that weight waits for the tab to be opened. The scoring
+// itself lives here, because the tab badge has to know the issue count before
+// you go there; lib/report imports the package's report subpath alone, so it
+// brings no table with it.
 const ReportView = lazy(() => import('./ReportView').then((m) => ({ default: m.ReportView })))
 
 const tabClass =

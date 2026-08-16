@@ -1,6 +1,9 @@
 # Category Colors
 
-A browser-based categorical palette optimizer. It generates palettes with simulated annealing, evaluates pairwise distinguishability (including color-vision-deficiency simulations), and previews the result against live weather visualizations.
+A browser-based categorical palette optimizer, and the reference demo for the
+[`category-colors`](https://www.npmjs.com/package/category-colors) package. It generates palettes with simulated annealing, evaluates pairwise distinguishability (including color-vision-deficiency simulations), and previews the result against live weather visualizations.
+
+Every control in the interface maps onto a field of the package's config object, so the app doubles as a way to explore what the library's parameters do before writing any code.
 
 ## What it includes
 
@@ -16,7 +19,9 @@ The optimizer runs in a Web Worker so generation does not block the interface. T
 
 ## Development
 
-Requires Node.js `^20.19.0` or `>=22.12.0`. The sibling [`category-colors`](../category-colors) package must be present because this app links it through a local `file:` dependency.
+Requires Node.js `>=22.12.0`, the floor `category-colors` sets.
+
+The app currently links the sibling [`category-colors`](../category-colors) checkout through a `file:` dependency, so that directory must be present. Once the package is published, switch that entry in `package.json` to a version range (`"category-colors": "^1.0.0"`) and the checkout is no longer needed.
 
 ```sh
 npm install
@@ -41,7 +46,7 @@ The app also contains two development-only reference surfaces:
 The initial palette and its recorded loss curve are checked in so the first load is instant. After changing optimizer defaults, regenerate them with:
 
 ```sh
-node scripts/regen-preset.cjs
+node scripts/regen-preset.mjs
 ```
 
 That script updates the values documented in `src/lib/palette.ts` and `src/lib/preset-history.ts`.
