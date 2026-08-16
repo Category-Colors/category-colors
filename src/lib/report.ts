@@ -1,13 +1,12 @@
-// Imported from the module rather than the package barrel: the barrel reaches
-// `evaluators` and its ~470 kB saliency dataset, which would follow this file
-// into whatever chunk imports it — and the tab bar imports it now, to badge the
-// Report tab with its issue count.
-import { reportJndIssues } from 'categorycolors/src/report/jnd'
-import type { JndReport } from 'categorycolors/src'
+// Imported from the package's report subpath rather than its barrel. Both are
+// tree-shakeable, but the subpath states the dependency exactly: this file
+// needs CVD simulation and deltaE and nothing else, and the tab bar imports it
+// to badge the Report tab with its issue count.
+import { reportJndIssues } from 'category-colors/report'
+import type { CvdType, JndReport, JndTest } from 'category-colors/report'
 import type { PaletteVersion } from './palette'
 
-export type { JndReport, JndTest, JndIssue } from 'categorycolors/src'
-import type { JndTest } from 'categorycolors/src'
+export type { JndReport, JndTest, JndPair } from 'category-colors/report'
 
 // 'normal' → 'No CVD'; CVD labels use the type name alone, adding the
 // severity only when two simulations of the same type would collide.
@@ -33,11 +32,13 @@ export function colorVsBackground(
   threshold: number,
   report: JndReport
 ): JndTest[] {
+  // Labels come from a report the library itself produced, so the type half is
+  // always one of its CVD names — the cast just re-states what split() lost.
   const cvdSimulations = report.tests
     .filter((t) => t.label !== 'normal')
     .map((t) => {
       const [type, severity] = t.label.split(':')
-      return { type, severity: Number(severity) }
+      return { type: type as CvdType, severity: Number(severity) }
     })
   return reportJndIssues([color, background], {
     jndThreshold: threshold,

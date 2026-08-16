@@ -1,4 +1,10 @@
-import categorycolors from 'categorycolors/src'
+import {
+  costBreakdown,
+  createDefaultState,
+  deltaE,
+  prepareInitialState,
+  type StateInput,
+} from 'category-colors'
 import { converter } from 'culori'
 import { buildConfig } from './algorithm'
 import { evaluatorLabel } from './evaluators'
@@ -36,11 +42,11 @@ export function computeStats(version: PaletteVersion): PaletteStats | null {
   // keeps it near-free
   config.initialTemperatureSamples = 1
 
-  const state = categorycolors.config.createDefaultState()
+  const state: StateInput = createDefaultState()
   state.colors = colors.map((hex) => ({ color: hex, fixedColor: false, fixedOrder: false }))
-  const prepared = categorycolors.core.prepareInitialState(state, config)
+  const prepared = prepareInitialState(state, config)
 
-  const breakdown = categorycolors.core.costBreakdown(prepared, config)
+  const breakdown = costBreakdown(prepared, config)
   // breakdown is positionally aligned with the specs buildConfig kept; the
   // fallback label only guards against the two lists drifting apart
   const activeSpecs = params.evaluators.filter((e) => e.weight > 0)
@@ -52,7 +58,6 @@ export function computeStats(version: PaletteVersion): PaletteStats | null {
     share: totalCost > 0 ? b.weightedCost / totalCost : 0,
   }))
 
-  const { deltaE } = categorycolors.utils
   let minDeltaE = Infinity
   let sum = 0
   let pairs = 0
