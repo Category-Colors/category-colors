@@ -1,7 +1,6 @@
 import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
 import { isWorkingSpace, spaceChannels, spaceInitialRanges, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
-import { PRESET_COST_HISTORY } from './preset-history'
 
 export type { WorkingSpace }
 
@@ -136,17 +135,6 @@ export const DEFAULT_PARAMS: PaletteParams = {
   targets: [],
   evaluators: DEFAULT_EVALUATORS,
   colorSpace: defaultColorSpace('okhsl'),
-}
-
-// Precomputed with DEFAULT_PARAMS so the app boots instantly instead of
-// annealing on load; pressing Generate with untouched settings produces a
-// palette of the same character. Regenerate with scripts/regen-preset.mjs
-// (keeps colors, cost, iterations, and preset-history.ts in sync).
-export const PRESET_PALETTE = {
-  colors: ['#864064', '#b79270', '#3377cd', '#8a4025', '#f18ab8', '#aae7ed', '#316c4d', '#c6f078'],
-  cost: 0.1703,
-  iterations: 13034,
-  costHistory: PRESET_COST_HISTORY,
 }
 
 const IMPORT_LIMITS = {

@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom'
 
 const DWELL = 200
 
-// One delegated tooltip for every icon-only button in the app: any
-// `button[aria-label]` grows a styled label after a 200ms dwell. A single
+// One delegated tooltip for every icon-only button in the app: any enabled
+// `button[aria-label]` grows a styled label after a 200ms dwell. A disabled
+// button is skipped — it cannot be pressed, so it has nothing to explain, and
+// naming it would be the one visual answer it still gave to a pointer. A single
 // fixed node is repositioned imperatively (compositor-only transitions),
 // glides between adjacent buttons, and hides on press, leave, or scroll.
 export function TooltipLayer() {
@@ -46,7 +48,7 @@ export function TooltipLayer() {
     }
 
     const onOver = (e: PointerEvent) => {
-      const el = (e.target as Element).closest?.('button[aria-label]') ?? null
+      const el = (e.target as Element).closest?.('button[aria-label]:not(:disabled)') ?? null
       if (el === state.el) return
       window.clearTimeout(state.timer)
       state.el = el

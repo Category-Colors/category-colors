@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import type { CityWeather } from '@/lib/weather'
+import { ChartTip, type Tip } from './ChartTip'
+import { tipAt } from './chart-geometry'
 import { CityBadge } from './CityBadge'
 
 export function SunShare({ cities, colors }: { cities: CityWeather[]; colors: string[] }) {
@@ -6,10 +9,14 @@ export function SunShare({ cities, colors }: { cities: CityWeather[]; colors: st
   // a forecast with no sun anywhere would divide by zero; the fallback keeps
   // every share at 0% (an empty bar) instead of NaN
   const total = hours.reduce((sum, h) => sum + h, 0) || 1
+  const [tip, setTip] = useState<Tip | null>(null)
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex h-7 gap-[2px] overflow-hidden rounded-md">
+      <div
+        className="flex h-7 gap-[2px] overflow-hidden rounded-md"
+        onPointerLeave={() => setTip(null)}
+      >
         {cities.map((city, i) => (
           <div
             key={city.code}
@@ -18,7 +25,7 @@ export function SunShare({ cities, colors }: { cities: CityWeather[]; colors: st
               width: `${(hours[i] / total) * 100}%`,
               backgroundColor: colors[i],
             }}
-            title={`${city.name} — ${Math.round(hours[i])}h of sun over 7 days`}
+            onPointerMove={(e) => setTip(tipAt(e, colors[i], city.name, `${Math.round(hours[i])}h of sun · ${Math.round((hours[i] / total) * 100)}%`))}
           />
         ))}
       </div>
@@ -30,6 +37,7 @@ export function SunShare({ cities, colors }: { cities: CityWeather[]; colors: st
           </span>
         ))}
       </div>
+      {tip && <ChartTip {...tip} />}
     </div>
   )
 }

@@ -13,20 +13,22 @@ import {
   type WorkingSpace,
 } from '@/lib/palette'
 import { hexValue } from '@/lib/color'
-import { SPACE_OPTIONS, spaceChannels } from '@/lib/color-spaces'
+import { SPACE_OPTIONS, spaceChannels, spaceDef } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
 import { AddEvaluatorMenu } from './AddEvaluatorMenu'
 import { ColorRow } from './ColorRow'
 import { EvaluatorEditor } from './EvaluatorEditor'
-import { ChevronsDownUpIcon, ChevronsUpDownIcon, TrashIcon } from './icons'
+import { TrashIcon } from './icons'
 import { MorphPanel } from './MorphPanel'
+import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
 import { RangeSlider } from './RangeSlider'
+import { CollapseAllButton } from './CollapseAllButton'
+import { countOf, useSections } from './sections'
 import { ListEmptyState, ListRow, ReorderList } from './ReorderList'
 
 const SECTIONS = ['space', 'init', 'evals', 'optimizer'] as const
-type SectionKey = (typeof SECTIONS)[number]
 
 // While the worker anneals, the button cycles through the stages of the
 // craft every 5s so long runs feel alive
@@ -45,6 +47,8 @@ export function ParametersPanel({
   busy,
   minimized,
   onMinimizedChange,
+  hoverToOpen,
+  width,
 }: {
   params: PaletteParams
   onParamsChange: (params: PaletteParams) => void
@@ -52,13 +56,10 @@ export function ParametersPanel({
   busy: boolean
   minimized: boolean
   onMinimizedChange: (minimized: boolean) => void
+  hoverToOpen: boolean
+  width: MotionValue<number>
 }) {
-  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
-    space: true,
-    init: true,
-    evals: true,
-    optimizer: true,
-  })
+  const sections = useSections(SECTIONS)
   const fileRef = useRef<HTMLInputElement>(null)
   const [verbIndex, setVerbIndex] = useState(0)
 
@@ -93,12 +94,6 @@ export function ParametersPanel({
       }}
     />
   )
-
-  const allCollapsed = SECTIONS.every((key) => !openSections[key])
-  const setAll = (open: boolean) =>
-    setOpenSections({ space: open, init: open, evals: open, optimizer: open })
-  const setSection = (key: SectionKey) => (open: boolean) =>
-    setOpenSections((s) => ({ ...s, [key]: open }))
 
   const importConfig = (file: File | undefined) => {
     if (!file) return
@@ -138,13 +133,7 @@ export function ParametersPanel({
                 { label: 'Import configuration…', onClick: () => fileRef.current?.click() },
               ]}
             />
-            <button
-              className="color-row-icon"
-              aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
-              onClick={() => setAll(allCollapsed)}
-            >
-              {allCollapsed ? <ChevronsUpDownIcon /> : <ChevronsDownUpIcon />}
-            </button>
+            <CollapseAllButton allCollapsed={sections.allCollapsed} onToggle={sections.toggleAll} />
             <input
               ref={fileRef}
               type="file"
@@ -166,7 +155,12 @@ export function ParametersPanel({
           max={20}
           step={1}
         />
-        <Folder title="Color space" open={openSections.space} onOpenChange={setSection('space')}>
+        <Folder
+          title="Color space"
+          open={sections.open.space}
+          onOpenChange={sections.setSection('space')}
+          summary={spaceDef(params.colorSpace.mode).label}
+        >
           <SelectControl
             label="Space"
             value={params.colorSpace.mode}
@@ -192,16 +186,19 @@ export function ParametersPanel({
         </Folder>
         <Folder
           title="Initialize"
-          open={openSections.init}
-          onOpenChange={setSection('init')}
+          open={sections.open.init}
+          onOpenChange={sections.setSection('init')}
+          summary={countOf(params.initColors.length, 'color')}
           actions={
-            <button
-              className="color-row-icon"
-              aria-label="Delete all"
-              onClick={() => set('initColors', [])}
-            >
-              <TrashIcon />
-            </button>
+            params.initColors.length > 0 && (
+              <button
+                className="color-row-icon"
+                aria-label="Delete all"
+                onClick={() => set('initColors', [])}
+              >
+                <TrashIcon />
+              </button>
+            )
           }
         >
           <ReorderList
@@ -236,16 +233,19 @@ export function ParametersPanel({
         </Folder>
         <Folder
           title="Evaluators"
-          open={openSections.evals}
-          onOpenChange={setSection('evals')}
+          open={sections.open.evals}
+          onOpenChange={sections.setSection('evals')}
+          summary={countOf(params.evaluators.length, 'evaluator')}
           actions={
-            <button
-              className="color-row-icon"
-              aria-label="Delete all"
-              onClick={() => set('evaluators', [])}
-            >
-              <TrashIcon />
-            </button>
+            params.evaluators.length > 0 && (
+              <button
+                className="color-row-icon"
+                aria-label="Delete all"
+                onClick={() => set('evaluators', [])}
+              >
+                <TrashIcon />
+              </button>
+            )
           }
         >
           <div className="panel-list">
@@ -276,7 +276,12 @@ export function ParametersPanel({
             )}
           </AnimatePresence>
         </Folder>
-        <Folder title="Optimizer" open={openSections.optimizer} onOpenChange={setSection('optimizer')}>
+        <Folder
+          title="Optimizer"
+          open={sections.open.optimizer}
+          onOpenChange={sections.setSection('optimizer')}
+          summary={`${params.maxIterations.toLocaleString()} iterations`}
+        >
           <Slider
             label="JND threshold"
             value={params.jnd}
@@ -317,7 +322,14 @@ export function ParametersPanel({
   )
 
   return (
-    <MorphPanel side="left" minimized={minimized} onMinimizedChange={onMinimizedChange}>
+    <MorphPanel
+      side="left"
+      name="Configuration"
+      minimized={minimized}
+      onMinimizedChange={onMinimizedChange}
+      hoverToOpen={hoverToOpen}
+      width={width}
+    >
       {panelBody}
     </MorphPanel>
   )

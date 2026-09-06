@@ -42,7 +42,7 @@ export function ReportView({
               <span key={test.label} className="flex items-center gap-1.5">
                 <span className="text-[11px] text-ink/45">{titles[i]}</span>
                 <span
-                  className={`rounded-full px-2 py-0.5 tabular-nums text-[11px] ${
+                  className={`count-badge ${
                     test.issueCount === 0
                       ? 'bg-ink/[0.06] text-ink/55'
                       : 'bg-danger/10 text-danger/90'

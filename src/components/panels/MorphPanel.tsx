@@ -1,7 +1,11 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion, animate, AnimatePresence } from 'motion/react'
+import type { MotionValue } from 'motion/react'
 import { SPRING, prefersReducedMotion } from '@/components/dialkit'
+
+export const PANEL_WIDTH = 292
+export const PUCK_SIZE = 42
 
 // Tabler layout-sidebar-collapse glyph; the frame stays put while the chevron
 // morphs between pointing toward the panel's edge (collapse) and away from
@@ -27,17 +31,40 @@ function SidebarToggleIcon({ side, minimized }: { side: 'left' | 'right'; minimi
 // The toggle is persistent — the container morphs around it.
 export function MorphPanel({
   side,
+  name,
   minimized,
   onMinimizedChange,
+  hoverToOpen = false,
+  width,
   children,
 }: {
   side: 'left' | 'right'
+  /** The panel's own title, lowercased into the footprint's invitation */
+  name: string
   minimized: boolean
   onMinimizedChange: (minimized: boolean) => void
+  /** First run: while collapsed, the panel's whole footprint is outlined,
+      lights up on hover, and opens the panel on click */
+  hoverToOpen?: boolean
+  /** The panel's live width. Owned by the app so the nav row can move with
+      it: both read the same number each frame, so nothing has to approximate
+      the spring. */
+  width: MotionValue<number>
   children: ReactNode
 }) {
   const morphRef = useRef<HTMLDivElement>(null)
   const pinnedHeight = useRef(600)
+
+  // Driven imperatively rather than through `animate` so the value is the
+  // shared motion value itself. Outside MotionConfig, so reduced motion is
+  // checked by hand.
+  useEffect(() => {
+    animate(
+      width,
+      minimized ? PUCK_SIZE : PANEL_WIDTH,
+      prefersReducedMotion() ? { duration: 0 } : minimized ? SPRING.morphOut : SPRING.morphIn
+    )
+  }, [width, minimized])
 
   // Capture the rendered height before collapsing; the collapse animates
   // height via explicit [from, to] keyframes because springing from 'auto'
@@ -49,16 +76,26 @@ export function MorphPanel({
 
   return (
     <aside className={`dialkit-root panel-dock panel-dock-${side}`}>
+      {/* before the morph in the DOM so the puck stays on top of it */}
+      {minimized && hoverToOpen && (
+        <button
+          type="button"
+          className="panel-hover-zone"
+          onClick={() => onMinimizedChange(false)}
+        >
+          {/* names the target rather than the gesture: the outline already
+              reads as a place, this says which one. Carried in the a11y tree
+              at all times — only its ink waits for the hover. */}
+          <span>Open {name.toLowerCase()} panel</span>
+        </button>
+      )}
       <motion.div
         ref={morphRef}
         className="panel-morph"
         data-min={minimized ? '' : undefined}
         initial={false}
-        animate={
-          minimized
-            ? { width: 42, height: [pinnedHeight.current, 42] }
-            : { width: 292, height: 'auto' }
-        }
+        style={{ width }}
+        animate={{ height: minimized ? [pinnedHeight.current, PUCK_SIZE] : 'auto' }}
         transition={minimized ? SPRING.morphOut : SPRING.morphIn}
         onClick={minimized ? () => onMinimizedChange(false) : undefined}
       >

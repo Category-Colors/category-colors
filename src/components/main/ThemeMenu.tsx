@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { SelectControl, popoverMotion } from '@/components/dialkit'
+import { SegmentedControl, SelectControl, popoverMotion } from '@/components/dialkit'
 import { useDismiss } from '@/components/dialkit/use-dropdown'
 import { ColorRow } from '@/components/panels/ColorRow'
+import { BrushIcon } from '@/components/panels/icons'
 import { hexValue, parseCssColor, valueToCss, type ColorValue } from '@/lib/color'
 import {
   CUSTOM,
@@ -50,15 +51,17 @@ export function ThemeMenu() {
 
   return (
     <div ref={ref} className="theme-menu dialkit-root">
-      {/* no aria-label: the visible text is already the accessible name, and
-          a redundant one only earns the button a tooltip it doesn't need */}
+      {/* no aria-label: the text is the accessible name even once the nav
+          row folds it away (index.css), and a redundant one only earns the
+          button a tooltip it doesn't need */}
       <button
         className="theme-trigger"
         data-open={String(open)}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        Theme
+        <BrushIcon />
+        <span className="theme-trigger-label">Theme</span>
       </button>
 
       <AnimatePresence>
@@ -75,23 +78,30 @@ export function ThemeMenu() {
             />
             {/* a custom theme is a single set of colours, not a pair — there
                 is no other mode to switch to */}
-            <SelectControl
-              label="Mode"
-              value={state.mode}
-              options={MODE_OPTIONS}
-              disabled={isCustom}
-              onChange={(mode) => setState({ ...state, mode: mode as ThemeMode })}
-            />
+            <div
+              className="dialkit-labeled-control dialkit-toggle-row"
+              onClick={(e) => {
+                if (isCustom || (e.target as HTMLElement).closest('.dialkit-segmented')) return
+                setState({ ...state, mode: state.mode === 'dark' ? 'light' : 'dark' })
+              }}
+            >
+              <span className="dialkit-labeled-control-label">Mode</span>
+              <SegmentedControl
+                options={MODE_OPTIONS}
+                value={state.mode}
+                disabled={isCustom}
+                onChange={(mode) => setState({ ...state, mode: mode as ThemeMode })}
+              />
+            </div>
             {isCustom && (
               <div className="theme-tokens">
                 {TOKEN_FIELDS.map((field) => (
-                  <label key={field.key} className="theme-token">
-                    <span>{field.label}</span>
-                    <ColorRow
-                      value={toValue(state.custom[field.key])}
-                      onValueChange={(v) => setToken(field.key, v)}
-                    />
-                  </label>
+                  <ColorRow
+                    key={field.key}
+                    label={field.label}
+                    value={toValue(state.custom[field.key])}
+                    onValueChange={(v) => setToken(field.key, v)}
+                  />
                 ))}
               </div>
             )}

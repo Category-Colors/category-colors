@@ -10,12 +10,15 @@ interface SegmentedControlProps<T extends string> {
   options: SegmentedControlOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Dims the control and ignores presses; the pill stays where it is */
+  disabled?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  disabled = false,
 }: SegmentedControlProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hasAnimated = useRef(false);
@@ -41,7 +44,12 @@ export function SegmentedControl<T extends string>({
   hasAnimated.current = true;
 
   return (
-    <div className="dialkit-segmented" ref={containerRef} role="group">
+    <div
+      className="dialkit-segmented"
+      ref={containerRef}
+      role="group"
+      data-disabled={disabled ? '' : undefined}
+    >
       {pillStyle && (
         <div
           className="dialkit-segmented-pill"
@@ -62,6 +70,7 @@ export function SegmentedControl<T extends string>({
             className="dialkit-segmented-button"
             data-active={String(isActive)}
             aria-pressed={isActive}
+            disabled={disabled}
           >
             {option.label}
           </button>

@@ -220,11 +220,11 @@
 }
 
 .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-icon {
-  cursor: pointer;
+  cursor: default;
 }
 
 .dialkit-folder-header {
-  cursor: pointer;
+  cursor: default;
   user-select: none;
 }
 
@@ -249,6 +249,21 @@
   letter-spacing: -0.01em;
   transform: translateY(-0.5px);
   transition: color var(--dial-anim-fast);
+}
+
+/* Collapsed sections keep a one-line account of their contents right after
+   the title, set like a de-emphasised value ("Evaluators 5 evaluators") */
+.dialkit-folder-summary {
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--dial-text-secondary);
+  transform: translateY(-0.5px); /* the title's optical nudge */
 }
 
 .dialkit-folder-title-root {
@@ -284,7 +299,6 @@
   padding: 0;
   background: transparent;
   border: none;
-  cursor: pointer;
 }
 
 .dialkit-folder-copy svg {
@@ -429,13 +443,20 @@
   height: var(--dial-row-height);
 }
 
+/* Cursor policy, app-like rather than web-like: the hand belongs to
+   hyperlinks, so controls keep the plain arrow and say what they are through
+   their own hover states. Cursors change only where they carry information the
+   control cannot: ew-resize on a track you scrub sideways, grab on something
+   you pick up and move, crosshair where the pointer's exact position is the
+   query, text on a field you type into. Disabled controls keep the arrow too —
+   not-allowed is a web convention, and the dimming already says it. */
 .dialkit-slider {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  cursor: pointer;
+  cursor: ew-resize; /* scrubbed sideways, so it says so */
   user-select: none;
   overflow: hidden;
   background: var(--dial-surface);
@@ -563,6 +584,11 @@
   padding: 2px;
   background: transparent;
   border-radius: var(--dial-radius);
+  transition: background var(--dial-anim-fast);
+}
+
+.dialkit-segmented[data-disabled] {
+  opacity: 0.35;
 }
 
 .dialkit-segmented-pill {
@@ -585,7 +611,6 @@
   font-weight: 500;
   background: transparent;
   border: none;
-  cursor: pointer;
   transition: color var(--dial-anim-fast);
 }
 
@@ -597,6 +622,21 @@
   color: var(--dial-text-label);
 }
 
+/* The pill says which segment is chosen; with the pointer cursor gone, this is
+   the only thing left saying the control can be touched at all. What lights up
+   is the track the pill travels down — not the other segment, which lit up
+   would read as though it were already selected — so the pill stays the one
+   thing that means "chosen". On a toggle row the whole row switches it, so
+   pointing anywhere on the row raises the same track.
+   Gated by hand rather than riding the touch escape hatch above, which only
+   neutralises surfaces painted with --dial-surface-hover. */
+@media (hover: hover) and (pointer: fine) {
+  .dialkit-segmented:not([data-disabled]):hover,
+  .dialkit-toggle-row:hover .dialkit-segmented:not([data-disabled]) {
+    background: var(--dial-surface-subtle);
+  }
+}
+
 /* Toggle */
 .dialkit-toggle {
   display: flex;
@@ -605,7 +645,7 @@
   padding: 10px 16px;
   background: var(--dial-surface);
   border-radius: var(--dial-radius);
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   transition: background var(--dial-anim-fast);
 }
@@ -664,30 +704,27 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast), color var(--dial-anim-fast),
     transform var(--dial-anim-press);
 }
 
-.dialkit-button:hover {
+.dialkit-button:not(:disabled):hover {
   background: var(--dial-surface-hover);
   color: var(--dial-text-primary);
 }
 
 .dialkit-select-trigger:disabled {
   opacity: 0.35;
-  cursor: default;
 }
 
 .dialkit-button:disabled {
   opacity: 0.35;
-  cursor: default;
 }
 
-.dialkit-button:disabled:hover {
-  background: var(--dial-surface);
-  color: var(--dial-text-secondary);
-}
+/* Nothing here re-states a resting value to undo a hover. Guarding the hover
+   itself is what keeps a disabled control inert: an undo only covers the
+   properties it happens to name, and variants like .square-button, which
+   carries its own colour, fall straight through one. */
 
 /* :not([data-open]) skips the popover triggers wearing button chrome — the
    add-bar's image and presets icons, the ghost "Add evaluator". Pressing one
@@ -769,7 +806,6 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast), color var(--dial-anim-fast),
     transform var(--dial-anim-press);
 }
@@ -846,7 +882,6 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
@@ -875,7 +910,6 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
@@ -957,11 +991,10 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
-.dialkit-select-trigger:hover {
+.dialkit-select-trigger:not(:disabled):hover {
   background: var(--dial-surface-hover);
 }
 
@@ -1023,7 +1056,6 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  cursor: pointer;
   text-align: left;
   transition: background var(--dial-anim-fast), color var(--dial-anim-fast);
 }
@@ -1134,7 +1166,6 @@
   height: 20px;
   border-radius: 4px;
   border: 1px solid var(--dial-border-hover);
-  cursor: pointer;
   transition: transform var(--dial-anim-fast);
 }
 
@@ -1173,20 +1204,11 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
-.dialkit-preset-trigger:hover {
+.dialkit-preset-trigger:not([data-disabled="true"]):hover {
   background: var(--dial-surface-hover);
-}
-
-.dialkit-preset-trigger[data-disabled="true"] {
-  cursor: default;
-}
-
-.dialkit-preset-trigger[data-disabled="true"]:hover {
-  background: var(--dial-surface);
 }
 
 .dialkit-preset-trigger[data-open="true"] {
@@ -1226,7 +1248,6 @@
   padding: 8px 10px 8px 10px;
   gap: 8px;
   border-radius: 8px;
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
@@ -1260,7 +1281,6 @@
   padding: 0;
   background: transparent;
   border: none;
-  cursor: pointer;
   opacity: 0;
   transition: opacity var(--dial-anim-fast);
   flex-shrink: 0;
@@ -1304,7 +1324,6 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  cursor: pointer;
   transition: background var(--dial-anim-fast), color var(--dial-anim-fast);
 }
 
@@ -1356,7 +1375,6 @@
   background: var(--dial-surface);
   border: none;
   border-radius: 6px;
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 
@@ -1366,7 +1384,6 @@
 
 .dialkit-preset-confirm:disabled {
   opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .dialkit-preset-confirm svg {
@@ -1410,7 +1427,6 @@
   background: var(--dial-surface);
   border: none;
   border-radius: var(--dial-radius);
-  cursor: pointer;
   transition: background var(--dial-anim-fast);
 }
 

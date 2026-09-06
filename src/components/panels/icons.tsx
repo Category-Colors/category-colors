@@ -121,6 +121,17 @@ export function SwatchesIcon() {
   )
 }
 
+// A flat paint brush, upright: notched handle, ferrule band, rounded bristles.
+// After Central Icons' paint-brush.
+export function BrushIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 14V3h-5.5L12 5l-1.5-2H5v11h4.5l-.3 4.5a2.8 2.8 0 0 0 5.6 0l-.3-4.5z" />
+      <path d="M5 10h14" />
+    </svg>
+  )
+}
+
 export function ChevronsRightIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

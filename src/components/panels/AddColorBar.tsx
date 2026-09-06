@@ -187,7 +187,7 @@ export function AddColorBar({
             {label}
           </button>
           <button
-            className="dialkit-button add-bar-icon"
+            className="dialkit-button square-button"
             data-open={String(imageOpen)}
             aria-label="Add from image…"
             onClick={() => (imageOpen ? closeImage() : setImageOpen(true))}
@@ -196,7 +196,7 @@ export function AddColorBar({
           </button>
           <button
             ref={presetsRef}
-            className="dialkit-button add-bar-icon"
+            className="dialkit-button square-button"
             data-open={String(menuOpen)}
             aria-label="Swap in a preset…"
             onClick={() => setMenuOpen(!menuOpen)}

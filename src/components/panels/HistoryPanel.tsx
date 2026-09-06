@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
-import { SegmentedControl, ButtonGroup, Folder, SelectControl } from '@/components/dialkit'
+import { Folder, SelectControl } from '@/components/dialkit'
 import type { PaletteVersion } from '@/lib/palette'
 import {
   convertValue,
@@ -24,8 +24,11 @@ import { ColorRow } from './ColorRow'
 import { HistoryPopover, type HistoryPopoverHandle } from './HistoryPopover'
 import { CheckIcon, CopyIcon, TrashIcon, XIcon } from './icons'
 import { MorphPanel } from './MorphPanel'
+import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
 import { ListRow, ReorderList } from './ReorderList'
+import { CollapseAllButton } from './CollapseAllButton'
+import { countOf, useSections } from './sections'
 
 // ReorderList and row animations need stable identity, which bare color
 // strings can't provide — the palette is mirrored locally as id-tagged rows.
@@ -92,6 +95,8 @@ export function HistoryPanel({
   onClearVersions,
   minimized,
   onMinimizedChange,
+  hoverToOpen,
+  width,
 }: {
   versions: PaletteVersion[]
   currentId: number | null
@@ -102,8 +107,20 @@ export function HistoryPanel({
   onClearVersions: () => void
   minimized: boolean
   onMinimizedChange: (minimized: boolean) => void
+  hoverToOpen: boolean
+  width: MotionValue<number>
 }) {
   const [format, setFormat] = useState<ExportFormat>('raw')
+  // the preview is optional reading, so it starts folded
+  // Nothing to show and nothing to say about it: with no versions yet, the
+  // whole section goes rather than standing there empty. It keeps its open
+  // state for when the first palette brings it back.
+  const hasHistory = versions.length > 0
+  const sections = useSections(
+    ['palette', 'history', 'preview'] as const,
+    ['preview'],
+    hasHistory ? (['palette', 'history', 'preview'] as const) : (['palette', 'preview'] as const)
+  )
   const [copied, setCopied] = useState(false)
   const previewRef = useRef<HTMLTextAreaElement>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(null)
@@ -185,10 +202,15 @@ export function HistoryPanel({
     )
   }
 
-  // delegated hover: one pair of listeners for the whole list
+  // Delegated hover: one pair of listeners for the whole list. Only the
+  // palette itself previews — the row's × is beside it, not part of it, so
+  // reaching for the × neither opens the popover nor lights the row.
   const onListOver = (e: React.PointerEvent) => {
-    const el = (e.target as Element).closest('[data-version]')
-    if (!el) return
+    const el = (e.target as Element).closest('.color-row-chip')?.closest('[data-version]')
+    if (!el) {
+      popover.current?.hide()
+      return
+    }
     const version = versions.find((v) => v.id === Number(el.getAttribute('data-version')))
     if (version) popover.current?.show(version, el)
   }
@@ -214,7 +236,14 @@ export function HistoryPanel({
   }
 
   return (
-    <MorphPanel side="right" minimized={minimized} onMinimizedChange={onMinimizedChange}>
+    <MorphPanel
+      side="right"
+      name="Output"
+      minimized={minimized}
+      onMinimizedChange={onMinimizedChange}
+      hoverToOpen={hoverToOpen}
+      width={width}
+    >
       <Folder
         title="Output"
         isRoot
@@ -223,6 +252,7 @@ export function HistoryPanel({
             <PanelMenu
               items={[{ label: 'Import palette…', onClick: () => fileRef.current?.click() }]}
             />
+            <CollapseAllButton allCollapsed={sections.allCollapsed} onToggle={sections.toggleAll} />
             <input
               ref={fileRef}
               type="file"
@@ -236,20 +266,34 @@ export function HistoryPanel({
           </>
         }
       >
+        {/* Both formats sit above the sections, like the config panel's
+            Colors row: they govern everything below and what the footer
+            copies and downloads */}
+        <SelectControl
+          label="Color format"
+          value={formatValue}
+          options={formatOptions}
+          onChange={convertAll}
+        />
+        <SelectControl
+          label="Output format"
+          value={format}
+          options={EXPORT_FORMATS}
+          onChange={(v) => setFormat(v as ExportFormat)}
+        />
         <Folder
           title="Palette"
+          open={sections.open.palette}
+          onOpenChange={sections.setSection('palette')}
+          summary={countOf(items.length, 'color')}
           actions={
-            <button className="color-row-icon" aria-label="Delete all" onClick={() => commit([])}>
-              <TrashIcon />
-            </button>
+            items.length > 0 && (
+              <button className="color-row-icon" aria-label="Delete all" onClick={() => commit([])}>
+                <TrashIcon />
+              </button>
+            )
           }
         >
-          <SelectControl
-            label="Format"
-            value={formatValue}
-            options={formatOptions}
-            onChange={convertAll}
-          />
           <ReorderList
             key={palette.gen}
             className="panel-list"
@@ -273,17 +317,18 @@ export function HistoryPanel({
             {items.length > 0 && <ListRow key="add-bar">{paletteAddBar()}</ListRow>}
           </AnimatePresence>
         </Folder>
-        <Folder
-          title="History"
-          actions={
-            <button className="color-row-icon" aria-label="Delete all" onClick={onClearVersions}>
-              <TrashIcon />
-            </button>
-          }
-        >
-          {versions.length === 0 ? (
-            <p className="panel-status">Generate a palette to start a history.</p>
-          ) : (
+        {hasHistory && (
+          <Folder
+            title="History"
+            open={sections.open.history}
+            onOpenChange={sections.setSection('history')}
+            summary={countOf(versions.length, 'version')}
+            actions={
+              <button className="color-row-icon" aria-label="Delete all" onClick={onClearVersions}>
+                <TrashIcon />
+              </button>
+            }
+          >
             <div className="version-list" onPointerOver={onListOver} onPointerLeave={onListLeave}>
               {newestFirst.map((v) => (
                 <VersionRow
@@ -298,17 +343,14 @@ export function HistoryPanel({
                 />
               ))}
             </div>
-          )}
-        </Folder>
-        <Folder title="Export">
-          <SegmentedControl
-            options={EXPORT_FORMATS}
-            value={format}
-            onChange={(v) => setFormat(v as ExportFormat)}
-          />
-          {current && (
-            // copy is an inset affordance on the preview it acts on, which
-            // leaves download as the panel's single primary action
+          </Folder>
+        )}
+        <Folder
+          title="Preview"
+          open={sections.open.preview}
+          onOpenChange={sections.setSection('preview')}
+        >
+          {current ? (
             <div className="export-preview-frame">
               {/* A read-only textarea rather than a <pre>: it's focusable and
                   selectable on its own, so the platform's select-all works
@@ -322,30 +364,33 @@ export function HistoryPanel({
                 value={formatPalette(formatted, format)}
               />
               <ScrollOverlay scrollerRef={previewRef} watch={`${format}:${formatted.length}`} />
-              <button
-                className="color-row-icon export-copy"
-                data-active={String(copied)}
-                // static name: the checkmark carries the confirmation, and a
-                // label that changes mid-hover leaves the tooltip stale
-                aria-label="Copy to clipboard"
-                onClick={copy}
-              >
-                {copied ? <CheckIcon /> : <CopyIcon />}
-              </button>
             </div>
+          ) : (
+            <p className="panel-status">Generate a palette to preview its export.</p>
           )}
         </Folder>
       </Folder>
       <div className="panel-footer">
-        <ButtonGroup
-          buttons={[
-            {
-              label: 'Download',
-              onClick: () => downloadPalette(formatted, format),
-              disabled: !current,
-            },
-          ]}
-        />
+        <div className="dialkit-button-group">
+          <button
+            className="dialkit-button square-button"
+            data-active={String(copied)}
+            // static name: the checkmark carries the confirmation, and a
+            // label that changes mid-hover leaves the tooltip stale
+            aria-label="Copy to clipboard"
+            disabled={!current}
+            onClick={copy}
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+          <button
+            className="dialkit-button"
+            disabled={!current}
+            onClick={() => downloadPalette(formatted, format)}
+          >
+            Download
+          </button>
+        </div>
       </div>
       <HistoryPopover ref={popover} />
     </MorphPanel>

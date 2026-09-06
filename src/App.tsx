@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
-import { MotionConfig } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
+import { MotionConfig, motion, useMotionValue, useTransform } from 'motion/react'
+import type { MotionStyle } from 'motion/react'
 import {
   DEFAULT_PARAMS,
-  PRESET_PALETTE,
   type PaletteParams,
   type PaletteVersion,
 } from '@/lib/palette'
@@ -12,30 +12,47 @@ import { MainTabs } from '@/components/main/MainTabs'
 import { TooltipLayer } from '@/components/TooltipLayer'
 import { ParametersPanel } from '@/components/panels/ParametersPanel'
 import { HistoryPanel } from '@/components/panels/HistoryPanel'
+import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
+
+// Below this the panels float over the canvas instead of the canvas
+// reserving a column for them (index.css). Floating panels would cover what
+// they float over, so at those widths both start collapsed.
+const panelsFloat = () => !window.matchMedia('(min-width: 1280px)').matches
 
 export default function App() {
   const [params, setParams] = useState<PaletteParams>(DEFAULT_PARAMS)
-  // Boot with the precomputed preset instead of annealing on load
-  const [versions, setVersions] = useState<PaletteVersion[]>(() => [
-    { id: 1, params: DEFAULT_PARAMS, ...PRESET_PALETTE, createdAt: Date.now() },
-  ])
-  const [currentId, setCurrentId] = useState<number | null>(1)
+  // Boots empty: the canvas explains the app until the first palette exists
+  const [versions, setVersions] = useState<PaletteVersion[]>([])
+  const [currentId, setCurrentId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const [panelMinimized, setPanelMinimized] = useState(false)
-  const [rightMinimized, setRightMinimized] = useState(false)
-  const nextId = useRef(2)
+  const [panelMinimized, setPanelMinimized] = useState(panelsFloat)
+  const [rightMinimized, setRightMinimized] = useState(panelsFloat)
+  // Each panel animates its width on one of these. How far it reaches past
+  // its collapsed puck becomes a CSS variable the floating layout pads the
+  // nav row by (index.css), so the logo and Theme button move with the
+  // panel's own spring rather than a transition that approximates it. They
+  // live on the app root, not the canvas: the docks sit outside the canvas
+  // and their collapsed footprints have to measure the same push.
+  const leftWidth = useMotionValue(panelMinimized ? PUCK_SIZE : PANEL_WIDTH)
+  const rightWidth = useMotionValue(rightMinimized ? PUCK_SIZE : PANEL_WIDTH)
+  const pushLeft = useTransform(leftWidth, (w) => `${w - PUCK_SIZE}px`)
+  const pushRight = useTransform(rightWidth, (w) => `${w - PUCK_SIZE}px`)
+  const nextId = useRef(1)
   const paramsRef = useRef(params)
   const generating = useRef(false)
   paramsRef.current = params
 
-  const generate = () => {
+  // With `override`, the run uses those params and the panel adopts them
+  // (the empty state's recipes); otherwise it uses whatever the panel holds.
+  const generate = (override?: PaletteParams) => {
     // State updates are asynchronous, so two clicks in the same frame can both
     // observe busy=false. The ref closes that small window and keeps the UI's
     // single-run contract honest.
     if (generating.current) return
     generating.current = true
     setBusy(true)
-    const snapshot = structuredClone(paramsRef.current)
+    if (override) setParams(override)
+    const snapshot = structuredClone(override ?? paramsRef.current)
     // annealing runs in a web worker, so the UI stays live throughout
     generatePaletteAsync(snapshot)
       .then((result) => {
@@ -57,6 +74,27 @@ export default function App() {
         setBusy(false)
       })
   }
+
+  // The header sticks to the top of the canvas; the moment anything has
+  // scrolled under it, a glass scrim fades in behind it (index.css). A flag on
+  // the document rather than React state — this fires on every scroll, and
+  // re-rendering the canvas and its charts to raise a boolean would be absurd.
+  useEffect(() => {
+    const root = document.documentElement
+    let scrolled: boolean | null = null
+    const sync = () => {
+      const next = window.scrollY > 0
+      if (next === scrolled) return
+      scrolled = next
+      root.toggleAttribute('data-scrolled', next)
+    }
+    sync()
+    window.addEventListener('scroll', sync, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', sync)
+      root.removeAttribute('data-scrolled')
+    }
+  }, [])
 
   const current = versions.find((v) => v.id === currentId) ?? null
 
@@ -108,7 +146,10 @@ export default function App() {
   return (
     <ThemeProvider>
     <MotionConfig reducedMotion="user">
-    <div className="app">
+    <motion.div
+      className="app"
+      style={{ '--push-left': pushLeft, '--push-right': pushRight } as MotionStyle}
+    >
       <ParametersPanel
         params={params}
         onParamsChange={setParams}
@@ -116,13 +157,11 @@ export default function App() {
         busy={busy}
         minimized={panelMinimized}
         onMinimizedChange={setPanelMinimized}
+        hoverToOpen={versions.length === 0}
+        width={leftWidth}
       />
-      <main
-        className={`app-main${panelMinimized ? ' app-main-left-min' : ''}${
-          rightMinimized ? ' app-main-right-min' : ''
-        }`}
-      >
-        <MainTabs version={current} />
+      <main className="app-main">
+        <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} />
       </main>
       <HistoryPanel
         versions={versions}
@@ -134,9 +173,11 @@ export default function App() {
         onClearVersions={clearVersions}
         minimized={rightMinimized}
         onMinimizedChange={setRightMinimized}
+        hoverToOpen={versions.length === 0}
+        width={rightWidth}
       />
       <TooltipLayer />
-    </div>
+    </motion.div>
     </MotionConfig>
     </ThemeProvider>
   )

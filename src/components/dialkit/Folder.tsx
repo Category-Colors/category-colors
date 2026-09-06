@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SPRING } from './motion';
+import { SPRING, FADE } from './motion';
 import { ICON_CHEVRON } from './icons';
 
 interface FolderProps {
@@ -11,7 +11,12 @@ interface FolderProps {
   /** Panel-header styling: title row without a chevron, never collapsible */
   isRoot?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
+  /** Header buttons. Toggling them on and off animates their slot open and
+      closed so the chevron beside them glides instead of jumping. */
   actions?: ReactNode;
+  /** One line shown beside the title while collapsed, so a closed section
+      still says what it holds */
+  summary?: ReactNode;
 }
 
 export function Folder({
@@ -22,6 +27,7 @@ export function Folder({
   isRoot = false,
   onOpenChange,
   actions,
+  summary,
 }: FolderProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isOpen = open ?? internalOpen;
@@ -52,6 +58,19 @@ export function Folder({
               onClick={handleToggle}
             >
               <span className="dialkit-folder-title">{title}</span>
+              <AnimatePresence initial={false}>
+                {!isOpen && summary !== undefined && (
+                  <motion.span
+                    className="dialkit-folder-summary"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={FADE}
+                  >
+                    {summary}
+                  </motion.span>
+                )}
+              </AnimatePresence>
               <motion.svg
                 className="dialkit-folder-icon"
                 viewBox="0 0 24 24"
@@ -68,9 +87,35 @@ export function Folder({
               </motion.svg>
             </button>
           )}
-          {actions && (
-            <div className="dialkit-folder-actions">{actions}</div>
-          )}
+          <AnimatePresence initial={false}>
+            {/* A collapsed folder hides its actions: they act on contents
+                nobody can see. The root's header is the panel's own, and
+                never collapses out from under them. */}
+            {actions && (isRoot || isOpen) && (
+              <motion.div
+                key="actions"
+                className="dialkit-folder-actions"
+                // the slot opens with the folder's own spring, the icon fades in
+                // once there is room for it and out ahead of the slot closing
+                initial={{ width: 0, opacity: 0 }}
+                animate={{
+                  width: 'auto',
+                  opacity: 1,
+                  transition: { width: SPRING.expand, opacity: { ...FADE, delay: 0.06 } },
+                }}
+                exit={{
+                  width: 0,
+                  opacity: 0,
+                  transition: { width: SPRING.expand, opacity: FADE },
+                }}
+                // root headers keep their icons' hover surfaces, which bleed
+                // 4px past the slot; their actions never toggle anyway
+                style={isRoot ? undefined : { overflow: 'hidden' }}
+              >
+                {actions}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

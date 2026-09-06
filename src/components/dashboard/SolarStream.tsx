@@ -1,9 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import type { CityWeather } from '@/lib/weather'
+import { ChartTip, type Tip } from './ChartTip'
+import { clampIndex, svgPoint, useChartPx, useHoverState } from './chart-geometry'
 
 const WIDTH = 1120
 const HEIGHT = 240
 const PAD = { top: 10, right: 10, bottom: 26, left: 10 }
+
+// This axis is UTC, not local, so it can't share chart-geometry's weekday.
+// Kept rather than rebuilt: the hover handler formats on every pointer move.
+const WEEKDAY_UTC = new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' })
 
 // Byron & Wattenberg wiggle offset (as in d3 stackOffsetWiggle): picks the
 // baseline that minimizes weighted wobble of the layers.
@@ -41,7 +47,13 @@ export function SolarStream({
   const lead = cities.map((c) => Math.round((ref - c.startUtcMs) / 3600_000))
   const m = Math.min(...lead.map((l, i) => cities[i].hourlyRadiation.length - l))
 
-  const { paths, dayTicks } = useMemo(() => {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const px = useChartPx(svgRef, WIDTH)
+  const font = px(10)
+
+  // `bands` keeps the stacked edges in screen units so hover can ask which
+  // layer contains the cursor without re-deriving the baseline every move.
+  const { paths, dayTicks, bands, series, x } = useMemo(() => {
     const series = cities.map((c, i) =>
       Array.from({ length: m }, (_, j) => c.hourlyRadiation[lead[i] + j] ?? 0)
     )
@@ -67,10 +79,12 @@ export function SolarStream({
     const x = (j: number) => PAD.left + (j / (m - 1)) * plotW
     const Y = (v: number) => PAD.top + plotH * (1 - (v - lo) / (hi - lo || 1))
 
-    const paths = stacked.map(({ y0, y1 }) => {
+    const bands = stacked.map(({ y0, y1 }) => ({ top: y1.map(Y), bottom: y0.map(Y) }))
+
+    const paths = bands.map(({ top, bottom }) => {
       let d = ''
-      for (let j = 0; j < m; j++) d += `${j ? 'L' : 'M'}${x(j).toFixed(1)},${Y(y1[j]).toFixed(1)}`
-      for (let j = m - 1; j >= 0; j--) d += `L${x(j).toFixed(1)},${Y(y0[j]).toFixed(1)}`
+      for (let j = 0; j < m; j++) d += `${j ? 'L' : 'M'}${x(j).toFixed(1)},${top[j].toFixed(1)}`
+      for (let j = m - 1; j >= 0; j--) d += `L${x(j).toFixed(1)},${bottom[j].toFixed(1)}`
       return d + 'Z'
     })
 
@@ -83,53 +97,113 @@ export function SolarStream({
       dayTicks.push({
         boundaryX: u > 0 ? x(u) : null,
         labelX: x(u + 12),
-        label: new Date(t).toLocaleDateString(undefined, {
-          weekday: 'short',
-          timeZone: 'UTC',
-        }),
+        label: WEEKDAY_UTC.format(t),
       })
     }
 
-    return { paths, dayTicks }
+    return { paths, dayTicks, bands, series, x }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cities])
 
+  // Hovering a stack reads the whole column: every city's radiation at that
+  // hour, listed top band first so the tooltip order matches what is on
+  // screen. The band actually under the cursor is marked active; above or
+  // below the stack there is no active band, only the column.
+  const [hover, setHover] = useHoverState<Tip & { j: number; c: number }>(cities)
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const { vx, vy } = svgPoint(e, WIDTH, HEIGHT)
+    const j = clampIndex(((vx - PAD.left) / (WIDTH - PAD.left - PAD.right)) * (m - 1), m - 1)
+    // Bands are contiguous, so the first one straddling the cursor is the one
+    // under it. Index 0 stacks lowest, which puts it last on screen.
+    const c = bands.findIndex((b) => vy >= b.top[j] && vy <= b.bottom[j])
+    const order = cities.map((_, ci) => ci).reverse()
+    const at = new Date(ref + j * 3600_000)
+    setHover({
+      j,
+      c,
+      x: e.clientX,
+      y: e.clientY,
+      title:
+        `${WEEKDAY_UTC.format(at)} ` +
+        `${String(at.getUTCHours()).padStart(2, '0')}:00 UTC · W/m²`,
+      active: c < 0 ? undefined : order.indexOf(c),
+      rows: order.map((ci) => ({
+        color: colors[ci],
+        label: cities[ci].name,
+        value: `${Math.round(series[ci][j])}`,
+      })),
+    })
+  }
+
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block w-full text-ink">
-      {dayTicks.map((tick) => (
-        <g key={tick.label + tick.labelX}>
-          {tick.boundaryX !== null && (
+    <>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        fontSize={font}
+        className="block w-full cursor-crosshair text-ink"
+        role="img"
+        aria-label={`Stacked shortwave radiation for ${cities.map((c) => c.name).join(', ')}`}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
+      >
+        {dayTicks.map((tick) => (
+          <g key={tick.label + tick.labelX}>
+            {tick.boundaryX !== null && (
+              <line
+                x1={tick.boundaryX}
+                x2={tick.boundaryX}
+                y1={PAD.top}
+                y2={HEIGHT - PAD.bottom}
+                stroke="currentColor"
+                strokeOpacity={0.05}
+              />
+            )}
+            <text
+              x={tick.labelX}
+              y={HEIGHT - 8}
+              textAnchor="middle"
+              className="fill-ink/35 tabular-nums"
+            >
+              {tick.label}
+            </text>
+          </g>
+        ))}
+        {paths.map((d, i) => (
+          <path
+            key={cities[i].code}
+            d={d}
+            fill={colors[i]}
+            stroke={colors[i]}
+            strokeWidth={1}
+            className="transition-colors duration-300"
+          />
+        ))}
+        {hover && (
+          <g pointerEvents="none">
             <line
-              x1={tick.boundaryX}
-              x2={tick.boundaryX}
+              x1={x(hover.j)}
+              x2={x(hover.j)}
               y1={PAD.top}
               y2={HEIGHT - PAD.bottom}
               stroke="currentColor"
-              strokeOpacity={0.05}
+              strokeOpacity={0.2}
             />
-          )}
-          <text
-            x={tick.labelX}
-            y={HEIGHT - 8}
-            textAnchor="middle"
-            className="fill-ink/35 tabular-nums text-[10px]"
-          >
-            {tick.label}
-          </text>
-        </g>
-      ))}
-      {paths.map((d, i) => (
-        <path
-          key={cities[i].code}
-          d={d}
-          fill={colors[i]}
-          stroke={colors[i]}
-          strokeWidth={1}
-          className="transition-colors duration-300"
-        >
-          <title>{cities[i].name}</title>
-        </path>
-      ))}
-    </svg>
+            {hover.c >= 0 && (
+              <circle
+                cx={x(hover.j)}
+                cy={(bands[hover.c].top[hover.j] + bands[hover.c].bottom[hover.j]) / 2}
+                r={4}
+                fill={colors[hover.c]}
+                className="stroke-panel"
+                strokeWidth={1.5}
+              />
+            )}
+          </g>
+        )}
+      </svg>
+      {hover && <ChartTip {...hover} />}
+    </>
   )
 }

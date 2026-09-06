@@ -14,6 +14,7 @@ const PICKER_HEIGHT = 280
 // provided — without onValueChange the row is read-only (selectable value,
 // no picker), without onRemove there's no ×.
 export function ColorRow({
+  label,
   value,
   onValueChange,
   onRemove,
@@ -26,6 +27,9 @@ export function ColorRow({
 }: {
   value: ColorValue
   onValueChange?: (value: ColorValue) => void
+  /** Renders the row as a labelled control like the select: label at the
+      left, swatch and value right-aligned on the row surface */
+  label?: string
   onRemove?: () => void
   onCopy?: () => boolean | Promise<boolean>
   fixedColor?: boolean
@@ -54,7 +58,8 @@ export function ColorRow({
   useEffect(() => () => clearTimeout(copiedTimer.current ?? undefined), [])
 
   return (
-    <div ref={rowRef} className="color-row">
+    <div ref={rowRef} className="color-row" data-labeled={label ? '' : undefined}>
+      {label && <span className="color-row-label">{label}</span>}
       <div
         className="color-row-chip"
         data-open={String(open)}
@@ -68,6 +73,7 @@ export function ColorRow({
         <input
           ref={inputRef}
           className="color-row-input"
+          aria-label={label}
           value={draft ?? valueToCss(value)}
           readOnly={!onValueChange}
           onChange={(e) => setDraft(e.target.value)}
