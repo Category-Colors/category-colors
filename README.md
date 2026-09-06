@@ -21,7 +21,7 @@ The optimizer runs in a Web Worker so generation does not block the interface. T
 
 Requires Node.js `>=22.12.0`, the floor `category-colors` sets.
 
-The app currently links the sibling [`category-colors`](../category-colors) checkout through a `file:` dependency, so that directory must be present. Once the package is published, switch that entry in `package.json` to a version range (`"category-colors": "^1.0.0"`) and the checkout is no longer needed.
+To develop against a local checkout of the library instead of the published package, point the dependency at it with `npm install ../category-colors` and start the dev server with `vite --force` so the pre-bundled copy is rebuilt after each library change.
 
 ```sh
 npm install
