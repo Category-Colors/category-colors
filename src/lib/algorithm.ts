@@ -1,12 +1,11 @@
 import {
   createDefaultConfig,
-  createDefaultState,
   evaluators,
   prepareInitialState,
   runSimulatedAnnealing,
   runWithOrderOptimization,
   type Config,
-  type StateInput,
+  type EvalFunction,
 } from 'category-colors'
 import { toCulori } from '@/lib/color'
 import type { CostSample, EvaluatorSpec, PaletteParams } from './palette'
@@ -16,9 +15,9 @@ import type { CostSample, EvaluatorSpec, PaletteParams } from './palette'
 // defaults doesn't drag the algorithm (and the saliency lookup table) onto the
 // initial load — only the worker and the report tab reach for this.
 
-function toEvalFunction(spec: EvaluatorSpec) {
+function toEvalFunction(spec: EvaluatorSpec): EvalFunction {
   // 'cvd' is the jnd evaluator scored on a CVD-simulated copy of the palette
-  const entry: Record<string, unknown> = {
+  const entry: EvalFunction = {
     function: evaluators[spec.type === 'cvd' ? 'jnd' : spec.type],
     weight: spec.weight,
   }
@@ -52,7 +51,7 @@ export function buildConfig(params: PaletteParams): Config {
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
   config.evalFunctions = params.evaluators
     .filter((spec) => spec.weight > 0)
-    .map(toEvalFunction) as Config['evalFunctions']
+    .map(toEvalFunction)
   return config
 }
 
@@ -60,14 +59,16 @@ export function generatePalette(params: PaletteParams) {
   const config = buildConfig(params)
   config.recordHistory = true
 
-  const state: StateInput = createDefaultState()
-  state.colors = params.initColors.map((c) => ({
-    color: toCulori(c.value),
-    fixedColor: c.fixedColor,
-    fixedOrder: c.fixedOrder,
-  }))
-
-  const initialState = prepareInitialState(state, config)
+  const initialState = prepareInitialState(
+    {
+      colors: params.initColors.map((c) => ({
+        color: toCulori(c.value),
+        fixedColor: c.fixedColor,
+        fixedOrder: c.fixedOrder,
+      })),
+    },
+    config
+  )
   const run = params.orderOptimization ? runWithOrderOptimization : runSimulatedAnnealing
   const finalState = run(initialState, config)
 

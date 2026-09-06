@@ -55,7 +55,7 @@ export function ReportView({
           </div>
         </div>
         <div className="rounded-[10px] bg-ink/5 p-5">
-          <PairGrid report={report} colors={version.colors} threshold={version.params.jnd} />
+          <PairGrid report={report} colors={version.colors} params={version.params} />
         </div>
       </section>
 

@@ -3,8 +3,8 @@
 // needs CVD simulation and deltaE and nothing else, and the tab bar imports it
 // to badge the Report tab with its issue count.
 import { reportJndIssues } from 'category-colors/report'
-import type { CvdType, JndReport, JndTest } from 'category-colors/report'
-import type { PaletteVersion } from './palette'
+import type { CvdSimulation, JndReport, JndTest } from 'category-colors/report'
+import type { PaletteParams, PaletteVersion } from './palette'
 
 export type { JndReport, JndTest, JndPair } from 'category-colors/report'
 
@@ -23,38 +23,11 @@ export function testTitles(tests: JndTest[]): string[] {
   })
 }
 
-// ΔE tests for a single palette color against a background color, run under
-// the same vision simulations as an existing report (labels carry type and
-// severity, e.g. "deuteranomaly:0.5").
-export function colorVsBackground(
-  color: string,
-  background: string,
-  threshold: number,
-  report: JndReport
-): JndTest[] {
-  // Labels come from a report the library itself produced, so the type half is
-  // always one of its CVD names — the cast just re-states what split() lost.
-  const cvdSimulations = report.tests
-    .filter((t) => t.label !== 'normal')
-    .map((t) => {
-      const [type, severity] = t.label.split(':')
-      return { type: type as CvdType, severity: Number(severity) }
-    })
-  return reportJndIssues([color, background], {
-    jndThreshold: threshold,
-    cvdSimulations,
-  }).tests
-}
-
-// Audits a version with the same criteria it was generated under: its own JND
-// threshold, and one simulation per active CVD evaluator (deduped — two
-// evaluators with the same type and severity would report identical issues).
-export function buildJndReport(version: PaletteVersion): JndReport | null {
-  const { params, colors } = version
-  if (colors.length < 2) return null
-
+// One simulation per active CVD evaluator, deduped — two evaluators with the
+// same type and severity would report identical issues.
+function cvdSimulationsFor(params: PaletteParams): CvdSimulation[] {
   const seen = new Set<string>()
-  const cvdSimulations = params.evaluators
+  return params.evaluators
     .filter((e) => e.type === 'cvd' && e.weight > 0)
     .map((e) => ({ type: e.cvd, severity: e.cvdSeverity }))
     .filter((s) => {
@@ -63,9 +36,23 @@ export function buildJndReport(version: PaletteVersion): JndReport | null {
       seen.add(key)
       return true
     })
+}
 
+// ΔE tests for a single palette color against a background color, under the
+// same threshold and vision simulations the palette's own report uses.
+export function colorVsBackground(color: string, background: string, params: PaletteParams): JndTest[] {
+  return reportJndIssues([color, background], {
+    jndThreshold: params.jnd,
+    cvdSimulations: cvdSimulationsFor(params),
+  }).tests
+}
+
+// Audits a version with the same criteria it was generated under.
+export function buildJndReport(version: PaletteVersion): JndReport | null {
+  const { params, colors } = version
+  if (colors.length < 2) return null
   return reportJndIssues(colors, {
     jndThreshold: params.jnd,
-    cvdSimulations,
+    cvdSimulations: cvdSimulationsFor(params),
   })
 }

@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { wcagContrast } from 'culori'
+import type { PaletteParams } from '@/lib/palette'
 import { colorVsBackground, testTitles, type JndReport } from '@/lib/report'
 import { useTheme } from '@/lib/theme'
 import { inkFor } from '@/lib/weather'
@@ -364,21 +365,22 @@ function HeaderSwatch({
 export function PairGrid({
   report,
   colors,
-  threshold,
+  params,
 }: {
   report: JndReport
   colors: string[]
-  threshold: number
+  params: PaletteParams
 }) {
   const { tokens } = useTheme()
   const pageBg = tokens.bg
+  const threshold = params.jnd
   const cells = useMemo(() => buildCells(report, threshold), [report, threshold])
   // each color measured against the app background, same tests as the report
   const swatchCells = useMemo(() => {
     const m = new Map<string, PairCell>()
     const titles = testTitles(report.tests)
     colors.forEach((c, i) => {
-      const tests = colorVsBackground(c, pageBg, threshold, report)
+      const tests = colorVsBackground(c, pageBg, params)
       m.set(`s:${i}`, {
         normal: tests[0]?.pairs?.[0]?.deltaE ?? 0,
         tests: tests.map((t, k) => {
@@ -389,7 +391,7 @@ export function PairGrid({
       })
     })
     return m
-  }, [report, colors, threshold, pageBg])
+  }, [report, colors, params, threshold, pageBg])
   const popCells = useMemo(
     () => new Map([...cells, ...swatchCells]),
     [cells, swatchCells]

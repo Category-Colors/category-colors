@@ -6,7 +6,7 @@ import { PRESET_COST_HISTORY } from './preset-history'
 export type { WorkingSpace }
 
 // Parameter shapes, defaults, and (de)serialization only — no algorithm.
-// Driving categorycolors lives in algorithm.ts so the app shell can import
+// Driving category-colors lives in algorithm.ts so the app shell can import
 // these types without pulling the optimizer into the initial bundle.
 
 export type EvaluatorType =
