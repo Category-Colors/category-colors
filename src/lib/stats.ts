@@ -1,10 +1,4 @@
-import {
-  costBreakdown,
-  createDefaultState,
-  deltaE,
-  prepareInitialState,
-  type StateInput,
-} from 'category-colors'
+import { costBreakdown, deltaE, prepareInitialState } from 'category-colors'
 import { converter } from 'culori'
 import { buildConfig } from './algorithm'
 import { evaluatorLabel } from './evaluators'
@@ -38,13 +32,18 @@ export function computeStats(version: PaletteVersion): PaletteStats | null {
   if (colors.length < 2) return null
 
   const config = buildConfig(params)
+  // Score exactly the colors on screen: the version's list can differ from
+  // params.colorCount, and fixing every color keeps prepareInitialState from
+  // padding, truncating, or clamping them into the working-space ranges.
+  config.colorCount = colors.length
   // prepareInitialState runs a temperature search we don't need; one sample
   // keeps it near-free
   config.initialTemperatureSamples = 1
 
-  const state: StateInput = createDefaultState()
-  state.colors = colors.map((hex) => ({ color: hex, fixedColor: false, fixedOrder: false }))
-  const prepared = prepareInitialState(state, config)
+  const prepared = prepareInitialState(
+    { colors: colors.map((hex) => ({ color: hex, fixedColor: true, fixedOrder: false })) },
+    config
+  )
 
   const breakdown = costBreakdown(prepared, config)
   // breakdown is positionally aligned with the specs buildConfig kept; the

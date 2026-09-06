@@ -10,5 +10,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // A linked ../category-colors checkout brings its own node_modules/culori;
+    // dedupe keeps the app and the library on one copy.
+    dedupe: ['culori'],
   },
 })

@@ -27,7 +27,7 @@ const round = (v: number, decimals: number) => {
 
 export const hexValue = (hex: string): ColorValue => ({ space: 'hex', hex })
 
-// Culori-shaped color: what the categorycolors algorithm (also culori-based)
+// Culori-shaped color: what the category-colors algorithm (also culori-based)
 // and culori's own converters consume.
 export function toCulori(value: ColorValue): Color | string {
   switch (value.space) {

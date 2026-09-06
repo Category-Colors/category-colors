@@ -21,7 +21,13 @@ The optimizer runs in a Web Worker so generation does not block the interface. T
 
 Requires Node.js `>=22.12.0`, the floor `category-colors` sets.
 
-To develop against a local checkout of the library instead of the published package, point the dependency at it with `npm install ../category-colors` and start the dev server with `vite --force` so the pre-bundled copy is rebuilt after each library change.
+To develop against a local checkout of the library instead of the published package, link it without touching `package.json` or the lockfile:
+
+```sh
+npm install --no-save ../category-colors
+```
+
+Vite serves the linked checkout from source, so library edits hot-reload. A plain `npm install` restores the published package.
 
 ```sh
 npm install
