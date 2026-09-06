@@ -107,9 +107,13 @@ export function MobileBar({
         // Without this, motion takes a layout snapshot and walks every
         // projection node in the app on every render of this component — and
         // it re-renders whenever App does, which a slider drag inside the
-        // config sheet does on every pointermove. `busy` is the only thing
-        // that changes this button's box.
-        layoutDependency={busy}
+        // config sheet does on every pointermove.
+        //
+        // The verb has to be in it, not just `busy`: the capsule is as wide as
+        // the word in it, so it resizes again at every stage of the anneal.
+        // Keyed on `busy` alone, those swaps would be skipped and the width
+        // would jump rather than settle.
+        layoutDependency={busy ? busyLabel : null}
         transition={SPRING.toolbar}
         type="button"
         className="mobile-bar-generate"
