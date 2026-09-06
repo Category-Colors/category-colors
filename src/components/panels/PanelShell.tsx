@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { MotionValue } from 'motion/react'
 import { Sheet } from '@/components/mobile/Sheet'
+import { useIsPhone } from '@/lib/use-media'
 import { MorphPanel } from './MorphPanel'
 
 /**
@@ -18,7 +19,6 @@ import { MorphPanel } from './MorphPanel'
 export function PanelShell({
   side,
   name,
-  phone,
   open,
   onOpenChange,
   hoverToOpen,
@@ -27,19 +27,28 @@ export function PanelShell({
 }: {
   side: 'left' | 'right'
   name: string
-  phone: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   hoverToOpen: boolean
   width: MotionValue<number>
   children: ReactNode
 }) {
+  // Asked here rather than threaded down from App: the panels themselves never
+  // read it, and it is the same subscription to the same query either way.
+  const phone = useIsPhone()
+  // One wrapper, built here rather than once per shell, and named: every rule
+  // that styles a panel body targets `.panel-shell` and neither shell's class
+  // appears in it. Only the two rules that set the scroller's extent differ,
+  // because that is the only thing that actually differs.
+  const body = (
+    <div className="panel-shell dialkit-panel" data-mode="inline">
+      <div className="dialkit-panel-inner">{children}</div>
+    </div>
+  )
   if (phone) {
     return (
       <Sheet open={open} onClose={() => onOpenChange(false)} label={name}>
-        <div className="dialkit-panel" data-mode="inline">
-          <div className="dialkit-panel-inner">{children}</div>
-        </div>
+        {body}
       </Sheet>
     )
   }
@@ -52,7 +61,7 @@ export function PanelShell({
       hoverToOpen={hoverToOpen}
       width={width}
     >
-      {children}
+      {body}
     </MorphPanel>
   )
 }

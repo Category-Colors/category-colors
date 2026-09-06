@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { wcagContrast } from 'culori'
+import { isHoverPointer } from '@/components/dialkit/dropdown-position'
 import type { PaletteVersion } from '@/lib/palette'
 import { colorVsBackground, testTitles, type JndReport } from '@/lib/report'
 import { useTheme } from '@/lib/theme'
@@ -394,6 +395,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
 
   // delegated: two listeners for the whole grid, one rect read per cell entry
   const onPointerOver = (e: React.PointerEvent) => {
+    if (!isHoverPointer(e)) return
     const el = (e.target as Element).closest('[data-pair]')
     if (el === lastTarget.current) return
     lastTarget.current = el

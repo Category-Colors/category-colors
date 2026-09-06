@@ -14,13 +14,12 @@ import { ParametersPanel } from '@/components/panels/ParametersPanel'
 import { HistoryPanel } from '@/components/panels/HistoryPanel'
 import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
 import { MobileBar, type MobileSheet } from '@/components/mobile/MobileBar'
-import { useIsPhone } from '@/lib/use-media'
-import { useBusyLabel } from '@/lib/use-busy-label'
+import { DOCKED, useIsPhone } from '@/lib/use-media'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
 // they float over, so at those widths both start collapsed.
-const panelsFloat = () => !window.matchMedia('(min-width: 1280px)').matches
+const panelsFloat = () => !matchMedia(DOCKED).matches
 
 export default function App() {
   const [params, setParams] = useState<PaletteParams>(DEFAULT_PARAMS)
@@ -28,7 +27,6 @@ export default function App() {
   const [versions, setVersions] = useState<PaletteVersion[]>([])
   const [currentId, setCurrentId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const busyLabel = useBusyLabel(busy)
   // A phone gets bottom sheets instead of docked panels, and only one at a
   // time: two sheets would stack on the same screen edge, and the one
   // underneath would be unreachable without dismissing the other.
@@ -177,8 +175,6 @@ export default function App() {
         onParamsChange={setParams}
         onGenerate={generate}
         busy={busy}
-        busyLabel={busyLabel}
-        phone={phone}
         open={configOpen}
         onOpenChange={openConfig}
         hoverToOpen={versions.length === 0}
@@ -195,7 +191,6 @@ export default function App() {
         onPaletteReplace={addPalette}
         onDeleteVersion={deleteVersion}
         onClearVersions={clearVersions}
-        phone={phone}
         open={outputOpen}
         onOpenChange={openOutput}
         hoverToOpen={versions.length === 0}
@@ -204,11 +199,9 @@ export default function App() {
       {phone && (
         <MobileBar
           busy={busy}
-          busyLabel={busyLabel}
-          open={sheet}
+            open={sheet}
           onOpen={setSheet}
           onGenerate={generate}
-          hidden={sheet !== null}
         />
       )}
       <TooltipLayer />

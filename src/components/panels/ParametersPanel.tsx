@@ -26,6 +26,7 @@ import { PanelMenu } from './PanelMenu'
 import { RangeSlider } from './RangeSlider'
 import { CollapseAllButton } from './CollapseAllButton'
 import { countOf, useSections } from './sections'
+import { useBusyLabel } from '@/lib/use-busy-label'
 import { ListEmptyState, ListRow, ReorderList } from './ReorderList'
 
 const SECTIONS = ['space', 'init', 'evals', 'optimizer'] as const
@@ -42,8 +43,6 @@ export function ParametersPanel({
   onParamsChange,
   onGenerate,
   busy,
-  busyLabel,
-  phone,
   open,
   onOpenChange,
   hoverToOpen,
@@ -53,13 +52,12 @@ export function ParametersPanel({
   onParamsChange: (params: PaletteParams) => void
   onGenerate: () => void
   busy: boolean
-  busyLabel: string
-  phone: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   hoverToOpen: boolean
   width: MotionValue<number>
 }) {
+  const busyLabel = useBusyLabel(busy)
   const sections = useSections(SECTIONS)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -316,7 +314,6 @@ export function ParametersPanel({
     <PanelShell
       side="left"
       name="Configuration"
-      phone={phone}
       open={open}
       onOpenChange={onOpenChange}
       hoverToOpen={hoverToOpen}

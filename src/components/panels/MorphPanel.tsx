@@ -133,9 +133,7 @@ export function MorphPanel({
               animate={{ opacity: 1, transition: { duration: 0.15, delay: 0.06 } }}
               exit={{ opacity: 0, transition: { duration: 0.08 } }}
             >
-              <div className="dialkit-panel" data-mode="inline">
-                <div className="dialkit-panel-inner">{children}</div>
-              </div>
+              {children}
             </motion.div>
           )}
         </AnimatePresence>

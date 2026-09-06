@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Folder, SelectControl } from '@/components/dialkit'
+import { isHoverPointer } from '@/components/dialkit/dropdown-position'
 import type { PaletteVersion } from '@/lib/palette'
 import {
   convertValue,
@@ -93,7 +94,6 @@ export function HistoryPanel({
   onPaletteReplace,
   onDeleteVersion,
   onClearVersions,
-  phone,
   open,
   onOpenChange,
   hoverToOpen,
@@ -106,7 +106,6 @@ export function HistoryPanel({
   onPaletteReplace: (colors: string[]) => void
   onDeleteVersion: (id: number) => void
   onClearVersions: () => void
-  phone: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   hoverToOpen: boolean
@@ -208,12 +207,11 @@ export function HistoryPanel({
   // palette itself previews — the row's × is beside it, not part of it, so
   // reaching for the × neither opens the popover nor lights the row.
   //
-  // Mouse only. The popover is a hover preview of a row you can already see,
-  // and a tap has no hover to leave; it also hangs itself off the left edge of
-  // the docked panel, which a sheet doesn't have — so on a phone a tap on a
-  // history row would show it off the side of the screen and leave it there.
+  // Mouse only (isHoverPointer): the popover also hangs itself off the left
+  // edge of the docked panel, which a sheet hasn't got, so on a phone a tap on
+  // a history row would put it off the side of the screen and leave it there.
   const onListOver = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'mouse') return
+    if (!isHoverPointer(e)) return
     const el = (e.target as Element).closest('.color-row-chip')?.closest('[data-version]')
     if (!el) {
       popover.current?.hide()
@@ -247,7 +245,6 @@ export function HistoryPanel({
     <PanelShell
       side="right"
       name="Output"
-      phone={phone}
       open={open}
       onOpenChange={onOpenChange}
       hoverToOpen={hoverToOpen}
