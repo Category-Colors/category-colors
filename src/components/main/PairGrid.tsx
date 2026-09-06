@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { wcagContrast } from 'culori'
-import type { PaletteParams } from '@/lib/palette'
+import type { PaletteVersion } from '@/lib/palette'
 import { colorVsBackground, testTitles, type JndReport } from '@/lib/report'
 import { useTheme } from '@/lib/theme'
 import { inkFor } from '@/lib/weather'
@@ -362,36 +362,29 @@ function HeaderSwatch({
   )
 }
 
-export function PairGrid({
-  report,
-  colors,
-  params,
-}: {
-  report: JndReport
-  colors: string[]
-  params: PaletteParams
-}) {
+export function PairGrid({ report, version }: { report: JndReport; version: PaletteVersion }) {
+  const { colors, params } = version
+  const threshold = params.jnd
   const { tokens } = useTheme()
   const pageBg = tokens.bg
-  const threshold = params.jnd
   const cells = useMemo(() => buildCells(report, threshold), [report, threshold])
   // each color measured against the app background, same tests as the report
   const swatchCells = useMemo(() => {
     const m = new Map<string, PairCell>()
     const titles = testTitles(report.tests)
-    colors.forEach((c, i) => {
-      const tests = colorVsBackground(c, pageBg, params)
+    version.colors.forEach((c, i) => {
+      const tests = colorVsBackground(c, pageBg, version.params)
       m.set(`s:${i}`, {
         normal: tests[0]?.pairs?.[0]?.deltaE ?? 0,
         tests: tests.map((t, k) => {
           const deltaE = t.pairs?.[0]?.deltaE ?? t.issues[0]?.deltaE ?? 0
-          return { title: titles[k] ?? t.label, deltaE, fail: deltaE < threshold }
+          return { title: titles[k] ?? t.label, deltaE, fail: deltaE < version.params.jnd }
         }),
         failLetters: [],
       })
     })
     return m
-  }, [report, colors, params, threshold, pageBg])
+  }, [report, version, pageBg])
   const popCells = useMemo(
     () => new Map([...cells, ...swatchCells]),
     [cells, swatchCells]

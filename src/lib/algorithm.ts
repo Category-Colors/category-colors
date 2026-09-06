@@ -8,7 +8,7 @@ import {
   type EvalFunction,
 } from 'category-colors'
 import { toCulori } from '@/lib/color'
-import type { CostSample, EvaluatorSpec, PaletteParams } from './palette'
+import type { EvaluatorSpec, PaletteParams } from './palette'
 
 // The bridge between the app's serializable params and the category-colors
 // algorithm. Kept apart from palette.ts so importing the parameter types and
@@ -49,9 +49,7 @@ export function buildConfig(params: PaletteParams): Config {
     ranges: params.colorSpace.ranges.map((r) => [...r]),
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
-  config.evalFunctions = params.evaluators
-    .filter((spec) => spec.weight > 0)
-    .map(toEvalFunction)
+  config.evalFunctions = params.evaluators.filter((spec) => spec.weight > 0).map(toEvalFunction)
   return config
 }
 
@@ -76,6 +74,6 @@ export function generatePalette(params: PaletteParams) {
     colors: finalState.colors.map(String),
     cost: finalState.cost,
     iterations: finalState.iterations,
-    costHistory: (finalState.costHistory ?? []) as CostSample[],
+    costHistory: finalState.costHistory ?? [],
   }
 }
