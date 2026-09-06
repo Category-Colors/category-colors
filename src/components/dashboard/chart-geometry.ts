@@ -15,23 +15,27 @@ export function svgPoint(e: ReactPointerEvent<SVGSVGElement>, width: number, hei
 // Snap a fractional position along an axis to the sample it lands on.
 export const clampIndex = (v: number, last: number) => Math.max(0, Math.min(last, Math.round(v)))
 
-// Returns a CSS-pixel → user-unit converter for a chart's viewBox. Everything
-// inside a viewBox is scaled by the element's width, so chrome measured in
-// user units shrinks with the chart — 10px labels on a 1120-unit chart come
-// out at 3px on a phone. Type, hairlines and hover rings are all real-world
-// sizes rather than data, so they go through px() and stay put.
-export function useChartPx(ref: RefObject<SVGSVGElement | null>, viewBoxWidth: number) {
-  const [unit, setUnit] = useState(1)
+// Publishes the chart's scale as `--u` — user units per CSS pixel — on the
+// <svg> itself. Everything inside a viewBox is scaled by the element's width,
+// so chrome measured in user units shrinks with the chart: 10px labels on a
+// 1120-unit chart come out at 3px on a phone. Type, hairlines and hover rings
+// are real-world sizes rather than data, so index.css sizes them off `--u`.
+//
+// Deliberately not React state. The canvas pads itself from the panel spring,
+// so these charts are resized on every frame of a panel morph; holding the
+// scale in state re-rendered all three of them, twenty series paths apiece, to
+// change one float. As a custom property the browser absorbs it in style
+// recalc, and the charts never hear about it.
+export function useChartUnit(ref: RefObject<SVGSVGElement | null>, viewBoxWidth: number) {
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const apply = (w: number) => w && setUnit(viewBoxWidth / w)
+    const apply = (w: number) => w && el.style.setProperty('--u', String(viewBoxWidth / w))
     apply(el.getBoundingClientRect().width) // before first paint; the observer only sees later changes
     const ro = new ResizeObserver(([entry]) => apply(entry.contentRect.width))
     ro.observe(el)
     return () => ro.disconnect()
   }, [ref, viewBoxWidth])
-  return (px: number) => px * unit
 }
 
 // Built once. toLocaleDateString builds a formatter per call, and these run

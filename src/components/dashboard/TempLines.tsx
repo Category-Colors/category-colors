@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import type { CityWeather } from '@/lib/weather'
 import { ChartTip, type Tip } from './ChartTip'
-import { clampIndex, svgPoint, useChartPx, useHoverState, weekday } from './chart-geometry'
+import { clampIndex, svgPoint, useChartUnit, useHoverState, weekday } from './chart-geometry'
 
 const WIDTH = 1120
 const HEIGHT = 300
@@ -30,8 +30,7 @@ export function TempLines({
   const y = (v: number) => PAD.top + plotH * (1 - (v - lo) / (hi - lo))
 
   const svgRef = useRef<SVGSVGElement>(null)
-  const px = useChartPx(svgRef, WIDTH)
-  const font = px(10)
+  useChartUnit(svgRef, WIDTH)
 
   const paths = useMemo(
     () =>
@@ -43,13 +42,6 @@ export function TempLines({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cities, lo, hi]
   )
-
-  const gridValues = []
-  for (let v = lo; v <= hi; v += step) gridValues.push(v)
-
-  // Direct-label only the extremes at the right edge; the masthead is the legend
-  const last = cities.map((c) => c.hourlyTemp[c.hourlyTemp.length - 1])
-  const labeled = [...new Set([last.indexOf(Math.max(...last)), last.indexOf(Math.min(...last))])]
 
   // The cursor picks an hour, and the tooltip reads that whole column: every
   // city's temperature at that hour, warmest first, which is the order the
@@ -89,19 +81,14 @@ export function TempLines({
     })
   }
 
-  return (
-    <>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        fontSize={font}
-        className="block w-full cursor-crosshair text-ink"
-        role="img"
-        aria-label={`Hourly temperature for ${cities.map((c) => c.name).join(', ')}`}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-        onPointerCancel={() => setHover(null)}
-      >
+  // Only the crosshair moves with the pointer. Holding the rest as one element
+  // lets React skip the subtree entirely on a hover — otherwise every grid
+  // line, day rule and series path is rebuilt and reconciled on every move.
+  const chrome = useMemo(() => {
+    const gridValues = []
+    for (let v = lo; v <= hi; v += step) gridValues.push(v)
+    return (
+      <>
         {gridValues.map((v) => (
           <g key={v}>
             <line
@@ -114,7 +101,8 @@ export function TempLines({
             />
             <text
               x={PAD.left - 6}
-              y={y(v) + font * 0.3}
+              y={y(v)}
+              dy="0.3em"
               textAnchor="end"
               className="fill-ink/35 tabular-nums"
             >
@@ -156,6 +144,46 @@ export function TempLines({
             className="transition-colors duration-300"
           />
         ))}
+      </>
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cities, days, colors, paths, lo, hi, step])
+
+  // Direct-label only the extremes at the right edge; the masthead is the legend
+  const edgeLabels = useMemo(() => {
+    const last = cities.map((c) => c.hourlyTemp[c.hourlyTemp.length - 1])
+    const labeled = [...new Set([last.indexOf(Math.max(...last)), last.indexOf(Math.min(...last))])]
+    return (
+      <>
+        {labeled.map((i) => (
+          <text
+            key={cities[i].code}
+            x={WIDTH - PAD.right + 5}
+            y={y(last[i])}
+            dy="0.3em"
+            className="fill-ink/55 tabular-nums"
+          >
+            {cities[i].code}
+          </text>
+        ))}
+      </>
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cities, lo, hi])
+
+  return (
+    <>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="chart-svg block w-full cursor-crosshair text-ink"
+        role="img"
+        aria-label={`Hourly temperature for ${cities.map((c) => c.name).join(', ')}`}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
+      >
+        {chrome}
         {hover && (
           <g pointerEvents="none">
             <line
@@ -176,16 +204,7 @@ export function TempLines({
             />
           </g>
         )}
-        {labeled.map((i) => (
-          <text
-            key={cities[i].code}
-            x={WIDTH - PAD.right + 5}
-            y={y(last[i]) + font * 0.3}
-            className="fill-ink/55 tabular-nums"
-          >
-            {cities[i].code}
-          </text>
-        ))}
+        {edgeLabels}
       </svg>
       {hover && <ChartTip {...hover} />}
     </>

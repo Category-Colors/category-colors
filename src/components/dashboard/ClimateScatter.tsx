@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { CityWeather } from '@/lib/weather'
 import { ChartTip, type Tip } from './ChartTip'
-import { svgPoint, useChartPx, useHoverState } from './chart-geometry'
+import { svgPoint, useChartUnit, useHoverState } from './chart-geometry'
 
 const WIDTH = 540
 const HEIGHT = 300
@@ -41,13 +42,7 @@ export function ClimateScatter({
   const y = (h: number) => PAD.top + plotH * (1 - (h - yLo) / (yHi - yLo))
 
   const svgRef = useRef<SVGSVGElement>(null)
-  const px = useChartPx(svgRef, WIDTH)
-  const font = px(10)
-
-  const xTicks = []
-  for (let v = xLo; v <= xHi; v += xStep) xTicks.push(v)
-  const yTicks = []
-  for (let v = yLo; v <= yHi; v += 20) yTicks.push(v)
+  useChartUnit(svgRef, WIDTH)
 
   // Keep the plotted positions, not just the path strings: hover has to find
   // the nearest dot, and re-projecting 3,360 points per pointermove would be
@@ -95,19 +90,15 @@ export function ClimateScatter({
     })
   }
 
-  return (
-    <>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        fontSize={font}
-        className="block w-full cursor-crosshair text-ink"
-        role="img"
-        aria-label={`Hourly temperature against relative humidity for ${cities.map((c) => c.name).join(', ')}`}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-        onPointerCancel={() => setHover(null)}
-      >
+  // Only the hover ring moves with the pointer; 3,360 dots and both axes are
+  // rebuilt once per palette, not once per move.
+  const chrome = useMemo(() => {
+    const xTicks = []
+    for (let v = xLo; v <= xHi; v += xStep) xTicks.push(v)
+    const yTicks = []
+    for (let v = yLo; v <= yHi; v += 20) yTicks.push(v)
+    return (
+      <>
         {yTicks.map((v) => (
           <g key={`y${v}`}>
             <line
@@ -120,7 +111,8 @@ export function ClimateScatter({
             />
             <text
               x={PAD.left - 6}
-              y={y(v) + font * 0.3}
+              y={y(v)}
+              dy="0.3em"
               textAnchor="end"
               className="fill-ink/35 tabular-nums"
             >
@@ -148,6 +140,25 @@ export function ClimateScatter({
             className="transition-colors duration-300"
           />
         ))}
+      </>
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paths, cities, colors, xLo, xHi, yLo, xStep])
+
+  return (
+    <>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="chart-svg block w-full cursor-crosshair text-ink"
+        style={{ '--dot-r': DOT_R } as CSSProperties}
+        role="img"
+        aria-label={`Hourly temperature against relative humidity for ${cities.map((c) => c.name).join(', ')}`}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
+      >
+        {chrome}
         {/* A hairline ring sitting 1px clear of the dot's edge. The stroke
             straddles the radius, so half of it is added back to keep that
             gap honest at any chart width. */}
@@ -155,10 +166,10 @@ export function ClimateScatter({
           <circle
             cx={pts[hover.c][hover.h][0]}
             cy={pts[hover.c][hover.h][1]}
-            r={DOT_R + px(1.5)}
+            className="chart-hover-ring"
             fill="none"
             stroke={colors[hover.c]}
-            strokeWidth={px(1)}
+            vectorEffect="non-scaling-stroke"
             pointerEvents="none"
           />
         )}

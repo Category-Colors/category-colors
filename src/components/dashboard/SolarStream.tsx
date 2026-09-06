@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import type { CityWeather } from '@/lib/weather'
 import { ChartTip, type Tip } from './ChartTip'
-import { clampIndex, svgPoint, useChartPx, useHoverState } from './chart-geometry'
+import { clampIndex, svgPoint, useChartUnit, useHoverState } from './chart-geometry'
 
 const WIDTH = 1120
 const HEIGHT = 240
@@ -48,8 +48,7 @@ export function SolarStream({
   const m = Math.min(...lead.map((l, i) => cities[i].hourlyRadiation.length - l))
 
   const svgRef = useRef<SVGSVGElement>(null)
-  const px = useChartPx(svgRef, WIDTH)
-  const font = px(10)
+  useChartUnit(svgRef, WIDTH)
 
   // `bands` keeps the stacked edges in screen units so hover can ask which
   // layer contains the cursor without re-deriving the baseline every move.
@@ -135,19 +134,11 @@ export function SolarStream({
     })
   }
 
-  return (
-    <>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        fontSize={font}
-        className="block w-full cursor-crosshair text-ink"
-        role="img"
-        aria-label={`Stacked shortwave radiation for ${cities.map((c) => c.name).join(', ')}`}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-        onPointerCancel={() => setHover(null)}
-      >
+  // Only the crosshair moves with the pointer; the bands and day rules are
+  // rebuilt once per palette, not once per move.
+  const chrome = useMemo(
+    () => (
+      <>
         {dayTicks.map((tick) => (
           <g key={tick.label + tick.labelX}>
             {tick.boundaryX !== null && (
@@ -180,6 +171,25 @@ export function SolarStream({
             className="transition-colors duration-300"
           />
         ))}
+      </>
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dayTicks, paths, cities, colors]
+  )
+
+  return (
+    <>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="chart-svg block w-full cursor-crosshair text-ink"
+        role="img"
+        aria-label={`Stacked shortwave radiation for ${cities.map((c) => c.name).join(', ')}`}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
+      >
+        {chrome}
         {hover && (
           <g pointerEvents="none">
             <line

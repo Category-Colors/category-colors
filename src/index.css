@@ -1088,6 +1088,23 @@ body {
   user-select: none;
 }
 
+/* Chart chrome sized in real pixels rather than user units. `--u` is user
+   units per CSS pixel, published on each <svg> by useChartUnit — so these
+   render at a constant size however wide the chart is drawn, and resizing one
+   costs a style recalc rather than a React render. Text nudges its own
+   baseline with dy="0.3em", which needs no one to know the size. */
+.chart-svg {
+  font-size: calc(10px * var(--u, 1));
+}
+
+/* A hairline ring 1px clear of the dot's edge; the stroke straddles the
+   radius, so half of it is added back. --dot-r comes from the same constant
+   that draws the dots. */
+.chart-hover-ring {
+  r: calc(var(--dot-r, 2.3) * 1px + 1.5px * var(--u, 1));
+  stroke-width: 1;
+}
+
 /* Two floating chips, one surface: the icon-button tooltip and the chart
    tooltip. Both sit outside .dialkit-root, so the token values are restated
    here rather than inherited. */
