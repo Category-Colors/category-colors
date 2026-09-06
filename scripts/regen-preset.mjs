@@ -2,11 +2,7 @@
 // the same code path Generate takes with untouched settings — and rewrites
 // preset-history.ts with the recorded loss curve.
 import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const server = await createServer({
   appType: 'custom',
@@ -32,7 +28,7 @@ export const PRESET_COST_HISTORY: CostSample[] = [
 ${lines.join('\n')}
 ]
 `
-  fs.writeFileSync(path.join(__dirname, '..', 'src', 'lib', 'preset-history.ts'), ts)
+  fs.writeFileSync(new URL('../src/lib/preset-history.ts', import.meta.url), ts)
 
   console.log(
     JSON.stringify(

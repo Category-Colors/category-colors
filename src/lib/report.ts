@@ -1,12 +1,9 @@
-// Imported from the package's report subpath rather than its barrel. Both are
-// tree-shakeable, but the subpath states the dependency exactly: this file
-// needs CVD simulation and deltaE and nothing else, and the tab bar imports it
-// to badge the Report tab with its issue count.
-import { reportJndIssues } from 'category-colors/report'
-import type { CvdSimulation, JndReport, JndTest } from 'category-colors/report'
+// Imports the package's report subpath so the tab badge can score a palette
+// without pulling in the optimizer or its saliency table (see MainTabs).
+import { reportJndIssues, type CvdSimulation, type JndReport, type JndTest } from 'category-colors/report'
 import type { PaletteParams, PaletteVersion } from './palette'
 
-export type { JndReport, JndTest, JndPair } from 'category-colors/report'
+export type { JndReport }
 
 // 'normal' → 'No CVD'; CVD labels use the type name alone, adding the
 // severity only when two simulations of the same type would collide.
