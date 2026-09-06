@@ -6,7 +6,11 @@ import { svgPoint, useChartUnit, useHoverState } from './chart-geometry'
 
 const WIDTH = 540
 const HEIGHT = 300
-const PAD = { top: 10, right: 12, bottom: 26, left: 34 }
+// `--u` keeps the axis labels 10 CSS pixels wherever the chart is drawn, but
+// PAD is in user units, so the gutter reserved for them shrinks as the chart
+// does. 44 is what "100%" needs at the narrowest this chart is drawn — a
+// phone's full-bleed canvas — and is slack everywhere wider.
+const PAD = { top: 10, right: 12, bottom: 26, left: 44 }
 const DOT_R = 2.3
 // Squared pick radius, in viewBox units: roughly a fingertip's worth of slop
 // around a 2.3-unit dot without letting the cursor claim a dot it isn't near.

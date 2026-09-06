@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Slider, Toggle, Folder, SelectControl } from '@/components/dialkit'
 import {
@@ -20,7 +20,7 @@ import { AddEvaluatorMenu } from './AddEvaluatorMenu'
 import { ColorRow } from './ColorRow'
 import { EvaluatorEditor } from './EvaluatorEditor'
 import { TrashIcon } from './icons'
-import { MorphPanel } from './MorphPanel'
+import { PanelShell } from './PanelShell'
 import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
 import { RangeSlider } from './RangeSlider'
@@ -30,9 +30,6 @@ import { ListEmptyState, ListRow, ReorderList } from './ReorderList'
 
 const SECTIONS = ['space', 'init', 'evals', 'optimizer'] as const
 
-// While the worker anneals, the button cycles through the stages of the
-// craft every 5s so long runs feel alive
-const BUSY_VERBS = ['Annealing…', 'Heating…', 'Cooling…', 'Tempering…', 'Quenching…', 'Polishing…']
 const MAX_CONFIG_BYTES = 1_000_000
 
 const replaceAt = <T,>(list: T[], index: number, item: T) =>
@@ -45,8 +42,10 @@ export function ParametersPanel({
   onParamsChange,
   onGenerate,
   busy,
-  minimized,
-  onMinimizedChange,
+  busyLabel,
+  phone,
+  open,
+  onOpenChange,
   hoverToOpen,
   width,
 }: {
@@ -54,23 +53,15 @@ export function ParametersPanel({
   onParamsChange: (params: PaletteParams) => void
   onGenerate: () => void
   busy: boolean
-  minimized: boolean
-  onMinimizedChange: (minimized: boolean) => void
+  busyLabel: string
+  phone: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
   hoverToOpen: boolean
   width: MotionValue<number>
 }) {
   const sections = useSections(SECTIONS)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [verbIndex, setVerbIndex] = useState(0)
-
-  useEffect(() => {
-    if (!busy) {
-      setVerbIndex(0)
-      return
-    }
-    const timer = setInterval(() => setVerbIndex((i) => i + 1), 5000)
-    return () => clearInterval(timer)
-  }, [busy])
 
   const set = <K extends keyof PaletteParams>(key: K, value: PaletteParams[K]) =>
     onParamsChange({ ...params, [key]: value })
@@ -314,7 +305,7 @@ export function ParametersPanel({
             }}
           >
             {busy && <span className="button-spinner" />}
-            {busy ? BUSY_VERBS[verbIndex % BUSY_VERBS.length] : 'Generate'}
+            {busy ? busyLabel : 'Generate'}
           </button>
         </div>
       </div>
@@ -322,15 +313,16 @@ export function ParametersPanel({
   )
 
   return (
-    <MorphPanel
+    <PanelShell
       side="left"
       name="Configuration"
-      minimized={minimized}
-      onMinimizedChange={onMinimizedChange}
+      phone={phone}
+      open={open}
+      onOpenChange={onOpenChange}
       hoverToOpen={hoverToOpen}
       width={width}
     >
       {panelBody}
-    </MorphPanel>
+    </PanelShell>
   )
 }

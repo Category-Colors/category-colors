@@ -13,6 +13,9 @@ import { TooltipLayer } from '@/components/TooltipLayer'
 import { ParametersPanel } from '@/components/panels/ParametersPanel'
 import { HistoryPanel } from '@/components/panels/HistoryPanel'
 import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
+import { MobileBar, type MobileSheet } from '@/components/mobile/MobileBar'
+import { useIsPhone } from '@/lib/use-media'
+import { useBusyLabel } from '@/lib/use-busy-label'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
@@ -25,16 +28,28 @@ export default function App() {
   const [versions, setVersions] = useState<PaletteVersion[]>([])
   const [currentId, setCurrentId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const [panelMinimized, setPanelMinimized] = useState(panelsFloat)
-  const [rightMinimized, setRightMinimized] = useState(panelsFloat)
+  const busyLabel = useBusyLabel(busy)
+  // A phone gets bottom sheets instead of docked panels, and only one at a
+  // time: two sheets would stack on the same screen edge, and the one
+  // underneath would be unreachable without dismissing the other.
+  const phone = useIsPhone()
+  const [sheet, setSheet] = useState<MobileSheet | null>(null)
+  const [leftOpen, setLeftOpen] = useState(() => !panelsFloat())
+  const [rightOpen, setRightOpen] = useState(() => !panelsFloat())
+  const configOpen = phone ? sheet === 'config' : leftOpen
+  const outputOpen = phone ? sheet === 'output' : rightOpen
+  const openConfig = (open: boolean) =>
+    phone ? setSheet(open ? 'config' : null) : setLeftOpen(open)
+  const openOutput = (open: boolean) =>
+    phone ? setSheet(open ? 'output' : null) : setRightOpen(open)
   // Each panel animates its width on one of these. How far it reaches past
   // its collapsed puck becomes a CSS variable the floating layout pads the
   // nav row by (index.css), so the logo and Theme button move with the
   // panel's own spring rather than a transition that approximates it. They
   // live on the app root, not the canvas: the docks sit outside the canvas
   // and their collapsed footprints have to measure the same push.
-  const leftWidth = useMotionValue(panelMinimized ? PUCK_SIZE : PANEL_WIDTH)
-  const rightWidth = useMotionValue(rightMinimized ? PUCK_SIZE : PANEL_WIDTH)
+  const leftWidth = useMotionValue(leftOpen ? PANEL_WIDTH : PUCK_SIZE)
+  const rightWidth = useMotionValue(rightOpen ? PANEL_WIDTH : PUCK_SIZE)
   const pushLeft = useTransform(leftWidth, (w) => `${w - PUCK_SIZE}px`)
   const pushRight = useTransform(rightWidth, (w) => `${w - PUCK_SIZE}px`)
   const nextId = useRef(1)
@@ -96,6 +111,13 @@ export default function App() {
     }
   }, [])
 
+  // Leaving the phone layout retires the sheet rather than leaving it parked:
+  // the docks take over at that width, and coming back would otherwise reopen
+  // a sheet nobody asked for.
+  useEffect(() => {
+    if (!phone) setSheet(null)
+  }, [phone])
+
   const current = versions.find((v) => v.id === currentId) ?? null
 
   const restore = (version: PaletteVersion) => {
@@ -155,8 +177,10 @@ export default function App() {
         onParamsChange={setParams}
         onGenerate={generate}
         busy={busy}
-        minimized={panelMinimized}
-        onMinimizedChange={setPanelMinimized}
+        busyLabel={busyLabel}
+        phone={phone}
+        open={configOpen}
+        onOpenChange={openConfig}
         hoverToOpen={versions.length === 0}
         width={leftWidth}
       />
@@ -171,11 +195,22 @@ export default function App() {
         onPaletteReplace={addPalette}
         onDeleteVersion={deleteVersion}
         onClearVersions={clearVersions}
-        minimized={rightMinimized}
-        onMinimizedChange={setRightMinimized}
+        phone={phone}
+        open={outputOpen}
+        onOpenChange={openOutput}
         hoverToOpen={versions.length === 0}
         width={rightWidth}
       />
+      {phone && (
+        <MobileBar
+          busy={busy}
+          busyLabel={busyLabel}
+          open={sheet}
+          onOpen={setSheet}
+          onGenerate={generate}
+          hidden={sheet !== null}
+        />
+      )}
       <TooltipLayer />
     </motion.div>
     </MotionConfig>

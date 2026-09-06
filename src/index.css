@@ -270,8 +270,11 @@ body {
 }
 
 /* Sticky panel header: same translucent glass + fade treatment as
-   .panel-footer, mirrored (content scrolls out under its bottom edge) */
-.panel-morph .dialkit-panel-header {
+   .panel-footer, mirrored (content scrolls out under its bottom edge).
+   Both shells a panel body can land in take it: the dock's morph and the
+   phone's sheet (PanelShell). */
+.panel-morph .dialkit-panel-header,
+.sheet .dialkit-panel-header {
   position: sticky;
   top: 0;
   z-index: 6;
@@ -284,7 +287,8 @@ body {
 
 /* The glass lives on a ::before layer so its fade mask can't clip
    descendants that pop out of the header box (the … menu) */
-.panel-morph .dialkit-panel-header::before {
+.panel-morph .dialkit-panel-header::before,
+.sheet .dialkit-panel-header::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -330,11 +334,13 @@ body {
 }
 
 /* Title hover strips bleed only as far as the tightened panel padding */
-.panel-morph .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row {
+.panel-morph .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row,
+.sheet .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row {
   margin-left: -6px;
 }
 
-.panel-morph .dialkit-panel-inner {
+.panel-morph .dialkit-panel-inner,
+.sheet .dialkit-panel-inner {
   padding-top: 0;
   padding-left: 6px;
   padding-right: 6px;
@@ -2034,3 +2040,304 @@ body {
   transform: none;
 }
 
+
+/* ── Phone layout ────────────────────────────────────────────── */
+
+/* Below this the docks stop being worth their footprint: two 42px pucks and
+   their insets cost 88 of a 393px screen before anything is drawn, and an
+   open 292px panel leaves a hundred pixels of canvas beside it. So the panels
+   become bottom sheets (PanelShell), the canvas takes the whole width, and the
+   controls that opened those panels move into a floating toolbar over it.
+   The breakpoint is mirrored in lib/use-media.ts — the components render
+   different chrome on each side of it, so the two have to agree. */
+@media (max-width: 767px) {
+  .app-main {
+    /* the canvas is the screen now; only the notch and a hair of inset */
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    /* and the last card clears the floating toolbar rather than sliding under
+       it, since the bar never scrolls away */
+    padding-bottom: calc(
+      var(--bar-size) + var(--bar-float) * 2 + env(safe-area-inset-bottom)
+    );
+  }
+
+  /* Nothing pushes the header sideways any more: the panels arrive from the
+     bottom edge, not the sides, so --push-left/--push-right have nothing to
+     compensate for. */
+  .app-nav,
+  .empty-canvas {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Thumbs, not cursors: the tab row grows to a 38px target and the pill with
+     it. The gain is taken out of the row's own padding, so the nav row's
+     height — which the scrim and the sticky offset are both measured from —
+     doesn't move. */
+  .app-nav [role='tab'] {
+    height: 38px;
+    padding-inline: 14px;
+    font-size: 15px;
+  }
+
+  .app-nav [role='tablist'] {
+    padding: 1px;
+    gap: 2px;
+  }
+
+  /* the sliding pill, which insets from the list by the same padding */
+  .app-nav [role='tablist'] > div:first-child {
+    inset-block: 1px;
+  }
+
+  /* The step list's third column can't hold a sentence at this width — it
+     came out four words wide. Two columns instead, with the detail forced back
+     under the name it belongs to; the rows tighten and the gap moves between
+     steps, so the pairing still reads as a pairing. */
+  .empty-steps {
+    grid-template-columns: auto 1fr;
+    row-gap: 3px;
+  }
+
+  .empty-step-detail {
+    grid-column: 2;
+    margin-bottom: 9px;
+  }
+
+  .empty-steps li:last-child .empty-step-detail {
+    margin-bottom: 0;
+  }
+
+}
+
+/* The pair grid keeps a floor under its columns (PairGrid), so once the
+   palette outgrows the width it overflows rather than compressing. This is
+   what it overflows into. Not phone-only: a wide palette in a narrow canvas
+   does the same thing at any width, and a card that scrolls is better than a
+   card its own content leaks out of. */
+.report-pairs {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* ── Bottom sheet ────────────────────────────────────────────── */
+
+/* Dimming behind the sheet, but only once it has climbed past halfway.
+   At the medium detent the canvas is still the point — you change a color and
+   watch the charts answer — so the scrim is fully transparent there and
+   doesn't take the taps that scroll them. Sheet.tsx drives both the opacity
+   and the pointer-events off the sheet's own height. */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: #000;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Only the top corners: the sheet is anchored to the screen's bottom edge
+     and never leaves it, so rounding the bottom would round nothing. */
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--dial-border);
+  /* Glass, not a solid card. Enough of the canvas comes through to keep the
+     charts present behind the panel you're editing them with — which is the
+     medium detent's whole argument — without the panel's own text having to
+     compete with a line chart. */
+  background: color-mix(in srgb, var(--dial-glass-bg) 88%, transparent);
+  backdrop-filter: blur(30px) saturate(1.7);
+  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  /* the second layer is the specular top edge that reads as a lit lip of
+     glass. Fixed white rather than ink at an alpha: a highlight is light on a
+     light theme too, where inverting it would draw a dark rule instead. */
+  box-shadow:
+    0 -12px 44px rgb(0 0 0 / calc(0.5 * var(--shadow-strength, 1))),
+    inset 0 1px 0 rgb(255 255 255 / 0.13);
+  outline: none;
+}
+
+/* The whole strip drags, not just the 38px pill in it — a grabber is an
+   affordance, not a hit area. `touch-action: none` because the gesture and
+   the browser's own pull-to-refresh want the same downward swipe. */
+.sheet-handle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sheet-handle:active {
+  cursor: grabbing;
+}
+
+.sheet-grabber {
+  width: 38px;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--theme-ink) 20%, transparent);
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* One scroller, as in the dock: the panel's own sticky header and sticky
+   .panel-footer both need this to be the thing that scrolls, which is what
+   keeps Generate on screen at the medium detent instead of below the fold. */
+.sheet .dialkit-panel,
+.sheet .dialkit-panel-inner {
+  width: 100%;
+}
+
+.sheet .dialkit-panel-inner {
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+  /* the canvas behind stays scrollable, but only when you touch the canvas */
+  overscroll-behavior: contain;
+}
+
+.sheet .dialkit-panel-inline {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* No collapse toggle in a sheet — the grabber and the scrim are how it closes
+   — so the header's action row gives back the slot the dock reserved. */
+.sheet .dialkit-panel-header .dialkit-folder-actions {
+  padding-right: 0;
+}
+
+/* The footer's glass strip clears the home indicator itself: it is sticky
+   inside the scroller, so padding on the scroller would sit below it rather
+   than under it. */
+.sheet .panel-footer {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+/* ── Floating toolbar ────────────────────────────── */
+
+:root {
+  --bar-size: 50px;
+  /* how far the islands float off the bottom edge */
+  --bar-float: 12px;
+}
+
+.mobile-bar {
+  position: fixed;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bar-float) + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  /* the row is a full-width flex track so the islands centre in it; only the
+     islands themselves should stand between a thumb and the charts */
+  pointer-events: none;
+}
+
+/* Three islands of one material. The blur, the specular lip and the shadow are
+   shared so they read as pieces of the same glass; only the tint tells the
+   primary action from the two panels. */
+.mobile-bar-button,
+.mobile-bar-generate {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--bar-size);
+  border-radius: 999px;
+  border: 1px solid var(--dial-border);
+  cursor: default;
+  backdrop-filter: blur(26px) saturate(1.8);
+  -webkit-backdrop-filter: blur(26px) saturate(1.8);
+  box-shadow:
+    0 10px 30px rgb(0 0 0 / calc(0.42 * var(--shadow-strength, 1))),
+    0 2px 8px rgb(0 0 0 / calc(0.3 * var(--shadow-strength, 1))),
+    inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+
+.mobile-bar-button {
+  width: var(--bar-size);
+  padding: 0;
+  background: color-mix(in srgb, var(--dial-glass-bg) 76%, transparent);
+  /* The ink carries the dimming, not the element: opacity here would take the
+     glass down with the glyph and leave a hole where the material was. */
+  color: color-mix(in oklab, var(--theme-ink) 62%, transparent);
+  transition:
+    background var(--dial-anim-fast),
+    color var(--dial-anim-fast),
+    transform var(--dial-anim-press);
+}
+
+/* Its sheet is up: the island fills in rather than growing a chip, since a
+   chip inside a 50px circle is just a smaller circle. */
+.mobile-bar-button[data-active] {
+  color: var(--theme-ink);
+  background: color-mix(
+    in srgb,
+    color-mix(in oklab, var(--theme-ink) 12%, var(--dial-glass-bg)) 88%,
+    transparent
+  );
+}
+
+.mobile-bar-button svg {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+}
+
+/* The app's one primary action, in the middle where the thumb rests, and the
+   only filled thing on the screen: ink on page, because it has to hold its own
+   against a dashboard of saturated color directly behind the glass. Round
+   while it waits — nothing to say — and it stretches into a capsule mid-run to
+   name the stage the anneal is at, the one piece of state the icons can't
+   show. */
+.mobile-bar-generate {
+  gap: 9px;
+  min-width: var(--bar-size);
+  padding-inline: 15px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--theme-ink);
+  border-color: transparent;
+  color: var(--theme-bg);
+  transition:
+    background var(--dial-anim-fast),
+    transform var(--dial-anim-press);
+}
+
+.mobile-bar-generate svg {
+  width: 21px;
+  height: 21px;
+}
+
+/* Dimmed while it runs, but only as far as the label can still be read on it:
+   the spinner says the button is working, the tint says it won't take another
+   press, and neither is worth losing the verb over. */
+.mobile-bar-generate[data-busy] {
+  background: color-mix(in oklab, var(--theme-ink) 78%, var(--theme-bg));
+}
+
+.mobile-bar-button:active,
+.mobile-bar-generate:active {
+  transform: scale(0.94);
+}

@@ -2,9 +2,14 @@ import { useMemo, useRef } from 'react'
 import type { CityWeather } from '@/lib/weather'
 import { ChartTip, type Tip } from './ChartTip'
 import { clampIndex, svgPoint, useChartUnit, useHoverState } from './chart-geometry'
+import { useIsPhone } from '@/lib/use-media'
 
-const WIDTH = 1120
 const HEIGHT = 240
+// See TempLines: the viewBox is the chart's aspect ratio, and 1120:240 is a
+// ribbon 77px tall on a phone. Half the width, and the same stack gets a
+// 2.3:1 box it can show a day's swell in.
+const WIDE = 1120
+const NARROW = 560
 const PAD = { top: 10, right: 10, bottom: 26, left: 10 }
 
 // This axis is UTC, not local, so it can't share chart-geometry's weekday.
@@ -47,6 +52,7 @@ export function SolarStream({
   const lead = cities.map((c) => Math.round((ref - c.startUtcMs) / 3600_000))
   const m = Math.min(...lead.map((l, i) => cities[i].hourlyRadiation.length - l))
 
+  const WIDTH = useIsPhone() ? NARROW : WIDE
   const svgRef = useRef<SVGSVGElement>(null)
   useChartUnit(svgRef, WIDTH)
 
@@ -102,7 +108,7 @@ export function SolarStream({
 
     return { paths, dayTicks, bands, series, x }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cities])
+  }, [cities, WIDTH])
 
   // Hovering a stack reads the whole column: every city's radiation at that
   // hour, listed top band first so the tooltip order matches what is on
