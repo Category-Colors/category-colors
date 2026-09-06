@@ -28,6 +28,12 @@ const PROJECT = 0.15
 // Above the large detent the sheet still follows the finger, at a quarter
 // speed — the resistance is what says there's nothing above this.
 const RUBBER = 0.25
+// How dark the page behind gets once the sheet is all the way up.
+const SCRIM = 0.4
+// A flick that ends in a pause is a release at rest, not a fling. Past this
+// many milliseconds without a pointermove, the last measured velocity is stale
+// and gets dropped rather than projected.
+const STALE_MS = 90
 
 /**
  * A bottom sheet with two detents, dragged by its handle.
@@ -83,8 +89,21 @@ function SheetBody({
   // live and scrollable — you can adjust a colour and then scroll the charts
   // to see it — and it dims and starts catching taps as the sheet claims the
   // screen.
-  const scrimOpacity = useTransform(height, [medium, large], [0, 0.4])
-  const scrimEvents = useTransform(height, (h) => (h > (medium + large) / 2 ? 'auto' : 'none'))
+  //
+  // A function rather than an input/output range, because on a viewport short
+  // enough that MEDIUM_FLOOR swallows the gap (landscape on a small phone) the
+  // two detents coincide. A range would interpolate across zero width, hand
+  // back NaN, and — since the browser drops `opacity: NaN` — leave this solid
+  // black box sitting over the screen at full strength. With one detent there
+  // is nothing to interpolate and the sheet is always "large", so the scrim is
+  // simply up.
+  const spread = large - medium
+  const scrimOpacity = useTransform(height, (h) =>
+    spread > 0 ? Math.max(0, Math.min(1, (h - medium) / spread)) * SCRIM : SCRIM
+  )
+  const scrimEvents = useTransform(height, (h) =>
+    spread > 0 && h <= medium + spread / 2 ? 'none' : 'auto'
+  )
   const drag = useRef<{ y: number; height: number; v: number; lastY: number; lastT: number }>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
 
@@ -150,11 +169,16 @@ function SheetBody({
     d.lastT = e.timeStamp
   }
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: ReactPointerEvent) => {
     const d = drag.current
     if (!d) return
     drag.current = null
-    const projected = height.get() + d.v * PROJECT
+    // `d.v` was last measured on a pointermove; a finger that flicks and then
+    // holds still emits no more of those, so without this a sheet released at
+    // rest would fly to the next detent — or dismiss — on a velocity from half
+    // a second ago.
+    const velocity = e.timeStamp - d.lastT > STALE_MS ? 0 : d.v
+    const projected = height.get() + velocity * PROJECT
     if (projected < medium * DISMISS) {
       onClose()
       return
@@ -169,7 +193,15 @@ function SheetBody({
   const transition = prefersReducedMotion() ? { duration: 0 } : SPRING.sheetIn
 
   return (
-    <>
+    // The layer, not the sheet, is the .dialkit-root. DialKit's dropdowns
+    // portal into the nearest one and position themselves against its box
+    // (dropdown-position.ts) — and the sheet is `overflow: hidden` and carries
+    // a transform, so a color picker or a select opened near its bottom edge
+    // would be measured against a moving box and then clipped away by it. A
+    // full-viewport layer is neither, and it still hands the sheet the theme
+    // tokens its glass is made of. Transparent to the pointer, so the canvas
+    // behind an unscrimmed sheet stays live; each child takes its own back.
+    <div className="sheet-layer dialkit-root">
       <motion.div
         className="sheet-scrim"
         style={{ opacity: scrimOpacity, pointerEvents: scrimEvents }}
@@ -178,7 +210,7 @@ function SheetBody({
       />
       <motion.div
         ref={sheetRef}
-        className="sheet dialkit-root"
+        className="sheet"
         role="dialog"
         aria-label={label}
         tabIndex={-1}
@@ -199,6 +231,6 @@ function SheetBody({
         </div>
         <div className="sheet-body">{children}</div>
       </motion.div>
-    </>
+    </div>
   )
 }

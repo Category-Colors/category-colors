@@ -2128,19 +2128,32 @@ body {
    watch the charts answer — so the scrim is fully transparent there and
    doesn't take the taps that scroll them. Sheet.tsx drives both the opacity
    and the pointer-events off the sheet's own height. */
-.sheet-scrim {
+/* The sheet's whole stack, and the .dialkit-root its dropdowns portal into
+   and measure against — which is why it is full-viewport, unclipped and
+   untransformed while the sheet inside it is none of those things. */
+.sheet-layer {
   position: fixed;
   inset: 0;
   z-index: 55;
+  pointer-events: none;
+}
+
+/* the scrim, the sheet, and any dropdown portaled in beside them */
+.sheet-layer > * {
+  pointer-events: auto;
+}
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
   background: #000;
 }
 
 .sheet {
-  position: fixed;
+  position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 60;
   display: flex;
   flex-direction: column;
   overflow: hidden;
