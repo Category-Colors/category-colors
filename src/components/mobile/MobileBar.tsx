@@ -18,15 +18,15 @@ function SlidersIcon() {
   )
 }
 
-// Tabler wand: the one glyph that reads as "make me something" rather than
-// "start" or "confirm", which is what this button actually does.
-function WandIcon() {
+// A play triangle: what this button starts is a run — the annealer, for as
+// long as it takes — and the spinner it turns into is the same idea carried
+// on. Filled, with the corners rounded by a stroke of its own colour rather
+// than by a longer path. Nudged right of the geometric centre, because a
+// right-pointing triangle centred by its bounding box reads as sitting left.
+function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 21l15 -15l-3 -3l-15 15l3 3" />
-      <path d="M15 6l3 3" />
-      <path d="M9 3a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2" />
-      <path d="M19 13a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2" />
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round">
+      <path d="M7.5 5.5v13l10.5 -6.5z" />
     </svg>
   )
 }
@@ -114,7 +114,7 @@ export function MobileBar({
           if (!busy) onGenerate()
         }}
       >
-        {busy ? <span className="button-spinner" /> : <WandIcon />}
+        {busy ? <span className="button-spinner" /> : <PlayIcon />}
         <AnimatePresence initial={false}>
           {busy && (
             <motion.span
