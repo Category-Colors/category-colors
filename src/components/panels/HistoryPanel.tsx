@@ -207,7 +207,13 @@ export function HistoryPanel({
   // Delegated hover: one pair of listeners for the whole list. Only the
   // palette itself previews — the row's × is beside it, not part of it, so
   // reaching for the × neither opens the popover nor lights the row.
+  //
+  // Mouse only. The popover is a hover preview of a row you can already see,
+  // and a tap has no hover to leave; it also hangs itself off the left edge of
+  // the docked panel, which a sheet doesn't have — so on a phone a tap on a
+  // history row would show it off the side of the screen and leave it there.
   const onListOver = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') return
     const el = (e.target as Element).closest('.color-row-chip')?.closest('[data-version]')
     if (!el) {
       popover.current?.hide()
