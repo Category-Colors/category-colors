@@ -35,3 +35,21 @@ export function getDropdownPosition(
 export function getDialKitPortalRoot(trigger: HTMLElement | null | undefined): HTMLElement | null {
   return (trigger?.closest('.dialkit-root') as HTMLElement | null) ?? null;
 }
+
+/**
+ * Whether a pointer event came from something that can hover.
+ *
+ * Every surface in this app that opens on `pointerover` and closes on
+ * `pointerleave` needs this. A touch has no hover to leave: the tap fires
+ * pointerover, the surface appears, and nothing takes it away again until the
+ * next tap lands somewhere else — so a preview meant to follow a cursor
+ * becomes a panel stuck on screen. Worse for anything whose contents change
+ * under a resting finger, which fires a fresh pointerover after its own
+ * pointerdown and re-raises what the press just dismissed.
+ *
+ * Asked per event rather than by media query, so a laptop with a touchscreen
+ * still gets its hover surfaces from the mouse. Charts are deliberately not
+ * callers: their tooltips track a moving pointer rather than waiting on a
+ * dwell, and a drag across one reads correctly on touch.
+ */
+export const isHoverPointer = (e: { pointerType: string }) => e.pointerType === 'mouse'

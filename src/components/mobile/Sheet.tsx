@@ -35,6 +35,12 @@ const SCRIM = 0.4
 // and gets dropped rather than projected.
 const STALE_MS = 90
 
+/** Where the two detents sit for a given viewport height. */
+const detentsFor = (vh: number) => {
+  const large = vh * LARGE
+  return { large, medium: Math.min(large, Math.max(vh * MEDIUM, MEDIUM_FLOOR)) }
+}
+
 /**
  * A bottom sheet with two detents, dragged by its handle.
  *
@@ -82,8 +88,8 @@ function SheetBody({
   // innerHeight, not 100dvh: the drag maths needs a number, and this is the
   // one the browser measures the visual viewport by.
   const [vh, setVh] = useState(() => window.innerHeight)
-  const large = vh * LARGE
-  const medium = Math.min(large, Math.max(vh * MEDIUM, MEDIUM_FLOOR))
+  const { medium, large } = detentsFor(vh)
+  const mid = (medium + large) / 2
   const height = useMotionValue(medium)
   // The scrim only exists between the detents: at medium the canvas behind is
   // live and scrollable — you can adjust a colour and then scroll the charts
@@ -101,17 +107,24 @@ function SheetBody({
   const scrimOpacity = useTransform(height, (h) =>
     spread > 0 ? Math.max(0, Math.min(1, (h - medium) / spread)) * SCRIM : SCRIM
   )
-  const scrimEvents = useTransform(height, (h) =>
-    spread > 0 && h <= medium + spread / 2 ? 'none' : 'auto'
-  )
+  const scrimEvents = useTransform(height, (h) => (spread > 0 && h <= mid ? 'none' : 'auto'))
   const drag = useRef<{ y: number; height: number; v: number; lastY: number; lastT: number }>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
 
+  // One handler for one event. The sheet also has to come back to a detent
+  // when the viewport changes under it (rotation, the URL bar collapsing) —
+  // snapping to whichever it was nearer, rather than scaling the raw height,
+  // which would leave it stranded between the two.
   useEffect(() => {
-    const onResize = () => setVh(window.innerHeight)
+    const onResize = () => {
+      const next = window.innerHeight
+      setVh(next)
+      const d = detentsFor(next)
+      height.set(height.get() > (d.medium + d.large) / 2 ? d.large : d.medium)
+    }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [])
+  }, [height])
 
   // Move focus into the sheet on open and hand it back on close. Not a focus
   // trap: at the medium detent the canvas behind is genuinely still in play,
@@ -121,17 +134,6 @@ function SheetBody({
     sheetRef.current?.focus({ preventScroll: true })
     return () => opener?.focus?.({ preventScroll: true })
   }, [])
-
-  // Keep the sheet on its detent when the viewport changes under it (rotation,
-  // the URL bar collapsing). Snapping to whichever detent it was nearer beats
-  // scaling the raw height, which would leave it between the two.
-  useEffect(() => {
-    const h = height.get()
-    height.set(h > (medium + large) / 2 ? large : medium)
-    // the detents are derived from vh, and re-running on every render would
-    // fight a drag in progress
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vh])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -183,14 +185,15 @@ function SheetBody({
       onClose()
       return
     }
+    // The one place here that has to ask. MotionConfig's reducedMotion covers
+    // motion's own props — the y above — but not a standalone animate() call,
+    // exactly as MorphPanel's width animation has to ask for itself.
     animate(
       height,
-      projected > (medium + large) / 2 ? large : medium,
+      projected > mid ? large : medium,
       prefersReducedMotion() ? { duration: 0 } : SPRING.detent
     )
   }
-
-  const transition = prefersReducedMotion() ? { duration: 0 } : SPRING.sheetIn
 
   return (
     // The layer, not the sheet, is the .dialkit-root. DialKit's dropdowns
@@ -217,8 +220,8 @@ function SheetBody({
         style={{ height }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
-        exit={{ y: '100%', transition: prefersReducedMotion() ? { duration: 0 } : SPRING.sheetOut }}
-        transition={transition}
+        exit={{ y: '100%', transition: SPRING.sheetOut }}
+        transition={SPRING.sheetIn}
       >
         <div
           className="sheet-handle"

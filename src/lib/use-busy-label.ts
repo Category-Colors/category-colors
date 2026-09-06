@@ -7,9 +7,12 @@ const BUSY_VERBS = ['Annealing…', 'Heating…', 'Cooling…', 'Tempering…', 
 /**
  * The generate button's label while a run is in flight.
  *
- * Owned above both buttons that show it: on a phone the panel's Generate and
- * the toolbar's are on screen in the same run, and two timers started a moment
- * apart would have them reading different stages of the same anneal.
+ * Called by each button rather than lifted above them: the panel's Generate
+ * and the toolbar's are never on screen together — the toolbar ducks away
+ * whenever a sheet is up, and there is no toolbar at all above the phone
+ * breakpoint — so they have nothing to stay in step with. Lifting it would
+ * put a 5-second timer on the app root and re-render the whole tree, charts
+ * included, to change one word in one button.
  */
 export function useBusyLabel(busy: boolean) {
   const [index, setIndex] = useState(0)

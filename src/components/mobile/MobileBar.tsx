@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { SPRING, prefersReducedMotion } from '@/components/dialkit'
+import { SPRING } from '@/components/dialkit'
+import { useBusyLabel } from '@/lib/use-busy-label'
 
 export type MobileSheet = 'config' | 'output'
 
@@ -66,27 +67,25 @@ function PaletteIcon() {
  */
 export function MobileBar({
   busy,
-  busyLabel,
   open,
   onOpen,
   onGenerate,
-  hidden,
 }: {
   busy: boolean
-  /** The generate button's cycling verb, shared with the panel's own button */
-  busyLabel: string
   open: MobileSheet | null
   onOpen: (sheet: MobileSheet) => void
   onGenerate: () => void
-  hidden: boolean
 }) {
-  const spring = prefersReducedMotion() ? { duration: 0 } : SPRING.toolbar
+  const busyLabel = useBusyLabel(busy)
+  // A sheet being up is the whole reason to duck, so it is not worth a second
+  // prop that has to agree with the first.
+  const hidden = open !== null
   return (
     <motion.div
       className="mobile-bar dialkit-root"
       initial={false}
       animate={{ y: hidden ? '160%' : '0%', opacity: hidden ? 0 : 1 }}
-      transition={spring}
+      transition={SPRING.toolbar}
       // hidden means a sheet owns the screen; nothing here should be tabbable
       // behind it
       inert={hidden || undefined}
@@ -105,7 +104,13 @@ export function MobileBar({
 
       <motion.button
         layout
-        transition={spring}
+        // Without this, motion takes a layout snapshot and walks every
+        // projection node in the app on every render of this component — and
+        // it re-renders whenever App does, which a slider drag inside the
+        // config sheet does on every pointermove. `busy` is the only thing
+        // that changes this button's box.
+        layoutDependency={busy}
+        transition={SPRING.toolbar}
         type="button"
         className="mobile-bar-generate"
         data-busy={busy ? '' : undefined}

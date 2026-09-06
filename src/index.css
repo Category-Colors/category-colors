@@ -105,6 +105,21 @@
   --dial-anim-reveal: var(--dial-anim-fast);
   --dial-backdrop-blur: 20px;
 
+  /* The phone chrome (index.css, phone layout below). Its islands float off
+     the bottom edge by --bar-float and are --bar-size square; .app-main pads
+     by both so the last card clears them. */
+  --bar-size: 50px;
+  --bar-float: 12px;
+
+  /* Two glass recipes heavier than the panels' --dial-backdrop-blur: these
+     surfaces float over a saturated dashboard rather than over the page, and
+     need to hold their own against it. Both carry the same specular lip —
+     fixed white rather than ink at an alpha, because a highlight is light on
+     a light theme too, where inverting it would draw a dark rule instead. */
+  --sheet-glass: blur(30px) saturate(1.7);
+  --bar-glass: blur(26px) saturate(1.8);
+  --glass-lip: inset 0 1px 0 rgb(255 255 255 / 0.14);
+
   /* Shadow weight scales with the page. The same 50%-black drop that reads as
      depth over a dark canvas is a grey smudge over a light one, so every
      chrome shadow multiplies its alpha by this rather than being tuned twice.
@@ -271,10 +286,9 @@ body {
 
 /* Sticky panel header: same translucent glass + fade treatment as
    .panel-footer, mirrored (content scrolls out under its bottom edge).
-   Both shells a panel body can land in take it: the dock's morph and the
-   phone's sheet (PanelShell). */
-.panel-morph .dialkit-panel-header,
-.sheet .dialkit-panel-header {
+   Keyed to the body PanelShell builds, not to either shell it lands in — the
+   dock's morph and the phone's sheet get it by containing one. */
+.panel-shell .dialkit-panel-header {
   position: sticky;
   top: 0;
   z-index: 6;
@@ -287,8 +301,7 @@ body {
 
 /* The glass lives on a ::before layer so its fade mask can't clip
    descendants that pop out of the header box (the … menu) */
-.panel-morph .dialkit-panel-header::before,
-.sheet .dialkit-panel-header::before {
+.panel-shell .dialkit-panel-header::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -334,13 +347,11 @@ body {
 }
 
 /* Title hover strips bleed only as far as the tightened panel padding */
-.panel-morph .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row,
-.sheet .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row {
+.panel-shell .dialkit-folder:not(.dialkit-folder-root) .dialkit-folder-title-row {
   margin-left: -6px;
 }
 
-.panel-morph .dialkit-panel-inner,
-.sheet .dialkit-panel-inner {
+.panel-shell .dialkit-panel-inner {
   padding-top: 0;
   padding-left: 6px;
   padding-right: 6px;
@@ -393,21 +404,31 @@ body {
   justify-content: flex-end;
 }
 
-.panel-dock .dialkit-panel,
-.panel-dock .dialkit-panel-inner {
+.panel-shell,
+.panel-shell > .dialkit-panel-inner {
   width: 100%;
 }
 
-.panel-dock .dialkit-panel-inner {
-  max-height: calc(100vh - var(--panel-gap) * 2);
+/* One scroller only — the outer one — so .panel-footer can stick to its
+   bottom. The root Folder renders a second .dialkit-panel-inner inside it,
+   and theme.css hands that one `max-height: inherit; overflow-y: auto`, so it
+   would happily become a second scroller and strand the footer inside it.
+   Hence the child combinator on every rule that sets this scroller's extent:
+   a descendant selector reaches the inner one too, and — being one class
+   longer than the override below — would win against it. */
+.panel-shell > .dialkit-panel-inner {
   overflow-y: auto;
 }
 
-/* One scroller only (the PanelShell wrapper), so .panel-footer can stick to
-   its bottom; the root Folder's inline wrapper must not scroll internally */
-.panel-dock .dialkit-panel-inline {
+.panel-shell .dialkit-panel-inline {
   max-height: none;
   overflow-y: visible;
+}
+
+/* How far the scroller may run is the one thing the two shells disagree on:
+   the dock is bounded by the viewport, the sheet by its own dragged height. */
+.panel-dock .panel-shell > .dialkit-panel-inner {
+  max-height: calc(100vh - var(--panel-gap) * 2);
 }
 
 .panel-status {
@@ -2166,14 +2187,11 @@ body {
      medium detent's whole argument — without the panel's own text having to
      compete with a line chart. */
   background: color-mix(in srgb, var(--dial-glass-bg) 88%, transparent);
-  backdrop-filter: blur(30px) saturate(1.7);
-  -webkit-backdrop-filter: blur(30px) saturate(1.7);
-  /* the second layer is the specular top edge that reads as a lit lip of
-     glass. Fixed white rather than ink at an alpha: a highlight is light on a
-     light theme too, where inverting it would draw a dark rule instead. */
+  backdrop-filter: var(--sheet-glass);
+  -webkit-backdrop-filter: var(--sheet-glass);
   box-shadow:
     0 -12px 44px rgb(0 0 0 / calc(0.5 * var(--shadow-strength, 1))),
-    inset 0 1px 0 rgb(255 255 255 / 0.13);
+    var(--glass-lip);
   outline: none;
 }
 
@@ -2209,22 +2227,11 @@ body {
 /* One scroller, as in the dock: the panel's own sticky header and sticky
    .panel-footer both need this to be the thing that scrolls, which is what
    keeps Generate on screen at the medium detent instead of below the fold. */
-.sheet .dialkit-panel,
-.sheet .dialkit-panel-inner {
-  width: 100%;
-}
-
-.sheet .dialkit-panel-inner {
+.sheet .panel-shell > .dialkit-panel-inner {
   height: 100%;
   max-height: none;
-  overflow-y: auto;
   /* the canvas behind stays scrollable, but only when you touch the canvas */
   overscroll-behavior: contain;
-}
-
-.sheet .dialkit-panel-inline {
-  max-height: none;
-  overflow-y: visible;
 }
 
 /* No collapse toggle in a sheet — the grabber and the scrim are how it closes
@@ -2241,12 +2248,6 @@ body {
 }
 
 /* ── Floating toolbar ────────────────────────────── */
-
-:root {
-  --bar-size: 50px;
-  /* how far the islands float off the bottom edge */
-  --bar-float: 12px;
-}
 
 .mobile-bar {
   position: fixed;
@@ -2278,12 +2279,12 @@ body {
   border-radius: 999px;
   border: 1px solid var(--dial-border);
   cursor: default;
-  backdrop-filter: blur(26px) saturate(1.8);
-  -webkit-backdrop-filter: blur(26px) saturate(1.8);
+  backdrop-filter: var(--bar-glass);
+  -webkit-backdrop-filter: var(--bar-glass);
   box-shadow:
     0 10px 30px rgb(0 0 0 / calc(0.42 * var(--shadow-strength, 1))),
     0 2px 8px rgb(0 0 0 / calc(0.3 * var(--shadow-strength, 1))),
-    inset 0 1px 0 rgb(255 255 255 / 0.14);
+    var(--glass-lip);
 }
 
 .mobile-bar-button {
@@ -2310,7 +2311,8 @@ body {
   );
 }
 
-.mobile-bar-button svg {
+.mobile-bar-button svg,
+.mobile-bar-generate svg {
   width: 21px;
   height: 21px;
   flex-shrink: 0;
@@ -2338,10 +2340,6 @@ body {
     transform var(--dial-anim-press);
 }
 
-.mobile-bar-generate svg {
-  width: 21px;
-  height: 21px;
-}
 
 /* Dimmed while it runs, but only as far as the label can still be read on it:
    the spinner says the button is working, the tint says it won't take another
@@ -2350,7 +2348,8 @@ body {
   background: color-mix(in oklab, var(--theme-ink) 78%, var(--theme-bg));
 }
 
+/* the same press the rest of the app's buttons use (theme.css) */
 .mobile-bar-button:active,
 .mobile-bar-generate:active {
-  transform: scale(0.94);
+  transform: scale(0.97);
 }

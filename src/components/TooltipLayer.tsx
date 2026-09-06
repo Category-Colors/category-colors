@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { isHoverPointer } from './dialkit/dropdown-position'
 
 const DWELL = 200
 
@@ -48,15 +49,7 @@ export function TooltipLayer() {
     }
 
     const onOver = (e: PointerEvent) => {
-      // A tooltip is a hover affordance, and a touch has no hover to leave:
-      // the tap fires pointerover, the chip appears, and nothing dismisses it
-      // until you tap somewhere else. Worse, a button whose contents change
-      // under a resting finger — the toolbar's play button, swapping its glyph
-      // for a spinner — fires a fresh pointerover after its own pointerdown
-      // and re-raises the chip the press had just dismissed. Asked per event
-      // rather than by media query, so a laptop with a touchscreen still gets
-      // tooltips from its mouse.
-      if (e.pointerType !== 'mouse') {
+      if (!isHoverPointer(e)) {
         hide()
         return
       }
