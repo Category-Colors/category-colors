@@ -1,15 +1,30 @@
 import { DEFAULT_PARAMS, defaultColorSpace, type PaletteParams } from '@/lib/palette'
 import { PRESET_PALETTES } from '@/lib/presets'
+import { useIsPhone } from '@/lib/use-media'
 
 // The essay this app implements
 const ESSAY = 'https://mattstromawn.com/writing/how-to-pick-the-least-wrong-colors/'
 
-const STEPS = [
-  ['Configure', 'Colors, space, and evaluators, on the ← left.'],
-  ['Generate', 'The optimizer picks colors that stay apart.'],
-  ['Refine', 'Preview on live charts, read the report, edit any color.'],
-  ['Export', 'Copy or download, on the right →.'],
-] as const
+// Two steps point at where their controls actually are, and on a phone that
+// isn't left and right — both panels open from the toolbar below, whose
+// buttons carry no labels to name. So the phone copy points at the toolbar and
+// lets the icons introduce themselves; the arrows would be pointing off the
+// side of the screen either way.
+const steps = (phone: boolean) =>
+  [
+    [
+      'Configure',
+      phone
+        ? 'Colors, space, and evaluators, from the toolbar below ↓.'
+        : 'Colors, space, and evaluators, on the ← left.',
+    ],
+    ['Generate', 'The optimizer picks colors that stay apart.'],
+    ['Refine', 'Preview on live charts, read the report, edit any color.'],
+    [
+      'Export',
+      phone ? 'Copy or download, from the toolbar below ↓.' : 'Copy or download, on the right →.',
+    ],
+  ] as const
 
 // Presets of the panel's own settings: a count plus OKHSL saturation and
 // lightness bands, over the defaults. The panel adopts them, so each is also a
@@ -39,6 +54,7 @@ export function EmptyState({
   onGenerate: (params?: PaletteParams) => void
   onPreset: (colors: string[]) => void
 }) {
+  const phone = useIsPhone()
   return (
     <section className="empty-state dialkit-root" aria-labelledby="empty-title">
       <h2 id="empty-title" className="empty-title">
@@ -49,7 +65,7 @@ export function EmptyState({
         way
       </h2>
       <ol className="empty-steps">
-        {STEPS.map(([name, detail], i) => (
+        {steps(phone).map(([name, detail], i) => (
           <li key={name}>
             <span className="empty-step-n">{i + 1}</span>
             <span className="empty-step-name">{name}</span>

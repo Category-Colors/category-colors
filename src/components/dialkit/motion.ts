@@ -18,6 +18,17 @@ export const SPRING = {
   morphOut: { type: 'spring', visualDuration: 0.12, bounce: 0.02 },
   /** Container arrivals (button → panel) — slightly longer, gently physical */
   morphIn: { type: 'spring', visualDuration: 0.24, bounce: 0.15 },
+  /** A bottom sheet rising from the screen edge. Longer than the panel morph
+      and with less bounce: it travels most of a phone's height, where the same
+      overshoot that reads as lively over 250px reads as loose over 800. */
+  sheetIn: { type: 'spring', visualDuration: 0.34, bounce: 0.1 },
+  /** …and leaving. Dismissals get out of the way; nothing to admire. */
+  sheetOut: { type: 'spring', visualDuration: 0.2, bounce: 0 },
+  /** A sheet settling onto a detent after a drag. Carries a little bounce so
+      the snap reads as the sheet catching, not as the drag being overridden. */
+  detent: { type: 'spring', visualDuration: 0.3, bounce: 0.16 },
+  /** The floating toolbar ducking out as a sheet takes over, and back */
+  toolbar: { type: 'spring', visualDuration: 0.26, bounce: 0.12 },
 } as const satisfies Record<string, Transition>
 
 /** Plain opacity fade for elements that shouldn't spring */

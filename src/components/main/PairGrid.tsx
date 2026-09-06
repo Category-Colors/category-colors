@@ -412,7 +412,15 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
     <>
       <div
         className="grid gap-y-1"
-        style={{ gridTemplateColumns: `minmax(28px, auto) repeat(${colors.length - 1}, minmax(0, 1fr))` }}
+        // 48px floor per column: the widest a cell gets is a failing ΔE beside
+        // its two-letter test marker ("20.4 PD"), and below that the marker
+        // runs into the next column. Past the point where the columns stop
+        // fitting, the grid keeps its floor and .report-pairs scrolls sideways
+        // instead — a squeezed grid of overlapping numbers is worse than one
+        // you have to push. Slack, so it only binds where 1fr can't.
+        style={{
+          gridTemplateColumns: `minmax(28px, auto) repeat(${colors.length - 1}, minmax(48px, 1fr))`,
+        }}
         onPointerOver={onPointerOver}
         onPointerLeave={onPointerLeave}
       >

@@ -23,7 +23,7 @@ import { AddColorBar } from './AddColorBar'
 import { ColorRow } from './ColorRow'
 import { HistoryPopover, type HistoryPopoverHandle } from './HistoryPopover'
 import { CheckIcon, CopyIcon, TrashIcon, XIcon } from './icons'
-import { MorphPanel } from './MorphPanel'
+import { PanelShell } from './PanelShell'
 import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
 import { ListRow, ReorderList } from './ReorderList'
@@ -93,8 +93,9 @@ export function HistoryPanel({
   onPaletteReplace,
   onDeleteVersion,
   onClearVersions,
-  minimized,
-  onMinimizedChange,
+  phone,
+  open,
+  onOpenChange,
   hoverToOpen,
   width,
 }: {
@@ -105,8 +106,9 @@ export function HistoryPanel({
   onPaletteReplace: (colors: string[]) => void
   onDeleteVersion: (id: number) => void
   onClearVersions: () => void
-  minimized: boolean
-  onMinimizedChange: (minimized: boolean) => void
+  phone: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
   hoverToOpen: boolean
   width: MotionValue<number>
 }) {
@@ -218,8 +220,8 @@ export function HistoryPanel({
 
   // the rows unmount when the panel collapses; the popover must follow
   useEffect(() => {
-    if (minimized) popover.current?.hide()
-  }, [minimized])
+    if (!open) popover.current?.hide()
+  }, [open])
 
   useEffect(() => () => clearTimeout(copyTimer.current ?? undefined), [])
 
@@ -236,11 +238,12 @@ export function HistoryPanel({
   }
 
   return (
-    <MorphPanel
+    <PanelShell
       side="right"
       name="Output"
-      minimized={minimized}
-      onMinimizedChange={onMinimizedChange}
+      phone={phone}
+      open={open}
+      onOpenChange={onOpenChange}
       hoverToOpen={hoverToOpen}
       width={width}
     >
@@ -393,6 +396,6 @@ export function HistoryPanel({
         </div>
       </div>
       <HistoryPopover ref={popover} />
-    </MorphPanel>
+    </PanelShell>
   )
 }

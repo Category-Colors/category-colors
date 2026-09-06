@@ -2,9 +2,18 @@ import { useMemo, useRef } from 'react'
 import type { CityWeather } from '@/lib/weather'
 import { ChartTip, type Tip } from './ChartTip'
 import { clampIndex, svgPoint, useChartUnit, useHoverState, weekday } from './chart-geometry'
+import { useIsPhone } from '@/lib/use-media'
 
-const WIDTH = 1120
 const HEIGHT = 300
+// The viewBox is the chart's aspect ratio as much as its coordinate system:
+// it is `w-full` with the default preserveAspectRatio, so 1120 units across
+// 300 down is a 3.7:1 band — a fine shape on a desk, and 97px tall on a phone.
+// Halving the width gives the same data a 1.9:1 box there. It also puts the
+// chrome back in proportion: `--u` keeps the labels 10px however wide the
+// chart is drawn, but PAD is in user units, and at 1120-across-a-phone the
+// gutter reserved for a label had shrunk to a third of the label.
+const WIDE = 1120
+const NARROW = 560
 const PAD = { top: 14, right: 48, bottom: 26, left: 36 }
 
 
@@ -17,6 +26,7 @@ export function TempLines({
   days: string[]
   colors: string[]
 }) {
+  const WIDTH = useIsPhone() ? NARROW : WIDE
   const all = cities.flatMap((c) => c.hourlyTemp)
   const rawLo = Math.floor(Math.min(...all) / 5) * 5
   const rawHi = Math.ceil(Math.max(...all) / 5) * 5
@@ -40,7 +50,7 @@ export function TempLines({
           .join(' ')
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cities, lo, hi]
+    [cities, lo, hi, WIDTH]
   )
 
   // The cursor picks an hour, and the tooltip reads that whole column: every
@@ -147,7 +157,7 @@ export function TempLines({
       </>
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cities, days, colors, paths, lo, hi, step])
+  }, [cities, days, colors, paths, lo, hi, step, WIDTH])
 
   // Direct-label only the extremes at the right edge; the masthead is the legend
   const edgeLabels = useMemo(() => {
@@ -169,7 +179,7 @@ export function TempLines({
       </>
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cities, lo, hi])
+  }, [cities, lo, hi, WIDTH])
 
   return (
     <>
