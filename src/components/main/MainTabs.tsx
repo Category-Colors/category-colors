@@ -1,8 +1,9 @@
-import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PaletteParams, PaletteVersion } from '@/lib/palette'
 import { buildJndReport } from '@/lib/report'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { PILL_TRANSITION } from '@/components/dialkit'
+import { AboutDialog } from './AboutDialog'
 import { ThemeMenu } from './ThemeMenu'
 import { EmptyState } from './EmptyState'
 
@@ -38,6 +39,8 @@ export function MainTabs({
   onPreset: (colors: string[]) => void
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('preview')
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const closeAbout = useCallback(() => setAboutOpen(false), [])
   // Scored once here and handed to the report, rather than each computing its
   // own: the badge needs the count on every palette change regardless of which
   // tab is showing.
@@ -71,7 +74,13 @@ export function MainTabs({
           toggles', so the collapsed pucks sit in this row; the row height and
           the gap under it are set in index.css, where the scrim reads them */}
       <div className="app-nav grid grid-cols-[1fr_auto_1fr] items-center gap-5">
-        <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="app-brand"
+          aria-haspopup="dialog"
+          aria-expanded={aboutOpen}
+          onClick={() => setAboutOpen(true)}
+        >
           {/* decorative: the wordmark beside it already names the app */}
           <span className="app-mark" aria-hidden="true" />
           {/* the mock's flat #999 as a rung on the ink ladder — /55 lands
@@ -80,7 +89,7 @@ export function MainTabs({
           <p className="app-wordmark text-[16px] font-medium tracking-[-0.01em] text-ink/55">
             Category colors
           </p>
-        </div>
+        </button>
         {/* Nothing to switch between until a palette exists. The theme button
             is placed in column 3 explicitly, so dropping this out of the middle
             leaves the row's ends where they were. */}
@@ -166,6 +175,7 @@ export function MainTabs({
           </Suspense>
         </div>
       )}
+      <AboutDialog open={aboutOpen} onClose={closeAbout} />
     </>
   )
 }
