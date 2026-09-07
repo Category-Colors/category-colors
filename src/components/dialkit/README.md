@@ -28,6 +28,15 @@ Local modifications:
   just before any header `actions` (at the right edge when there are none).
   See end of `theme.css`. Direction semantics flipped from upstream:
   down = collapsed, up = open (matching the select dropdowns).
+- Chevron and checkmark strokes pinned to the app's icon weight: `Folder` and
+  `SelectControl` chevrons 2 / 2.5 -> 1.5, and `--dial-check-mask` 3 -> 1.5.
+  Written as literals rather than importing the app's `ICON_STROKE`, which
+  would point this vendored directory back at `components/panels`.
+- `Folder` hides its `actions` while collapsed — they act on contents nobody
+  can see — with `keepActionsWhenClosed` opting a folder out, for actions aimed
+  at the folder itself (an evaluator row's × removes the evaluator). The slot
+  is only clipped when its width animates, so an opted-out folder keeps its
+  icons' bleeding hover surfaces the way root headers do.
 - `Folder` supports a controlled `open` prop (falls back to internal state via
   `defaultOpen` when omitted), and the `actions` slot also renders in the
   open inline-root header.

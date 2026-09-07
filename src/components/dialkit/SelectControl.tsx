@@ -58,7 +58,7 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             animate={{ rotate: isOpen ? 180 : 0 }}

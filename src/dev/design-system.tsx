@@ -1,9 +1,15 @@
-import type { ReactNode } from 'react'
+import type { JSX, ReactNode } from 'react'
 import * as Icons from '@/components/panels/icons'
 import { ButtonGroup, SegmentedControl } from '@/components/dialkit'
 import { ColorRow } from '@/components/panels/ColorRow'
 import { TooltipLayer } from '@/components/TooltipLayer'
 import { hexValue } from '@/lib/color'
+
+// Everything the icons module exports that is actually a glyph — it also
+// exports ICON_STROKE, the weight they are all drawn at.
+const GLYPHS = Object.entries(Icons).filter(
+  (entry): entry is [string, () => JSX.Element] => typeof entry[1] === 'function'
+)
 
 // Living reference at /design-system: tokens, components, icons, and the
 // motion/interaction rules agents should follow when extending the app.
@@ -155,7 +161,7 @@ export function DesignSystemPage() {
       <Section title="Icons">
         <Card>
           <div className="grid grid-cols-4 gap-2 md:grid-cols-6">
-            {Object.entries(Icons).map(([name, Icon]) => (
+            {GLYPHS.map(([name, Icon]) => (
               <div key={name} className="flex items-center gap-2 rounded-md px-2 py-1.5">
                 <span className="flex size-5 shrink-0 items-center justify-center text-ink/70 [&_svg]:size-4">
                   <Icon />

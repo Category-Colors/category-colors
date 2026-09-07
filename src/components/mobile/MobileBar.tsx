@@ -1,20 +1,20 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { SPRING } from '@/components/dialkit'
 import { useBusyLabel } from '@/lib/use-busy-label'
+import { ICON_STROKE } from '@/components/panels/icons'
 
 export type MobileSheet = 'config' | 'output'
 
 // Tabler adjustments-horizontal: three tracks with their handles offset, which
 // is the panel it opens in miniature.
+// The handles sit on their tracks, and this button's ink is translucent
+// (.mobile-bar-button), so the whole glyph is one <path> — a <circle> of its
+// own composites over the track and doubles the ink at the join. Each handle
+// is the two-arc subpath a <circle r="2"> draws (see panels/icons.tsx).
 function SlidersIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6h9M17 6h3" />
-      <path d="M4 12h4M12 12h8" />
-      <path d="M4 18h11M19 18h1" />
-      <circle cx="15" cy="6" r="2" />
-      <circle cx="10" cy="12" r="2" />
-      <circle cx="17" cy="18" r="2" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h9M17 6h3M4 12h4M12 12h8M4 18h11M19 18h1M13 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM8 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM15 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0z" />
     </svg>
   )
 }
@@ -36,11 +36,15 @@ function PlayIcon() {
 // and taken away; a painter's palette says "the colors themselves" at 21px,
 // where a download tray would promise a file the tap doesn't hand over and a
 // stack of swatches turns to mud. The dots are filled rather than stroked —
-// three hairline rings this small close up into blobs.
+// three hairline rings this small close up into blobs, and they clear the
+// outline, so they stay their own elements. The outline ends where it starts,
+// so it closes with z rather than stacking two round caps on the same point —
+// one element, so that stack never doubled, but a closed contour is what the
+// shape actually is.
 function PaletteIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25z" />
       <circle cx="8.5" cy="10.5" r="1" fill="currentColor" stroke="none" />
       <circle cx="12.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
       <circle cx="16.5" cy="10.5" r="1" fill="currentColor" stroke="none" />

@@ -49,7 +49,7 @@
 
   /* Selected-item check; same glyph as the CheckIcon component, as a mask so
      it picks up currentColor */
-  --dial-check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E")
+  --dial-check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5L20 7'/%3E%3C/svg%3E")
     center / contain no-repeat;
 
   /* Fonts */
@@ -1533,7 +1533,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .dialkit-folder-header:hover .dialkit-folder-icon {
+  .dialkit-folder-title-row:hover .dialkit-folder-icon {
     opacity: 0.6;
   }
 }
@@ -1547,21 +1547,19 @@
   border-radius: 6px;
 }
 
-.dialkit-folder:not(.dialkit-folder-root)
-  > .dialkit-folder-header:hover
-  .dialkit-folder-title-row {
-  background: var(--dial-surface);
-}
+/* Hovering an action must not light the row up behind it: the × removes the
+   row, and a lit row says the row itself is about to take the click. The
+   trigger is the chip, not the header, so the actions sit outside it by
+   construction and the icons get their own hover surface back.
 
-/* The row holds its highlight while the pointer is over an action icon; the
-   icon brightens on its own rather than growing a second, competing surface.
-   Suppressing the row highlight there instead (a :not(:has(…:hover)) guard)
-   meant crossing the icons turned it off mid-row, so any sweep across a row —
-   or a move toward its × — flashed on/off/on and read as a double activation.
-   Root panel headers keep the icon background: their row never highlights. */
+   Not a :has() guard on the header — that was tried and reverted. It subtracts
+   only where an icon is hovered, so the 2px gaps between icons, and the bands
+   above and below them, still counted as header-hover: crossing the actions
+   flashed the row on/off/on and read as a double activation. The chip is one
+   contiguous rectangle with no such holes, so it can only go on once and off
+   once. Root panel headers are unaffected; their row never highlights. */
 .dialkit-folder:not(.dialkit-folder-root)
   > .dialkit-folder-header
-  .dialkit-folder-actions
-  .color-row-icon:hover {
-  background: transparent;
+  .dialkit-folder-title-row:hover {
+  background: var(--dial-surface);
 }

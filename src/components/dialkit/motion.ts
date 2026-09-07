@@ -31,6 +31,24 @@ export const SPRING = {
   toolbar: { type: 'spring', visualDuration: 0.26, bounce: 0.12 },
 } as const satisfies Record<string, Transition>
 
+/**
+ * Everything the app's two non-modal windows (About, the Manual) share about
+ * how they arrive, leave and drag. Only `dragControls` and `dragConstraints`
+ * stay at the call site — they name that window's own bar and layer. Held here
+ * so the pair cannot drift the next time one of them is edited alone.
+ */
+export const windowMotion = () =>
+  ({
+    drag: true,
+    dragListener: false,
+    dragElastic: 0,
+    dragMomentum: false,
+    initial: { opacity: 0, y: 12, scale: 0.965 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: 6, scale: 0.98, transition: SPRING.morphOut },
+    transition: SPRING.morphIn,
+  }) as const
+
 /** Plain opacity fade for elements that shouldn't spring */
 export const FADE: Transition = { duration: 0.12 }
 

@@ -14,6 +14,10 @@ interface FolderProps {
   /** Header buttons. Toggling them on and off animates their slot open and
       closed so the chevron beside them glides instead of jumping. */
   actions?: ReactNode;
+  /** Keep `actions` in the header while collapsed. For actions that act on the
+      folder itself rather than on its contents — an evaluator's × removes the
+      evaluator, which is as true closed as open. */
+  keepActionsWhenClosed?: boolean;
   /** One line shown beside the title while collapsed, so a closed section
       still says what it holds */
   summary?: ReactNode;
@@ -27,10 +31,16 @@ export function Folder({
   isRoot = false,
   onOpenChange,
   actions,
+  keepActionsWhenClosed = false,
   summary,
 }: FolderProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isOpen = open ?? internalOpen;
+
+  // Actions that never toggle with the folder: the root header's, which never
+  // collapses, and a caller's that acts on the folder itself. Both the slot's
+  // visibility and whether it needs clipping follow from this one fact.
+  const actionsAlwaysVisible = isRoot || keepActionsWhenClosed;
 
   const handleToggle = () => {
     if (isRoot) return;
@@ -76,7 +86,7 @@ export function Folder({
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={false}
@@ -90,8 +100,10 @@ export function Folder({
           <AnimatePresence initial={false}>
             {/* A collapsed folder hides its actions: they act on contents
                 nobody can see. The root's header is the panel's own, and
-                never collapses out from under them. */}
-            {actions && (isRoot || isOpen) && (
+                never collapses out from under them, and an action aimed at the
+                folder rather than its contents opts out via
+                keepActionsWhenClosed. */}
+            {actions && (isOpen || actionsAlwaysVisible) && (
               <motion.div
                 key="actions"
                 className="dialkit-folder-actions"
@@ -108,9 +120,10 @@ export function Folder({
                   opacity: 0,
                   transition: { width: SPRING.expand, opacity: FADE },
                 }}
-                // root headers keep their icons' hover surfaces, which bleed
-                // 4px past the slot; their actions never toggle anyway
-                style={isRoot ? undefined : { overflow: 'hidden' }}
+                // Only a slot that animates its width needs clipping; skipping
+                // it lets the icons' hover surfaces bleed the 4px past the slot
+                // that they are drawn to.
+                style={actionsAlwaysVisible ? undefined : { overflow: 'hidden' }}
               >
                 {actions}
               </motion.div>

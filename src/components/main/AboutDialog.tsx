@@ -1,15 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
-import { SPRING } from '@/components/dialkit'
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m4 4 8 8m0-8-8 8" />
-    </svg>
-  )
-}
+import { windowMotion } from '@/components/dialkit'
+import { useWindowEscape, useWindowFocusReturn } from '@/lib/use-window-escape'
+import { XIcon } from '@/components/panels/icons'
 
 function SplashArtwork() {
   return (
@@ -48,68 +42,44 @@ function AboutSplash({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const dragControls = useDragControls()
 
+  useWindowEscape(dialogRef, onClose)
+  useWindowFocusReturn(dialogRef)
+
+  // Nothing inside is worth landing on, so the window itself takes focus —
+  // which is also what makes Escape reach it.
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null
-    const dialog = dialogRef.current
-    dialog?.focus({ preventScroll: true })
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        // This window can sit over a phone sheet. Capture Escape before that
-        // sheet's listener sees it, so one press dismisses one layer.
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
-      // A non-modal window may have handed focus back to the page already.
-      // Restore its opener only when focus is still leaving with the window.
-      if (dialog?.contains(document.activeElement)) {
-        opener?.focus?.({ preventScroll: true })
-      }
-    }
-  }, [onClose])
+    dialogRef.current?.focus({ preventScroll: true })
+  }, [])
 
   return createPortal(
-    <motion.div ref={layerRef} className="about-layer">
+    <motion.div ref={layerRef} className="window-layer">
       <motion.div
         ref={dialogRef}
-        className="about-dialog"
+        className="about-dialog window-surface"
         role="dialog"
         aria-labelledby="about-title"
         aria-describedby="about-description"
         tabIndex={-1}
-        drag
-        dragListener={false}
+        {...windowMotion()}
         dragControls={dragControls}
         dragConstraints={layerRef}
-        dragElastic={0}
-        dragMomentum={false}
-        initial={{ opacity: 0, y: 12, scale: 0.965 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 6, scale: 0.98, transition: SPRING.morphOut }}
-        transition={SPRING.morphIn}
       >
         <div
-          className="about-window-bar"
+          className="window-bar"
           onPointerDown={(event) => {
             event.preventDefault()
             dragControls.start(event)
           }}
         >
-          <span className="about-window-title">About</span>
+          <span className="window-title">About</span>
           <button
             type="button"
-            className="about-close"
+            className="window-close"
             aria-label="Close About window"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={onClose}
           >
-            <CloseIcon />
+            <XIcon />
           </button>
         </div>
 

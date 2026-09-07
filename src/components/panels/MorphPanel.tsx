@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { motion, animate, AnimatePresence } from 'motion/react'
 import type { MotionValue } from 'motion/react'
 import { SPRING, prefersReducedMotion } from '@/components/dialkit'
+import { ICON_STROKE } from '@/components/panels/icons'
 
 export const PANEL_WIDTH = 292
 export const PUCK_SIZE = 42
@@ -10,14 +11,19 @@ export const PUCK_SIZE = 42
 // Tabler layout-sidebar-collapse glyph; the frame stays put while the chevron
 // morphs between pointing toward the panel's edge (collapse) and away from
 // it (expand).
+// The divider ends inside the frame's stroke, so the two ride in one <path> —
+// one element is one rasterized stroke region, and translucent ink can't
+// double the junction (see panels/icons.tsx). The chevron touches neither, so
+// it stays its own element and keeps animating its own d.
+const FRAME = 'M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12'
+
 function SidebarToggleIcon({ side, minimized }: { side: 'left' | 'right'; minimized: boolean }) {
   const divider = side === 'left' ? 'M9 4v16' : 'M15 4v16'
   const collapse = side === 'left' ? 'M15 10l-2 2l2 2' : 'M9 10l2 2l-2 2'
   const expand = side === 'left' ? 'M13 10l2 2l-2 2' : 'M11 10l-2 2l2 2'
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12" />
-      <path d={divider} />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE} strokeLinecap="round" strokeLinejoin="round">
+      <path d={FRAME + divider} />
       <motion.path
         initial={false}
         animate={{ d: minimized ? expand : collapse }}

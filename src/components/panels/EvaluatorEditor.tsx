@@ -103,6 +103,9 @@ export function EvaluatorEditor({
     <Folder
       title={specTitle(spec)}
       defaultOpen={defaultOpen}
+      // the × removes the evaluator, not anything inside it, so it stays
+      // reachable from the collapsed row
+      keepActionsWhenClosed
       actions={
         <button className="color-row-icon" aria-label="Remove" onClick={onRemove}>
           <XIcon />
@@ -121,19 +124,23 @@ export function EvaluatorEditor({
       {spec.type === 'cvd' && (
         <>
           <SelectControl
-            label="Deficiency"
+            label="Simulation"
             value={spec.cvd}
             options={CVD_OPTIONS}
             onChange={(v) => set('cvd', v as CvdType)}
           />
-          <Slider
-            label="Severity"
-            value={spec.cvdSeverity}
-            onChange={(v) => set('cvdSeverity', v)}
-            min={0}
-            max={1}
-            step={0.05}
-          />
+          {/* Grayscale is a print check, not a deficiency with a degree —
+              see cvdSeverityFor, which pins it to 1 on the way out */}
+          {spec.cvd !== 'grayscale' && (
+            <Slider
+              label="Severity"
+              value={spec.cvdSeverity}
+              onChange={(v) => set('cvdSeverity', v)}
+              min={0}
+              max={1}
+              step={0.05}
+            />
+          )}
         </>
       )}
       {spec.type === 'similarity' && targets && onTargetsChange && (

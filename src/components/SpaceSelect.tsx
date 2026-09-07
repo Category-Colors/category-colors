@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { SPRING, popoverMotion } from '@/components/dialkit'
 import { ICON_CHEVRON } from '@/components/dialkit/icons'
 import { useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
+import { ICON_STROKE } from '@/components/panels/icons'
 
 // Compact color-space select reusing the DialKit dropdown chrome. Positioned
 // inline rather than portaled, so clicks stay inside whatever popover or card
@@ -50,7 +51,7 @@ export function SpaceSelect<T extends string>({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2.5"
+          strokeWidth={ICON_STROKE}
           strokeLinecap="round"
           strokeLinejoin="round"
           animate={{ rotate: open ? 180 : 0 }}

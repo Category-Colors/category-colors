@@ -290,7 +290,7 @@ body {
   border: none;
   border-radius: 7px;
   background: none;
-  /* opaque stroke + element-level translucency (see header icons note) */
+  /* opaque stroke + element-level translucency (see .color-row-icon) */
   color: var(--theme-ink);
   opacity: 0.25;
   /* transform is driven by motion (MorphPanel), including the press — a CSS
@@ -1077,8 +1077,9 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 5px;
-  /* opaque stroke; translucency at the element level so overlapping svg
-     lines (the ×'s cross, the lock's shackle) don't double up */
+  /* opaque stroke; translucency at the element level, which takes the hover
+     surface down with the glyph. Doubled lines are no longer the reason: the
+     icons are one <path> each, so translucent ink would be safe too. */
   color: var(--theme-ink);
   opacity: 0.25;
 }
@@ -1340,7 +1341,7 @@ body {
   height: 28px;
   border-radius: 6px;
   border: 1px solid var(--dial-border);
-  /* opaque stroke + element opacity: the pipette's strokes overlap */
+  /* opaque stroke + element opacity (see .color-row-icon) */
   color: var(--theme-ink);
   opacity: 0.6;
 }
@@ -2079,8 +2080,17 @@ body {
 /* The artwork is a fixed little artifact, like the old creative-tool About
    windows, while its colophon follows the app's resolved light/dark polarity:
    warm paper in light mode, black print stock in dark. */
-.about-layer {
+/* Shared chrome for the app's two draggable, non-modal windows: About and the
+   Manual. The layer centres one window and lets every click through to the app
+   behind it — no scrim, because neither window takes the page out of play. Each
+   window fills in --window-paper / --window-ink / --window-rule for its own
+   surface; the bar and close button read only those. */
+.window-layer {
   position: fixed;
+  /* Insetting the layer is what keeps the windows off the screen edges, and it
+     sidesteps the viewport units entirely: a fixed box tracks the real viewport
+     as a phone's chrome comes and goes, where 100vh is the *large* viewport and
+     would push a window's bottom out of reach. */
   inset: 24px;
   z-index: 100;
   display: grid;
@@ -2089,59 +2099,41 @@ body {
   pointer-events: none;
 }
 
-.about-dialog {
-  --about-paper: #f0eee8;
-  --about-ink: #11131c;
-  --about-edge: rgb(255 255 255 / 0.26);
-  --about-rule: rgb(17 19 28 / 0.28);
-  --about-foot: rgb(17 19 28 / 0.56);
-  --about-grid: rgb(17 19 28 / 0.027);
-  --about-art-rule: #11131c;
-  --about-shadow:
-    0 2px 0 rgb(255 255 255 / 0.2) inset,
-    0 30px 90px rgb(0 0 0 / 0.56),
-    0 4px 16px rgb(0 0 0 / 0.42);
-
+/* What both windows are, structurally: a column of chrome over content, lifted
+   off the layer and clipped to its own corners. Each keeps only what makes it
+   itself — its width, its corner radius, its border and shadow. */
+.window-surface {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(660px, 100%);
-  max-height: 100%;
   overflow: hidden;
-  border: 1px solid var(--about-edge);
-  border-radius: 9px;
-  background: var(--about-paper);
-  color: var(--about-ink);
-  box-shadow: var(--about-shadow);
-  isolation: isolate;
+  background: var(--window-paper);
+  color: var(--window-ink);
   pointer-events: auto;
   transform-origin: center;
 }
 
-.about-dialog:focus {
-  outline: none;
-}
-
-.about-window-bar {
+.window-bar {
   display: flex;
   flex: 0 0 28px;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
   min-height: 28px;
   padding: 0 5px 0 10px;
-  border-bottom: 1px solid var(--about-rule);
-  background: var(--about-paper);
-  color: var(--about-ink);
+  border-bottom: 1px solid var(--window-rule);
+  background: var(--window-paper);
+  color: var(--window-ink);
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
 
-.about-window-bar:active {
+.window-bar:active {
   cursor: grabbing;
 }
 
-.about-window-title {
+.window-title {
   overflow: hidden;
   font-size: 9px;
   font-weight: 620;
@@ -2150,12 +2142,14 @@ body {
   white-space: nowrap;
 }
 
-.about-window-content {
-  min-height: 0;
-  overflow: auto;
+.window-bar-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
 }
 
-.about-close {
+.window-close {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -2170,29 +2164,61 @@ body {
   transition: opacity 100ms, background-color 100ms, transform 120ms;
 }
 
-.about-close svg {
+.window-close svg {
   width: 14px;
   height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .about-close:hover {
-    background: var(--about-rule);
+  .window-close:hover {
+    background: var(--window-rule);
     opacity: 1;
   }
 }
 
-.about-close:active {
+.window-close:active {
   transform: scale(0.92);
 }
 
-.about-close:focus-visible {
+.window-close:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 0;
   opacity: 1;
+}
+
+.about-dialog {
+  --window-paper: var(--about-paper);
+  --window-ink: var(--about-ink);
+  --window-rule: var(--about-rule);
+
+  --about-paper: #f0eee8;
+  --about-ink: #11131c;
+  --about-edge: rgb(255 255 255 / 0.26);
+  --about-rule: rgb(17 19 28 / 0.28);
+  --about-foot: rgb(17 19 28 / 0.56);
+  --about-grid: rgb(17 19 28 / 0.027);
+  --about-art-rule: #11131c;
+  --about-shadow:
+    0 2px 0 rgb(255 255 255 / 0.2) inset,
+    0 30px 90px rgb(0 0 0 / 0.56),
+    0 4px 16px rgb(0 0 0 / 0.42);
+
+  width: min(660px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--about-edge);
+  border-radius: 9px;
+  box-shadow: var(--about-shadow);
+  /* the artwork's own stacking, kept off the page behind it */
+  isolation: isolate;
+}
+
+.about-dialog:focus {
+  outline: none;
+}
+
+.about-window-content {
+  min-height: 0;
+  overflow: auto;
 }
 
 .about-artwork {
@@ -2496,7 +2522,8 @@ body {
 }
 
 @media (max-width: 560px) {
-  .about-layer {
+  /* both windows, not just About: a phone has no room for a 24px frame */
+  .window-layer {
     inset: 12px;
   }
 
@@ -2938,126 +2965,46 @@ body {
 
 /* ── Manual ──────────────────────────────────────────────────── */
 
-/* A native modal dialog, so the page behind it is inert and Escape already
-   works. It lives in the top layer, which is why nothing here sets z-index and
-   why the tooltip layer — a fixed node under <body> — cannot draw over it.
-   `display` and `overlay` transition as discrete properties so the exit is
-   still animated; the reduced-motion block above drops both from the
-   transition list, which leaves the fade on entry and an instant dismissal. */
-.manual {
-  width: min(720px, calc(100vw - 32px));
-  /* dvh, where the rest of the app uses vh: those surfaces are the docked
-     panels, whose vh term only ever binds on a desktop, where the two units
-     agree. This is the one surface that fills a phone's screen, and there
-     100vh is the *large* viewport — the bottom of the list would sit under
-     the browser's own chrome with no way to scroll it into reach. */
-  max-height: min(680px, calc(100dvh - 96px));
-  /* A modal dialog is centred by the UA's own `margin: auto` against inset 0
-     — which Tailwind's preflight zeroes along with every other margin, and
-     without it this sits in the top-left corner. */
-  margin: auto;
-  padding: 0;
-  overflow: hidden;
-  color: var(--theme-ink);
-  /* The panel fill and hairline come from .popover-surface on the element
-     itself — the same chrome the pair grid and history popovers portal out
-     with. Only the radius and a shadow deep enough for a modal differ, and
-     this rule is later in the file, so they win. */
+/* A draggable, non-modal window on the shared .window-layer, with the same bar
+   and close as About. It was a native modal <dialog>, which gave the top layer,
+   Escape and an inert page for free — but the manual is a reference, and a
+   modal is the one shape that cannot be left open beside the thing it explains.
+   Escape and focus are arranged in the component instead; the scrim and the
+   focus trap are gone on purpose. */
+.manual-window {
+  /* the app's own panel chrome, where About is a paper artifact — this window
+     is a working surface and stays in the app's polarity */
+  --window-paper: var(--theme-panel);
+  --window-ink: var(--theme-ink);
+  --window-rule: color-mix(in oklab, var(--theme-ink) 8%, transparent);
+
+  /* against .window-layer, which is already inset from the viewport */
+  width: min(720px, 100%);
+  max-height: min(680px, 100%);
+  border: 1px solid color-mix(in oklab, var(--theme-ink) 10%, transparent);
   border-radius: 14px;
   box-shadow: 0 24px 64px rgb(0 0 0 / calc(0.5 * var(--shadow-strength, 1)));
-  opacity: 0;
-  transform: translateY(8px) scale(0.985);
-  transition:
-    opacity var(--dial-anim-reveal),
-    transform var(--dial-anim-reveal),
-    overlay var(--dial-anim-reveal) allow-discrete,
-    display var(--dial-anim-reveal) allow-discrete;
 }
 
-/* The UA rule is `dialog:not([open]) { display: none }`, so the open state has
-   to carry the layout mode — a bare `display: flex` above would show the
-   dialog while it is closed. */
-.manual[open] {
-  display: flex;
-  flex-direction: column;
-  opacity: 1;
-  transform: none;
-}
-
-@starting-style {
-  .manual[open] {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-}
-
-.manual::backdrop {
-  background: rgb(0 0 0 / 0);
-  /* no `display` here, unlike the dialog itself: nothing ever sets
-     display:none on the pseudo — leaving the top layer is what removes it,
-     and deferring that is what `overlay` is doing. */
-  transition:
-    background-color var(--dial-anim-reveal),
-    backdrop-filter var(--dial-anim-reveal),
-    overlay var(--dial-anim-reveal) allow-discrete;
-}
-
-/* One value for both polarities, unlike the chrome shadows above: a shadow
-   describes how far a surface is lifted, which depends on what it is lifted
-   over, but a scrim's job is to take the page out of play — and 42% black
-   plus a light blur does that over a saturated dashboard either way. */
-.manual[open]::backdrop {
-  background: rgb(0 0 0 / 0.42);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-}
-
-@starting-style {
-  .manual[open]::backdrop {
-    background: rgb(0 0 0 / 0);
-    backdrop-filter: blur(0);
-    -webkit-backdrop-filter: blur(0);
-  }
-}
-
+/* The title moved into the window bar, so this holds the search field alone. */
 .manual-head {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   flex-shrink: 0;
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid color-mix(in oklab, var(--theme-ink) 8%, transparent);
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--window-rule);
 }
 
-.manual-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.manual-title {
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: color-mix(in oklab, var(--theme-ink) 95%, transparent);
-}
-
-/* The chord that opened it, so the next visit doesn't need the button. */
+/* Sized against the 9px bar title it sits beside, not the 13px body it used to
+   share a row with. */
 .manual-kbd {
-  padding: 2px 5px;
+  padding: 2px 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1;
-  color: color-mix(in oklab, var(--theme-ink) 40%, transparent);
-  background: var(--dial-surface);
-  border-radius: 4px;
-}
-
-/* The app's own icon button, pushed to the end of the row. Size, radius, ink,
-   hover and the grouped press scale all come from .color-row-icon — the same
-   button every panel row closes itself with. */
-.manual-close {
-  margin-left: auto;
+  color: color-mix(in oklab, var(--window-ink) 55%, transparent);
+  background: color-mix(in oklab, var(--window-ink) 8%, transparent);
+  border-radius: 3px;
 }
 
 .manual-search {
@@ -3116,7 +3063,7 @@ body {
   max-width: 68ch;
   padding-bottom: 12px;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.4;
   color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
 }
 
@@ -3149,7 +3096,7 @@ body {
 .manual-entry dd {
   margin: 0;
   font-size: 12px;
-  line-height: 1.65;
+  line-height: 1.4;
   color: color-mix(in oklab, var(--theme-ink) 62%, transparent);
 }
 
