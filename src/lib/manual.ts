@@ -139,7 +139,11 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Saliency',
-        body: 'Prefers colors people can name. It scores each color against a model built from a public color-naming survey: prototypical reds and blues score well, while the mud between named regions scores badly. The one evaluator concerned with what a color means rather than where it sits.',
+        body: 'Prefers colors people can name. It scores each color against a model built from a public color-naming survey: prototypical reds and blues score well, while the mud between named regions scores badly. Concerned with what a color means rather than where it sits, as Name difference is.',
+      },
+      {
+        term: 'Name difference',
+        body: 'Penalizes colors people would call by the same word. Every color carries a vector of how often survey participants reached for each of 153 terms — Heer and Stone (2012) — and the cost is the mean overlap between every pair, so two blues score badly however far apart ΔE puts them. Saliency asks whether a color has a name; this asks whether two colors share one.',
       },
     ],
   },

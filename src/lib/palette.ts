@@ -17,6 +17,7 @@ export type EvaluatorType =
   | 'avoid'
   | 'contrast'
   | 'saliency'
+  | 'names'
 
 // 'grayscale' is the odd one out: culori's luminance projection, the same
 // matrix CSS `filter: grayscale()` uses, standing in for print or a

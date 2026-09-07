@@ -7,6 +7,9 @@ import {
   type Config,
   type EvalFunction,
 } from 'category-colors'
+// Not in the `evaluators` barrel: its naming table is ~260 kB, so the package
+// keeps it on a subpath of its own the way it does saliency's.
+import names from 'category-colors/evaluators/names'
 import { toCulori } from '@/lib/color'
 import { cvdSeverityFor } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
@@ -17,9 +20,10 @@ import type { EvaluatorSpec, PaletteParams } from './palette'
 // initial load — only the worker and the report tab reach for this.
 
 function toEvalFunction(spec: EvaluatorSpec): EvalFunction {
-  // 'cvd' is the jnd evaluator scored on a CVD-simulated copy of the palette
+  // 'cvd' is the jnd evaluator scored on a CVD-simulated copy of the palette;
+  // 'names' is the one evaluator the barrel does not carry.
   const entry: EvalFunction = {
-    function: evaluators[spec.type === 'cvd' ? 'jnd' : spec.type],
+    function: spec.type === 'names' ? names : evaluators[spec.type === 'cvd' ? 'jnd' : spec.type],
     weight: spec.weight,
   }
   if (spec.type === 'cvd') {

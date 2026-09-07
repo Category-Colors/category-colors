@@ -14,6 +14,7 @@ const TYPE_LABELS: Record<EvaluatorType, string> = {
   avoid: 'Avoid',
   contrast: 'Contrast',
   saliency: 'Saliency',
+  names: 'Name difference',
 }
 
 export const TYPE_HINTS: Record<EvaluatorType, string> = {
@@ -25,6 +26,7 @@ export const TYPE_HINTS: Record<EvaluatorType, string> = {
   avoid: 'Pushes the palette away from these colors',
   contrast: 'Holds WCAG contrast against a background or adjacent colors',
   saliency: 'Prefers vivid, nameable colors',
+  names: 'Penalizes colors that share a name',
 }
 
 export const EVALUATOR_TYPES = Object.keys(TYPE_LABELS) as EvaluatorType[]
