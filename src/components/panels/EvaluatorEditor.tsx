@@ -185,7 +185,7 @@ export function EvaluatorEditor({
             step={0.5}
           />
           <Toggle
-            label="Adjacent pairs"
+            label="Check adjacent pairs"
             checked={spec.checkAdjacent}
             onChange={(v) => set('checkAdjacent', v)}
           />

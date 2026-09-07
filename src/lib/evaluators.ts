@@ -23,7 +23,7 @@ export const TYPE_HINTS: Record<EvaluatorType, string> = {
   cvd: 'JND under a simulated viewing condition',
   similarity: 'Pulls the palette toward the targets',
   avoid: 'Pushes the palette away from these colors',
-  contrast: 'Holds WCAG contrast against a background',
+  contrast: 'Holds WCAG contrast against a background or adjacent colors',
   saliency: 'Prefers vivid, nameable colors',
 }
 
