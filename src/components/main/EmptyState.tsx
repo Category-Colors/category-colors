@@ -18,7 +18,7 @@ const steps = (phone: boolean) =>
         ? 'Colors, space, and evaluators, from the toolbar below ↓.'
         : 'Colors, space, and evaluators, on the ← left.',
     ],
-    ['Generate', 'The optimizer picks colors that stay apart.'],
+    ['Generate', 'The algorithm optimizes your color palette.'],
     ['Refine', 'Preview on live charts, read the report, edit any color.'],
     [
       'Export',
