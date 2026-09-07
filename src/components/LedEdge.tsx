@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { clampChroma, converter } from 'culori'
+import { prefersReducedMotion } from '@/components/dialkit'
 import { useTheme } from '@/lib/theme'
 
 // Three rows of LED matrix along the end of the page, seen close enough that
@@ -13,16 +14,13 @@ import { useTheme } from '@/lib/theme'
 
 const toRgb = converter('rgb')
 
-/** ~30fps. The pulses are slow enough that the halved rate is invisible, and
- *  unlike a spring this layer never settles: at 60 it would hold the
- *  compositor at full rate for as long as it's on screen. */
+/** How long the loop sleeps between draws — about 30fps. The pulses are slow
+ *  enough that halving the rate is invisible, and unlike a spring this layer
+ *  never settles: at full rate it would hold the compositor for as long as it
+ *  is on screen. The real gap is this plus however long the frame that's asked
+ *  for afterwards takes to arrive, so the cadence lands at or a little under
+ *  30 depending on the display. Nothing here needs it exact. */
 const FRAME = 1000 / 30
-
-/** rAF deltas land a shade either side of the interval on a 60Hz display, so
- *  comparing against it exactly drops one render in every few and the strip
- *  alternates 30fps with 20 instead of holding a cadence. Slack under half a
- *  display frame absorbs the jitter and still can't let two through in one. */
-const SLACK = 4
 
 const VERTEX = `#version 300 es
 void main() {
@@ -35,7 +33,7 @@ void main() {
 const FRAGMENT = `#version 300 es
 precision highp float;
 
-uniform vec2 uSize;  // drawing buffer, device px
+uniform float uBand; // drawing buffer height, device px
 uniform float uTime; // seconds
 uniform vec3 uInk;
 
@@ -49,6 +47,10 @@ const float HALF = 0.36;
 const float ROUND = 0.11;
 
 const float ROWS = 3.0;
+
+// Alpha of an emitter at the top of its pulse. The knob to reach for first if
+// the strip reads hot or dim.
+const float PEAK = 0.6;
 
 // Integer bit-mixing, not the usual fract(sin(dot(p, k))). That one bands into
 // visible diagonals at exactly the frequency a pixel grid samples it at, which
@@ -75,8 +77,8 @@ float valueNoise(vec2 p) {
 void main() {
   // The pitch is the band's height over the row count, so the strip is exactly
   // three emitters tall whatever height the CSS gives it — and there is no dpr
-  // arithmetic to keep in step, since uSize is already in device pixels.
-  float pitch = uSize.y / ROWS;
+  // arithmetic to keep in step, since uBand is already in device pixels.
+  float pitch = uBand / ROWS;
   vec2 grid = gl_FragCoord.xy / pitch;
   vec2 id = floor(grid);
   vec2 cell = fract(grid) - 0.5;
@@ -111,7 +113,7 @@ void main() {
   // no falloff, brief flashes would read as noise instead of as a panel.
   float pulse = pow(sin(fract(phase) * PI), 1.4);
 
-  float a = led * amp * pulse * 0.6;
+  float a = led * amp * pulse * PEAK;
 
   outColor = vec4(uInk * a, a);
 }`
@@ -122,8 +124,9 @@ export function LedEdge() {
   // The ink reaches the shader through a ref, not the setup effect's deps: a
   // theme change should swap a uniform, not rebuild the GL context.
   const ink = useRef<[number, number, number]>([1, 1, 1])
-  // Set only when the loop isn't running, which is the one case where a new ink
-  // wouldn't otherwise reach the screen.
+  // The draw path that doesn't go through the loop, for the ink effect to call.
+  // It is the only way a new ink reaches the screen when there is no loop —
+  // under reduced motion, or while the strip is scrolled out of view.
   const redraw = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -166,7 +169,7 @@ export function LedEdge() {
     }
     gl.useProgram(program)
 
-    const uSize = gl.getUniformLocation(program, 'uSize')
+    const uBand = gl.getUniformLocation(program, 'uBand')
     const uTime = gl.getUniformLocation(program, 'uTime')
     const uInk = gl.getUniformLocation(program, 'uInk')
 
@@ -176,9 +179,14 @@ export function LedEdge() {
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }
 
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = prefersReducedMotion()
     let raf = 0
+    let timer = 0
     let last = 0
+
+    // One frame outside the loop, at whatever time the loop last drew — 0
+    // before it has ever run, which is the frame reduced motion holds.
+    const repaint = () => render(last / 1000)
 
     const resize = () => {
       // Read the ratio here rather than once on setup: browser zoom and a drag
@@ -191,47 +199,77 @@ export function LedEdge() {
       // Assigning either dimension reallocates and clears the drawing buffer
       // even when the value is unchanged, and ResizeObserver delivers sub-pixel
       // layout changes — a window drag would thrash allocation once a frame.
-      if (w === canvas.width && h === canvas.height) return
-      canvas.width = w
-      canvas.height = h
+      // Only the allocation is worth guarding, and only the allocation may be:
+      // the uniform belongs to the program, which is rebuilt on every run of
+      // this effect (StrictMode does two), while the canvas keeps its size
+      // across them. Guarding the upload too would leave the second program's
+      // uBand at 0, and a pitch of 0/ROWS takes the whole shader to NaN.
+      if (w !== canvas.width || h !== canvas.height) {
+        canvas.width = w
+        canvas.height = h
+      }
       gl.viewport(0, 0, w, h)
-      gl.uniform2f(uSize, w, h)
-      // Nothing redraws it on its own when the loop isn't running.
-      if (reduced) render(0)
+      gl.uniform1f(uBand, h)
+      // Assigning the dimensions cleared the buffer, so paint it now rather
+      // than leaving the strip blank until the next tick — up to 33ms on a
+      // window drag, and forever when the loop isn't running at all.
+      repaint()
     }
+    // Once synchronously, so uBand is set before anything else can paint;
+    // the observer's own first delivery then no-ops on the size guard.
+    resize()
     const ro = new ResizeObserver(resize)
     ro.observe(canvas)
 
+    // Sleep first, then ask for a single frame — rather than re-entering rAF
+    // every time and discarding most of the callbacks against an interval
+    // check. rAF delivers at display rate, so that pattern woke this component
+    // 120 times a second on a 120Hz panel to draw 30, and the registrations
+    // cost more than the drawing did: measured 15.2ms of main thread per
+    // second, of which 11.0 remained with the draw call stubbed out. This way
+    // ~32 callbacks produce the same ~30 draws.
     const tick = (now: number) => {
-      raf = requestAnimationFrame(tick)
-      if (now - last < FRAME - SLACK) return
+      raf = 0
       last = now
       render(now / 1000)
+      timer = setTimeout(() => {
+        raf = requestAnimationFrame(tick)
+      }, FRAME)
+    }
+    // Both halves, since a stop can land either while sleeping or while
+    // waiting on the frame.
+    const stop = () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(timer)
+      raf = 0
+      timer = 0
     }
 
-    // Reduced motion: the matrix still paints, it just holds still. Emitters
-    // frozen mid-pulse are the texture without the twinkle.
+    // A new ink repaints immediately rather than waiting on the loop — which
+    // under reduced motion is never, since there isn't one.
+    redraw.current = repaint
+
+    // Reduced motion is the whole reason for the branch: the matrix still
+    // paints, it just holds still. Emitters frozen mid-pulse are the texture
+    // without the twinkle.
     let io: IntersectionObserver | undefined
-    if (reduced) {
-      redraw.current = () => render(0)
-    } else {
+    if (!reduced) {
       // The band sits at the end of the page, not against the viewport, so on
       // anything longer than a screen it spends most of its life scrolled out
       // of sight — and rAF goes on firing when it does. A hidden tab is the
       // browser's problem; this one is ours.
       io = new IntersectionObserver(([entry]) => {
         if (entry.isIntersecting) {
-          if (!raf) raf = requestAnimationFrame(tick)
+          if (!raf && !timer) raf = requestAnimationFrame(tick)
         } else {
-          cancelAnimationFrame(raf)
-          raf = 0
+          stop()
         }
       })
       io.observe(canvas)
     }
 
     return () => {
-      cancelAnimationFrame(raf)
+      stop()
       redraw.current = null
       ro.disconnect()
       io?.disconnect()

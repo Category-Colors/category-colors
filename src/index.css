@@ -133,10 +133,15 @@
      ThemeProvider sets data-polarity from the resolved background, which
      covers custom themes as well as the presets' light/dark modes. */
   --shadow-strength: 1;
+
+  /* The same trade, for the LED strip: ink that reads as emitted light over a
+     dark page reads as dirt over a light one. */
+  --led-strength: 1;
 }
 
 :root[data-polarity='light'] {
   --shadow-strength: 0.18;
+  --led-strength: 0.45;
 }
 
 body {
@@ -2368,13 +2373,20 @@ body {
    bottom of the page, not the bottom of the screen, so a page that fits shows
    it at rest under the content and a page that scrolls keeps it at the end,
    where you arrive rather than where you always are.
-   Out of flow, and sized to the band the canvas already clears for it in its
-   own bottom padding, so nothing is ever drawn over: the strip is a margin,
-   not a wash over the last card.
-   Full-bleed because the containing block is .app-main's padding box, so the
-   canvas insets the charts ride don't apply here.
-   The band is only the area the shader may draw in; the falloff inside it is
-   the shader's own, not a mask, so the sparks thin out on their own curve. */
+   Sized to the band the canvas already clears for it in its own bottom
+   padding, so nothing is ever drawn over: the strip is a margin, not a wash
+   over the last card.
+   Out of flow for one reason, and it isn't scroll height — the padding above
+   reserves exactly what an in-flow strip would occupy, so the page is the same
+   height either way. It is full bleed. Absolute against .app-main, the
+   containing block is its padding box, so the canvas insets the charts ride
+   don't reach here and the strip needs to know nothing about them. In flow it
+   would stop at those gutters, and climbing back out would mean negative
+   margins carrying --canvas-inset plus the push — twice, because under
+   1280px .app-main drops to a flat inset and hands the push to .app-nav and
+   .empty-canvas instead. The push itself is --push-left/right, which App.tsx
+   rewrites every frame off the panel spring. A decoration would then be
+   tracking the gutter, the animation, and the breakpoint where they swap. */
 .led-edge {
   position: absolute;
   left: 0;
@@ -2386,10 +2398,5 @@ body {
   width: 100%;
   height: var(--led-band);
   pointer-events: none;
-}
-
-/* The same trade --shadow-strength makes: ink that reads as emitted light
-   over a dark page reads as dirt over a light one. */
-:root[data-polarity='light'] .led-edge {
-  opacity: 0.45;
+  opacity: var(--led-strength);
 }
