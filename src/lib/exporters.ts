@@ -1,4 +1,5 @@
-import { convertValue, parseCssColor, type ColorValue } from './color'
+import { converter, formatCss, parse, type Color } from 'culori'
+import { convertValue, parseCssColor, valueToCss, type ColorValue } from './color'
 
 export type ExportFormat = 'raw' | 'css' | 'json'
 
@@ -36,39 +37,90 @@ function toDtcgValue(value: ColorValue): Record<string, unknown> {
   }
 }
 
-const tokenToHex = (raw: string): string | null => {
-  const value = parseCssColor(raw.trim())
-  if (!value) return null
-  const hex = convertValue(value, 'hex')
-  return hex.space === 'hex' ? hex.hex : null
+const toLab = converter('oklab')
+
+// Preserve perceptual and wide-gamut colors. Plain RGB/named inputs keep the
+// familiar hex presentation; unsupported editor spaces convert through OKLAB.
+const tokenToColor = (raw: string): string | null => {
+  const parsed = parse(raw.trim())
+  if (!parsed) return null
+  if (parsed.alpha !== undefined && parsed.alpha !== 1) throw new Error('Palettes use opaque colors. Remove transparency before importing.')
+  if (parsed.mode === 'rgb') {
+    const value = parseCssColor(raw)
+    if (!value) return null
+    return valueToCss(convertValue(value, 'hex'))
+  }
+  const value = parseCssColor(raw)
+  return value ? valueToCss(value) : null
 }
 
-// Inverse of formatPalette, tolerant of hand-made files: tries JSON first,
-// then scans the text for color tokens (hex or css color functions)
-export function parsePalette(text: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter((entry): entry is string => typeof entry === 'string')
-        .map(tokenToHex)
-        .filter((hex): hex is string => hex !== null)
-    }
-  } catch {
-    // not JSON — fall through to token scanning
-  }
-  const tokens =
-    text.match(
-      /#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab|color)\([^)]*\)/g
-    ) ?? []
-  const scanned = tokens.map(tokenToHex).filter((hex): hex is string => hex !== null)
-  if (scanned.length > 0) return scanned
+const DTCG_SPACES: Record<string, [Color['mode'], string[]]> = {
+  srgb: ['rgb', ['r', 'g', 'b']], 'srgb-linear': ['lrgb', ['r', 'g', 'b']],
+  'display-p3': ['p3', ['r', 'g', 'b']], 'a98-rgb': ['a98', ['r', 'g', 'b']],
+  'prophoto-rgb': ['prophoto', ['r', 'g', 'b']], rec2020: ['rec2020', ['r', 'g', 'b']],
+  hsl: ['hsl', ['h', 's', 'l']], hwb: ['hwb', ['h', 'w', 'b']],
+  lab: ['lab', ['l', 'a', 'b']], lch: ['lch', ['l', 'c', 'h']],
+  oklab: ['oklab', ['l', 'a', 'b']], oklch: ['oklch', ['l', 'c', 'h']],
+  'xyz-d65': ['xyz65', ['x', 'y', 'z']], 'xyz-d50': ['xyz50', ['x', 'y', 'z']],
+}
 
-  const directValues = [
-    ...text.split(/\r?\n/).map((line) => line.trim().replace(/[,;]$/, '')),
-    ...[...text.matchAll(/:\s*([^;{}\n]+)\s*;?/g)].map((match) => match[1].trim()),
-  ]
-  return directValues.map(tokenToHex).filter((hex): hex is string => hex !== null)
+function fromDtcg(value: unknown): string {
+  if (!value || typeof value !== 'object') throw new Error('Invalid color token value.')
+  const v = value as Record<string, unknown>
+  if (v.alpha !== undefined && v.alpha !== 1) throw new Error('Palettes use opaque colors. Remove transparency before importing.')
+  const definition = typeof v.colorSpace === 'string' ? DTCG_SPACES[v.colorSpace] : undefined
+  if (!definition) throw new Error(`Unsupported token color space: ${String(v.colorSpace)}`)
+  if (!Array.isArray(v.components) || v.components.length !== 3 || !v.components.every((n) => n === 'none' || (typeof n === 'number' && Number.isFinite(n)))) throw new Error('Color tokens need three finite components.')
+  const [mode, channels] = definition
+  const input = { mode, ...Object.fromEntries(channels.map((channel, i) => {
+    const component = v.components as (number | 'none')[]
+    let n = component[i] === 'none' ? 0 : component[i]
+    if ((mode === 'hsl' || mode === 'hwb') && i > 0) n /= 100
+    return [channel, n]
+  })) } as Color
+  const lab = toLab(input)
+  if (![lab.l, lab.a, lab.b].every(Number.isFinite)) throw new Error('Invalid color token components.')
+  // Store RGB token precision perceptually instead of rounding to 8-bit hex.
+  return formatCss(mode === 'oklab' || mode === 'oklch' || mode === 'hsl' ? input : lab)
+}
+
+function parseTokenFile(root: object): string[] {
+  const entries = new Map<string, { value: unknown; type: unknown }>()
+  const walk = (node: unknown, path: string[], inherited: unknown, depth: number) => {
+    if (depth > 40) throw new Error('Token groups are nested too deeply.')
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return
+    const record = node as Record<string, unknown>
+    const type = record.$type ?? inherited
+    if ('$value' in record) { entries.set(path.join('.'), { value: record.$value, type }); return }
+    for (const [name, child] of Object.entries(record)) if (!name.startsWith('$')) walk(child, [...path, name], type, depth + 1)
+  }
+  walk(root, [], undefined, 0)
+  const resolve = (path: string, seen = new Set<string>()): string => {
+    if (seen.has(path)) throw new Error('Circular color token reference.')
+    const token = entries.get(path)
+    if (!token || token.type !== 'color') throw new Error(`Missing color token: ${path}`)
+    if (typeof token.value === 'string' && /^\{[^{}]+\}$/.test(token.value)) {
+      seen.add(path)
+      return resolve(token.value.slice(1, -1), seen)
+    }
+    return fromDtcg(token.value)
+  }
+  return [...entries].filter(([, token]) => token.type === 'color').map(([path]) => resolve(path))
+}
+
+export function parsePalette(text: string): string[] {
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { /* raw text or CSS */ }
+  if (Array.isArray(parsed)) return parsed.filter((c): c is string => typeof c === 'string').map(tokenToColor).filter((c): c is string => c !== null)
+  if (parsed && typeof parsed === 'object') return parseTokenFile(parsed)
+  // Parse declarations individually so named colors and functions can mix.
+  const declarations = [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|[;{])\s*--[\w-]+\s*:\s*([^;{}]+)(?=;|}|$)/g)]
+  if (declarations.length) return declarations.map((m) => tokenToColor(m[1].trim())).filter((c): c is string => c !== null)
+  const lines = text.split(/\r?\n/).map((line) => line.trim().replace(/[,;]$/, '')).filter(Boolean)
+  const lineColors = lines.map(tokenToColor)
+  if (lineColors.length > 0 && lineColors.every((value) => value !== null)) return lineColors
+  const tokens = text.match(/#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab|color)\([^)]*\)/gi) ?? []
+  return tokens.map(tokenToColor).filter((c): c is string => c !== null)
 }
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [

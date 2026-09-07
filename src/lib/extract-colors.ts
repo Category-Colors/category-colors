@@ -66,7 +66,7 @@ export async function extractColors(file: File, count = 8): Promise<string[]> {
   if (total === 0) return []
 
   // Candidates: bin means with enough pixels behind them to not be noise
-  const minCount = Math.max(2, Math.round(total * 0.001))
+  const minCount = Math.min(total, Math.max(2, Math.round(total * 0.001)))
   const candidates = [...bins.values()]
     .filter((bin) => bin.n >= minCount)
     .map((bin) => ({

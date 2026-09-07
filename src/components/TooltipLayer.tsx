@@ -10,6 +10,11 @@ const DWELL = 200
 // naming it would be the one visual answer it still gave to a pointer. A single
 // fixed node is repositioned imperatively (compositor-only transitions),
 // glides between adjacent buttons, and hides on press, leave, or scroll.
+//
+// `data-no-tooltip` opts a button out while keeping its accessible name, for
+// the few that already answer the same hover with something richer — the
+// history rows raise a whole preview popover, and a label repeating "Restore
+// palette" over the top of it is a second answer to one question.
 export function TooltipLayer() {
   const tipRef = useRef<HTMLDivElement>(null)
 
@@ -53,7 +58,10 @@ export function TooltipLayer() {
         hide()
         return
       }
-      const el = (e.target as Element).closest?.('button[aria-label]:not(:disabled)') ?? null
+      const el =
+        (e.target as Element).closest?.(
+          'button[aria-label]:not(:disabled):not([data-no-tooltip])'
+        ) ?? null
       if (el === state.el) return
       window.clearTimeout(state.timer)
       state.el = el

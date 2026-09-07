@@ -73,3 +73,7 @@ export function generatePaletteAsync(params: PaletteParams): Promise<GenerateRes
     }
   })
 }
+
+export function cancelPaletteGeneration() {
+  retireWorker(new DOMException('Generation cancelled', 'AbortError'))
+}

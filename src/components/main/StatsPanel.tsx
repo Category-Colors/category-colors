@@ -202,7 +202,10 @@ export function StatsPanel({ version }: { version: PaletteVersion }) {
             ))}
           </div>
         </div>
-        <LossGraph history={version.costHistory} />
+        <div className="flex flex-1 flex-col gap-2">
+          {version.edited && <p className="text-[12px] text-ink/75">Original generation loss — palette edited afterward</p>}
+          <LossGraph history={version.costHistory} />
+        </div>
       </div>
     </div>
   )

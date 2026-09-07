@@ -19,7 +19,7 @@ import { AddColorBar } from './AddColorBar'
 import { AddEvaluatorMenu } from './AddEvaluatorMenu'
 import { ColorRow } from './ColorRow'
 import { EvaluatorEditor } from './EvaluatorEditor'
-import { TrashIcon } from './icons'
+import { StopIcon, TrashIcon } from './icons'
 import { PanelShell } from './PanelShell'
 import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
@@ -42,6 +42,7 @@ export function ParametersPanel({
   params,
   onParamsChange,
   onGenerate,
+  onCancel,
   busy,
   open,
   onOpenChange,
@@ -51,6 +52,7 @@ export function ParametersPanel({
   params: PaletteParams
   onParamsChange: (params: PaletteParams) => void
   onGenerate: () => void
+  onCancel: () => void
   busy: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -296,15 +298,30 @@ export function ParametersPanel({
       </Folder>
       <div className="panel-footer">
         <div className="dialkit-button-group">
+          {/* While a run is in flight the main button reports it rather than
+              accepting a second one; stopping is the button beside it, so the
+              one target no longer means two different things depending on when
+              it is pressed. */}
           <button
             className="dialkit-button generate-button"
-            onClick={() => {
-              if (!busy) onGenerate()
-            }}
+            data-busy={busy ? '' : undefined}
+            disabled={busy}
+            // wrapped, not passed by reference: onGenerate's first argument is
+            // structuredCloned to the worker, and a PointerEvent is not cloneable
+            onClick={() => onGenerate()}
           >
             {busy && <span className="button-spinner" />}
             {busy ? busyLabel : 'Generate'}
           </button>
+          {busy && (
+            <button
+              className="dialkit-button square-button"
+              aria-label="Stop generation"
+              onClick={() => onCancel()}
+            >
+              <StopIcon />
+            </button>
+          )}
         </div>
       </div>
     </>

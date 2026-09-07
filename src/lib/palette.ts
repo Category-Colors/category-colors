@@ -91,6 +91,7 @@ export interface PaletteParams {
 export type CostSample = [iteration: number, cost: number]
 
 export interface PaletteVersion {
+  edited?: boolean
   id: number
   params: PaletteParams
   colors: string[]
@@ -132,18 +133,40 @@ export function newTargetColor(value: ColorValue = hexValue('#888888')): TargetC
 
 // The optimizer starts unopinionated: random initialization (no seeds, no
 // targets, no similarity pull) with the perceptual evaluators only.
+//
+// These mirror category-colors 3.0's `createDefaultConfig()`. The severity of
+// 1 is the point: Machado's model has no separate dichromacy matrix, so
+// `protanomaly` at severity 1 *is* protanopia, and optimizing the harder case
+// carries the milder one. That is why the app's narrower CvdType can express
+// the library's default exactly despite naming only the anomaly variants.
+//
+// The CVD weights look far too low next to an unimpaired `jnd` of 1 until you
+// measure them — the terms saturate early. Carrying them higher buys almost
+// nothing, because the binding constraint is grayscale, not a deficiency.
+// Lower the `jnd` weight to trade ordinary separation back for CVD headroom.
 const DEFAULT_EVALUATORS: EvaluatorSpec[] = [
   newEvaluatorSpec('energy', { weight: 0.15 }),
   newEvaluatorSpec('range', { weight: 0.15 }),
-  newEvaluatorSpec('jnd', { weight: 0.15 }),
-  newEvaluatorSpec('cvd', { weight: 0.15, cvd: 'protanomaly' }),
-  newEvaluatorSpec('cvd', { weight: 0.5, cvd: 'deuteranomaly' }),
+  newEvaluatorSpec('jnd', { weight: 1 }),
+  newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'protanomaly', cvdSeverity: 1 }),
+  newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'deuteranomaly', cvdSeverity: 1 }),
+  newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'tritanomaly', cvdSeverity: 1 }),
+  // No cvdSeverity: grayscale reads its severity through cvdSeverityFor, which
+  // pins it to 1 regardless of what is stored here.
+  newEvaluatorSpec('cvd', { weight: 0.05, cvd: 'grayscale' }),
 ]
 
 export const DEFAULT_PARAMS: PaletteParams = {
   colorCount: 8,
   jnd: 20,
-  maxIterations: 20000,
+  // 20000 was enough for the older five-term objective, which converged well
+  // inside it. This one does not: measured at eight colors, cutting it off at
+  // 20000 costs about eight points of ordinary separation (23.2 -> 15.8 mean
+  // minimum deltaE) and leaves the worst case at 4.0 instead of 7.7. The extra
+  // iterations are nearly free in wall clock — cooling hits `cutoff` first, so
+  // a run ends on temperature around 40-60k either way, and 60000 buys full
+  // convergence for roughly 6s more on the first generate rather than 3x.
+  maxIterations: 60000,
   orderOptimization: true,
   initColors: [],
   targets: [],

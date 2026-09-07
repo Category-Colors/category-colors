@@ -64,11 +64,11 @@ function fromCulori(space: Space, input: Color | string): ColorValue {
     }
     case 'oklch': {
       const { l, c, h } = toOklchMode(color)
-      return { space, l: round(l, 3), c: round(c, 3), h: round(h ?? 0, 1) }
+      return { space, l: round(l, 6), c: round(c, 6), h: round(h ?? 0, 4) }
     }
     case 'oklab': {
       const { l, a, b } = toOklabMode(color)
-      return { space, l: round(l, 3), a: round(a, 3), b: round(b, 3) }
+      return { space, l: round(l, 6), a: round(a, 6), b: round(b, 6) }
     }
   }
 }
@@ -101,7 +101,7 @@ export function parseCssColor(text: string): ColorValue | null {
   const space =
     parsed.mode === 'hsl' || parsed.mode === 'oklch' || parsed.mode === 'oklab'
       ? parsed.mode
-      : 'rgb'
+      : parsed.mode === 'rgb' ? 'rgb' : 'oklab'
   return fromCulori(space, parsed)
 }
 

@@ -7,23 +7,23 @@ import App from './App.tsx'
 
 // The story harness and the design-system reference are development surfaces
 // reached by URL; loading them lazily keeps them out of the app's bundle.
-const StoryPage = lazy(() => import('./dev/stories.tsx').then((m) => ({ default: m.StoryPage })))
-const DesignSystemPage = lazy(() =>
+const StoryPage = import.meta.env.DEV ? lazy(() => import('./dev/stories.tsx').then((m) => ({ default: m.StoryPage }))) : null
+const DesignSystemPage = import.meta.env.DEV ? lazy(() =>
   import('./dev/design-system.tsx').then((m) => ({ default: m.DesignSystemPage }))
-)
+) : null
 
-const story = new URLSearchParams(location.search).get('story')
-const designSystem = location.pathname === '/design-system'
+const story = import.meta.env.DEV ? new URLSearchParams(location.search).get('story') : null
+const designSystem = import.meta.env.DEV && location.pathname === '/design-system'
 const root = document.getElementById('root')
 if (!root) throw new Error('Missing #root application mount point')
 
 createRoot(root).render(
   <StrictMode>
-    {story !== null ? (
+    {story !== null && StoryPage ? (
       <Suspense fallback={null}>
         <StoryPage name={story} />
       </Suspense>
-    ) : designSystem ? (
+    ) : designSystem && DesignSystemPage ? (
       <Suspense fallback={null}>
         <DesignSystemPage />
       </Suspense>

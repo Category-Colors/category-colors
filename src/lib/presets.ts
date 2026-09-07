@@ -1,5 +1,7 @@
 // Well-known categorical palettes offered as a starting point; swapping one
-// in replaces the whole list rather than appending to it.
+// in replaces the whole list rather than appending to it. EmptyState shows the
+// first three as its starter chips, so insert below them unless you mean to
+// change that screen too.
 export const PRESET_PALETTES: { name: string; colors: string[] }[] = [
   {
     name: 'Okabe–Ito',
@@ -12,6 +14,23 @@ export const PRESET_PALETTES: { name: string; colors: string[] }[] = [
   {
     name: 'Observable 10',
     colors: ['#4269D0', '#EFB118', '#FF725C', '#6CC5B0', '#3CA951', '#FF8AB7', '#A463F2', '#97BBF5', '#9C6B4E', '#9498A0'],
+  },
+  // Petroff's cycles are the nearest published work to this app's own
+  // objective — perceptual distance under simulated CVD plus an explicit
+  // lightness separation for grayscale. Each length is optimized separately,
+  // so Petroff 8 is not the first eight of Petroff 10; pick the entry that
+  // matches the color count rather than truncating a longer one.
+  {
+    name: 'Petroff 6',
+    colors: ['#5790FC', '#F89C20', '#E42536', '#964A8B', '#9C9CA1', '#7A21DD'],
+  },
+  {
+    name: 'Petroff 8',
+    colors: ['#1845FB', '#FF5E02', '#C91F16', '#C849A9', '#ADAD7D', '#86C8DD', '#578DFF', '#656364'],
+  },
+  {
+    name: 'Petroff 10',
+    colors: ['#3F90DA', '#FFA90E', '#BD1F01', '#94A4A2', '#832DB6', '#A96B59', '#E76300', '#B9AC70', '#717581', '#92DADD'],
   },
   {
     name: 'ColorBrewer Set2',

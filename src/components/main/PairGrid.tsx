@@ -15,6 +15,7 @@ import type { PaletteVersion } from '@/lib/palette'
 import { colorVsBackground, testTitles, type JndReport } from '@/lib/report'
 import { useTheme } from '@/lib/theme'
 import { inkFor } from '@/lib/weather'
+import { readableColor } from '@/lib/contrast'
 
 // Swatch popovers measure each color against the page it sits on, so this has
 // to be the live theme background — a stale constant would report contrast
@@ -131,6 +132,7 @@ function PairPopover({
   pageBg: string
   ref: Ref<PopoverHandle>
 }) {
+  const { tokens } = useTheme()
   const popRef = useRef<HTMLDivElement>(null)
   // two stacked content slots; flipping `front` crossfades old and new
   // simultaneously in a single commit. `instant` marks fresh opens, where
@@ -280,11 +282,14 @@ function PairPopover({
   return createPortal(
     <div
       ref={popRef}
+      aria-hidden="true"
       onPointerEnter={cancelHide}
       onPointerLeave={scheduleHide}
-      className="popover-surface fixed top-0 left-0 z-50 w-56 will-change-transform"
+      className="report-content popover-surface fixed top-0 left-0 z-50 w-56 will-change-transform"
       style={
         {
+          '--report-text': readableColor([tokens.panel], tokens.ink),
+          '--report-danger': readableColor([tokens.panel], tokens.danger),
           opacity: 0,
           pointerEvents: 'none',
           transform: 'translate3d(0, 0, 0) scale(0.94)',
@@ -348,7 +353,9 @@ function HeaderSwatch({
 }) {
   const ink = inkFor(color)
   return (
-    <div
+    <button
+      type="button"
+      aria-label={`Color ${index + 1}, ${color}, compared with page background`}
       data-pair={`s:${index}`}
       className="flex size-[34px] shrink-0 cursor-default flex-col items-center justify-center rounded leading-[1.15] hover:ring-1 hover:ring-ink/40 data-active:ring-1 data-active:ring-ink/40"
       style={{ background: color }}
@@ -356,10 +363,10 @@ function HeaderSwatch({
       <span className="tabular-nums text-[10px] font-medium" style={{ color: ink }}>
         {cell ? cell.normal.toFixed(1) : ''}
       </span>
-      <span className="tabular-nums text-[9px]" style={{ color: ink, opacity: 0.6 }}>
+      <span className="tabular-nums text-[11px]" style={{ color: ink }}>
         {wcagContrast(color, pageBg).toFixed(1)}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -392,9 +399,37 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
   )
   const popover = useRef<PopoverHandle>(null)
   const lastTarget = useRef<Element | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const detailRef = useRef<HTMLElement>(null)
+  const detailAnchor = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    setSelected(null)
+    popover.current?.hide()
+  }, [version.id, colors])
+  useEffect(() => {
+    if (!selected) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { detailAnchor.current?.focus(); setSelected(null) }
+    }
+    const onOutside = (event: PointerEvent) => {
+      const target = event.target as Element
+      if (!detailRef.current?.contains(target) && !target.closest('[data-pair]')) setSelected(null)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onOutside)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onOutside) }
+  }, [selected])
+  const selectDetail = (target: EventTarget) => {
+    const el = (target as HTMLElement).closest<HTMLElement>('[data-pair]')
+    if (!el) return
+    detailAnchor.current = el
+    popover.current?.hide()
+    setSelected(el.dataset.pair ?? null)
+  }
 
   // delegated: two listeners for the whole grid, one rect read per cell entry
   const onPointerOver = (e: React.PointerEvent) => {
+    if (selected) return
     if (!isHoverPointer(e)) return
     const el = (e.target as Element).closest('[data-pair]')
     if (el === lastTarget.current) return
@@ -425,6 +460,11 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         }}
         onPointerOver={onPointerOver}
         onPointerLeave={onPointerLeave}
+        onClick={(e) => selectDetail(e.target)}
+        onFocus={(e) => selectDetail(e.target)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget) && !detailRef.current?.contains(e.relatedTarget)) setSelected(null)
+        }}
       >
         <div />
         {colors.slice(0, -1).map((c, j) => (
@@ -450,9 +490,11 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
                 const ratio = wcagContrast(rowColor, colColor)
                 const failing = (cell?.failLetters.length ?? 0) > 0
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={j}
                     data-pair={`${j}:${i}`}
+                    aria-label={`Colors ${j + 1} and ${i + 1}: delta E ${cell?.normal.toFixed(1) ?? 'unknown'}, contrast ${ratio.toFixed(2)}${failing ? ', issues detected' : ', no JND issues'}`}
                     className="flex h-[34px] cursor-default flex-col items-center justify-center rounded-md leading-tight hover:bg-ink/[0.04] data-active:bg-ink/[0.04]"
                   >
                     <span
@@ -470,7 +512,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
                     <span className="tabular-nums text-[11px] text-ink/30">
                       {ratio.toFixed(1)}
                     </span>
-                  </div>
+                  </button>
                 )
               })}
             </Fragment>
@@ -478,6 +520,14 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         })}
       </div>
       <PairPopover ref={popover} cells={popCells} colors={colors} pageBg={pageBg} />
+      {selected && popCells.has(selected) && createPortal(
+        <aside ref={detailRef} aria-label="Color comparison details" className="report-content popover-surface fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl shadow-xl" style={{ '--report-text': readableColor([tokens.panel], tokens.ink), '--report-danger': readableColor([tokens.panel], tokens.danger) } as CSSProperties}>
+          <button className="px-3 pt-2 text-[13px] text-ink underline" onClick={() => { detailAnchor.current?.focus(); setSelected(null) }}>Close details</button>
+          <div role="status" aria-live="polite">
+            <PairDetail a={colors[Number(selected.startsWith('s:') ? selected.slice(2) : selected.split(':')[0])]} b={selected.startsWith('s:') ? pageBg : colors[Number(selected.split(':')[1])]} cell={popCells.get(selected)!} />
+          </div>
+        </aside>, document.body
+      )}
     </>
   )
 }

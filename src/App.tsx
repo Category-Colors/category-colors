@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { MotionConfig, motion, useMotionValue, useTransform } from 'motion/react'
 import type { MotionStyle } from 'motion/react'
 import {
-  DEFAULT_PARAMS,
   type PaletteParams,
   type PaletteVersion,
 } from '@/lib/palette'
-import { generatePaletteAsync } from '@/lib/generate'
+import { cancelPaletteGeneration, generatePaletteAsync } from '@/lib/generate'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { MainTabs } from '@/components/main/MainTabs'
 import { TooltipLayer } from '@/components/TooltipLayer'
@@ -16,6 +15,7 @@ import { HistoryPanel } from '@/components/panels/HistoryPanel'
 import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
 import { MobileBar, type MobileSheet } from '@/components/mobile/MobileBar'
 import { DOCKED, useIsPhone } from '@/lib/use-media'
+import { loadSession, saveSession } from '@/lib/session'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
@@ -23,10 +23,12 @@ import { DOCKED, useIsPhone } from '@/lib/use-media'
 const panelsFloat = () => !matchMedia(DOCKED).matches
 
 export default function App() {
-  const [params, setParams] = useState<PaletteParams>(DEFAULT_PARAMS)
+  const [restored] = useState(loadSession)
+  const [storageWarning, setStorageWarning] = useState(restored.warning)
+  const [params, setParams] = useState<PaletteParams>(restored.session.params)
   // Boots empty: the canvas explains the app until the first palette exists
-  const [versions, setVersions] = useState<PaletteVersion[]>([])
-  const [currentId, setCurrentId] = useState<number | null>(null)
+  const [versions, setVersions] = useState<PaletteVersion[]>(restored.session.versions)
+  const [currentId, setCurrentId] = useState<number | null>(restored.session.currentId)
   const [busy, setBusy] = useState(false)
   // A phone gets bottom sheets instead of docked panels, and only one at a
   // time: two sheets would stack on the same screen edge, and the one
@@ -51,10 +53,28 @@ export default function App() {
   const rightWidth = useMotionValue(rightOpen ? PANEL_WIDTH : PUCK_SIZE)
   const pushLeft = useTransform(leftWidth, (w) => `${w - PUCK_SIZE}px`)
   const pushRight = useTransform(rightWidth, (w) => `${w - PUCK_SIZE}px`)
-  const nextId = useRef(1)
+  const nextId = useRef(Math.max(0, ...restored.session.versions.map((v) => v.id)) + 1)
   const paramsRef = useRef(params)
   const generating = useRef(false)
   paramsRef.current = params
+
+  const sessionRef = useRef({ params, versions, currentId })
+  sessionRef.current = { params, versions, currentId }
+  useEffect(() => {
+    const flush = () => {
+      const saved = saveSession(sessionRef.current)
+      setStorageWarning(saved ? null : 'Your work could not be saved in this browser. Download it before leaving.')
+    }
+    const timer = window.setTimeout(flush, 250)
+    window.addEventListener('pagehide', flush)
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [params, versions, currentId])
 
   // With `override`, the run uses those params and the panel adopts them
   // (the empty state's recipes); otherwise it uses whatever the panel holds.
@@ -80,6 +100,7 @@ export default function App() {
         setCurrentId(version.id)
       })
       .catch((err) => {
+        if (err?.name === 'AbortError') return
         console.error('Palette generation failed:', err)
         alert('Palette generation failed — see the console for details.')
       })
@@ -132,7 +153,7 @@ export default function App() {
       addPalette(colors)
       return
     }
-    setVersions((prev) => prev.map((v) => (v.id === currentId ? { ...v, colors } : v)))
+    setVersions((prev) => prev.map((v) => (v.id === currentId ? { ...v, colors, edited: v.costHistory.length > 0 || v.edited } : v)))
   }
 
   const clearVersions = () => {
@@ -175,6 +196,7 @@ export default function App() {
         params={params}
         onParamsChange={setParams}
         onGenerate={generate}
+        onCancel={cancelPaletteGeneration}
         busy={busy}
         open={configOpen}
         onOpenChange={openConfig}
@@ -182,7 +204,11 @@ export default function App() {
         width={leftWidth}
       />
       <main className="app-main">
-        <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} />
+        {storageWarning && <p role="status" className="rounded-lg bg-panel p-3 text-[13px] text-ink">{storageWarning}</p>}
+        <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} onReload={() => {
+          if (saveSession(sessionRef.current)) window.location.reload()
+          else setStorageWarning('Reload was paused because your session could not be saved. Download your palette first.')
+        }} />
         <LedEdge />
       </main>
       <HistoryPanel
@@ -204,6 +230,7 @@ export default function App() {
             open={sheet}
           onOpen={setSheet}
           onGenerate={generate}
+          onCancel={cancelPaletteGeneration}
         />
       )}
       <TooltipLayer />

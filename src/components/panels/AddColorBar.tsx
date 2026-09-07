@@ -37,7 +37,11 @@ export function AddColorBar({
   const presetsRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const imagePopRef = useRef<HTMLDivElement>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [menuPos, setMenuPos] = useState<{
+    top: number
+    right: number
+    maxHeight: number
+  } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [imageOpen, setImageOpen] = useState(false)
   const [extracted, setExtracted] = useState<Extracted | null>(null)
@@ -52,12 +56,19 @@ export function AddColorBar({
   })
 
   // The presets menu is right-aligned to its trigger rather than left-aligned
-  // and trigger-width, so it measures itself instead of using the shared helper
+  // and trigger-width, so it measures itself instead of using the shared helper.
+  // It also caps itself: the list is long enough to outrun a laptop viewport,
+  // and unlike the shared helper it can't flip above — the trigger sits low in
+  // the panel, so there is even less room up there. Scroll instead.
   useEffect(() => {
     if (!menuOpen || !presetsRef.current || !portalTarget) return
     const t = presetsRef.current.getBoundingClientRect()
     const root = portalTarget.getBoundingClientRect()
-    setMenuPos({ top: t.bottom - root.top + 4, right: root.right - t.right })
+    setMenuPos({
+      top: t.bottom - root.top + 4,
+      right: root.right - t.right,
+      maxHeight: Math.max(160, window.innerHeight - t.bottom - 16),
+    })
   }, [menuOpen, portalTarget])
 
   // Every preview url is revoked exactly once — when it's replaced, cleared,
@@ -224,7 +235,12 @@ export function AddColorBar({
                 ref={warmMenuRef}
                 className="dialkit-select-dropdown preset-menu"
                 {...popoverMotion()}
-                style={{ position: 'absolute', top: menuPos.top, right: menuPos.right }}
+                style={{
+                  position: 'absolute',
+                  top: menuPos.top,
+                  right: menuPos.right,
+                  maxHeight: menuPos.maxHeight,
+                }}
               >
                 {PRESET_PALETTES.map((preset) => (
                   <button
@@ -277,6 +293,7 @@ export function AddColorBar({
                           data-selected={String(extracted.selected.includes(hex))}
                           style={{ backgroundColor: hex }}
                           aria-label={hex}
+                          aria-pressed={extracted.selected.includes(hex)}
                           onClick={() => toggleSwatch(hex)}
                         />
                       ))}

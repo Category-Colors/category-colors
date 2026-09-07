@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { SPRING } from '@/components/dialkit'
 import { useBusyLabel } from '@/lib/use-busy-label'
-import { ICON_STROKE } from '@/components/panels/icons'
+import { ICON_STROKE, StopIcon } from '@/components/panels/icons'
 
 export type MobileSheet = 'config' | 'output'
 
@@ -74,11 +74,13 @@ export function MobileBar({
   open,
   onOpen,
   onGenerate,
+  onCancel,
 }: {
   busy: boolean
   open: MobileSheet | null
   onOpen: (sheet: MobileSheet) => void
   onGenerate: () => void
+  onCancel: () => void
 }) {
   const busyLabel = useBusyLabel(busy)
   // A sheet being up is the whole reason to duck, so it is not worth a second
@@ -122,10 +124,9 @@ export function MobileBar({
         type="button"
         className="mobile-bar-generate"
         data-busy={busy ? '' : undefined}
+        disabled={busy}
         aria-label="Generate a palette"
-        onClick={() => {
-          if (!busy) onGenerate()
-        }}
+        onClick={() => onGenerate()}
       >
         {busy ? <span className="button-spinner" /> : <PlayIcon />}
         <AnimatePresence initial={false}>
@@ -141,6 +142,28 @@ export function MobileBar({
           )}
         </AnimatePresence>
       </motion.button>
+
+      {/* Stopping is its own island rather than a second meaning for the
+          capsule, which matches the panel footer. It only exists mid-run, so
+          it scales in from the capsule's edge rather than displacing the row
+          from nothing. */}
+      <AnimatePresence initial={false}>
+        {busy && (
+          <motion.button
+            layout
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={SPRING.toolbar}
+            type="button"
+            className="mobile-bar-button mobile-bar-stop"
+            aria-label="Stop generation"
+            onClick={() => onCancel()}
+          >
+            <StopIcon />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <button
         type="button"

@@ -48,12 +48,17 @@ The app also contains two development-only reference surfaces:
 - `/?story=` lists focused component stories.
 - `/design-system` shows the component and token reference.
 
-## Preset regeneration
+## Deployment and sessions
 
-The initial palette and its recorded loss curve are checked in so the first load is instant. After changing optimizer defaults, regenerate them with:
+Run `npm ci`, the checks above, and publish `dist/` to a static HTTPS host.
+The production build excludes the development reference pages. Serve HTML with
+revalidation and hashed assets with long-lived caching; retain prior assets
+during deployments so open sessions can still load the report chunk.
 
-```sh
-node scripts/regen-preset.mjs
-```
+Palettes, history, and configuration currently live in memory and are lost on
+reload. Download palettes and export configuration before leaving. Only the
+theme is persisted locally.
 
-That script updates the values documented in `src/lib/palette.ts` and `src/lib/preset-history.ts`.
+The chart preview requests forecasts directly from Open-Meteo. Its free endpoint
+is for non-commercial use; review [Open-Meteo's terms](https://open-meteo.com/en/terms)
+before a commercial launch. Weather attribution appears below the charts.

@@ -69,6 +69,20 @@ export function XIcon() {
   )
 }
 
+// A rounded square, drawn as a subpath rather than <rect rx> for the reason at
+// the top of this file. Filled, unlike its neighbours: at 15px a 1.5-stroke
+// outline of a square reads as a checkbox. Being filled also makes it heavier
+// than an outlined glyph of the same size, so it carries no opacity override:
+// it rides .square-button's resting 0.7 like the copy and image buttons, which
+// is what keeps a solid shape from out-shouting the outlines around it.
+export function StopIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M9 6.5h6a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5H9a2.5 2.5 0 0 1-2.5-2.5V9A2.5 2.5 0 0 1 9 6.5z" />
+    </svg>
+  )
+}
+
 export function CopyIcon() {
   return (
     <Icon>
