@@ -10,6 +10,14 @@ const DWELL = 200
 // naming it would be the one visual answer it still gave to a pointer. A single
 // fixed node is repositioned imperatively (compositor-only transitions),
 // glides between adjacent buttons, and hides on press, leave, or scroll.
+//
+// `data-no-tooltip` opts a whole region out while keeping every accessible
+// name inside it, for the areas that already answer a hover with something
+// richer: the history list raises a preview popover, the pair grid raises a
+// per-pair one. A tooltip repeating the button's label over the top of those
+// is a second answer to one question. It is read by ancestry, not per button,
+// because the rule belongs to the area — a cell added inside one of them is
+// then correct without anyone remembering to tag it.
 export function TooltipLayer() {
   const tipRef = useRef<HTMLDivElement>(null)
 
@@ -53,7 +61,8 @@ export function TooltipLayer() {
         hide()
         return
       }
-      const el = (e.target as Element).closest?.('button[aria-label]:not(:disabled)') ?? null
+      const button = (e.target as Element).closest?.('button[aria-label]:not(:disabled)') ?? null
+      const el = button?.closest('[data-no-tooltip]') ? null : button
       if (el === state.el) return
       window.clearTimeout(state.timer)
       state.el = el

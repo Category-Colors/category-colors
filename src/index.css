@@ -1,6 +1,24 @@
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
 
+/* Report numbers and labels must remain readable, including custom themes.
+   The colors are measured against their actual page/card surfaces in JS. */
+.report-content :is([class~="text-ink"], [class*="text-ink/"]) {
+  color: var(--report-text);
+}
+.report-content :is([class~="text-danger"], [class*="text-danger/"]) {
+  color: var(--report-danger);
+}
+.drag-handle:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+[data-pair]:focus-visible {
+  outline: 2px solid var(--report-text, currentColor);
+  outline-offset: 2px;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* The one variant this app used from shadcn/tailwind.css, inlined verbatim so
@@ -644,7 +662,8 @@ body {
   height: 15px;
 }
 
-/* Presets menu: palette name over a swatch strip */
+/* Presets menu: palette name over a swatch strip. Height cap and scrolling come
+   from .dialkit-select-dropdown, which it also carries. */
 .preset-menu {
   width: 216px;
 }
@@ -853,6 +872,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+/* Disabled while a run is in flight, but it is also the only progress the
+   panel shows — the spinner and the cycling verb have to stay readable, so it
+   keeps full contrast instead of the usual disabled dimming. */
+.generate-button:disabled {
+  opacity: 1;
 }
 
 .button-spinner {
@@ -2918,9 +2944,16 @@ body {
 
 /* Dimmed while it runs, but only as far as the label can still be read on it:
    the spinner says the button is working, the tint says it won't take another
-   press, and neither is worth losing the verb over. */
-.mobile-bar-generate[data-busy] {
+   press — and now it genuinely won't, since stopping moved to the island
+   beside it. Neither is worth losing the verb over. */
+.mobile-bar-generate:disabled {
   background: color-mix(in oklab, var(--theme-ink) 78%, var(--theme-bg));
+}
+
+/* Full-strength ink, unlike its neighbours' 62%: it is on screen only while a
+   run is in flight, and it is the only way to end one. */
+.mobile-bar-stop {
+  color: var(--theme-ink);
 }
 
 /* the same press the rest of the app's buttons use (theme.css) */

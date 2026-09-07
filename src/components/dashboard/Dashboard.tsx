@@ -49,9 +49,11 @@ function ChartCard({
 export function Dashboard({ colors }: { colors: string[] }) {
   const [data, setData] = useState<WeatherData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
+    setError(null)
     fetchWeather()
       .then((next) => {
         if (active) setData(next)
@@ -62,7 +64,7 @@ export function Dashboard({ colors }: { colors: string[] }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [attempt])
 
   // Preserve the city-array identity while colors change but their count does
   // not, so chart path memoization survives live palette edits.
@@ -80,9 +82,12 @@ export function Dashboard({ colors }: { colors: string[] }) {
   }
   if (error) {
     return (
-      <p className="pt-6 tabular-nums text-[12px] text-ink/50">
-        Couldn't reach Open-Meteo ({error}). Reload to retry.
-      </p>
+      <div className="pt-6 text-[12px] text-ink/70" role="alert">
+        <p>Couldn't load the forecast ({error}). Your palette is still available.</p>
+        <button type="button" className="mt-3 underline" onClick={() => setAttempt((value) => value + 1)}>
+          Retry weather
+        </button>
+      </div>
     )
   }
   const n = colors.length
@@ -146,6 +151,12 @@ export function Dashboard({ colors }: { colors: string[] }) {
           {data ? <SunShare cities={cities} colors={colors} /> : <SunShareSkeleton count={n} />}
         </ChartCard>
       </div>
+      <p className="text-[12px] text-ink/70">
+        Weather data by <a className="underline" href="https://open-meteo.com/">Open-Meteo</a>,
+        {' '}<a className="underline" href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+        {' '}Daily totals and sunshine hours calculated from forecast data.
+        {colors.length > 20 && ' Preview shows the first 20 palette colors.'}
+      </p>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PaletteParams, PaletteVersion } from '@/lib/palette'
 import { buildJndReport } from '@/lib/report'
 import { Dashboard } from '@/components/dashboard/Dashboard'
@@ -7,6 +7,7 @@ import { AboutDialog } from './AboutDialog'
 import { ThemeMenu } from './ThemeMenu'
 import { Manual } from './Manual'
 import { EmptyState } from './EmptyState'
+import { ResilientReport } from './ReportBoundary'
 
 // The report's rendering stays split out — the map, the pair grid and the stats
 // panel between them reach lib/algorithm, and with it category-colors' saliency
@@ -14,7 +15,6 @@ import { EmptyState } from './EmptyState'
 // itself lives here, because the tab badge has to know the issue count before
 // you go there; lib/report imports the package's report subpath alone, so it
 // brings no table with it.
-const ReportView = lazy(() => import('./ReportView').then((m) => ({ default: m.ReportView })))
 
 // The active background is the sliding pill below, not a per-tab class, so
 // switching tabs moves it the way a segmented control moves its own.
@@ -33,11 +33,13 @@ export function MainTabs({
   busy,
   onGenerate,
   onPreset,
+  onReload,
 }: {
   version: PaletteVersion | null
   busy: boolean
   onGenerate: (params?: PaletteParams) => void
   onPreset: (colors: string[]) => void
+  onReload: () => void
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('preview')
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -168,13 +170,7 @@ export function MainTabs({
           aria-labelledby="tab-report"
           className="pt-1 focus-visible:outline-none"
         >
-          <Suspense
-            fallback={
-              <p className="pt-6 tabular-nums text-[12px] text-ink/50">Loading the report…</p>
-            }
-          >
-            <ReportView version={version} report={report} />
-          </Suspense>
+          <ResilientReport version={version} report={report} onReload={onReload} />
         </div>
       )}
       <AboutDialog open={aboutOpen} onClose={closeAbout} />

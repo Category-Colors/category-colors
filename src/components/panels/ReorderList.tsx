@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
 import { SPRING } from '@/components/dialkit'
 
@@ -46,7 +46,7 @@ function GripIcon() {
   )
 }
 
-function ReorderItem<T>({ item, children }: { item: T; children: ReactNode }) {
+function ReorderItem<T>({ item, children, index, count, instructions, onMove }: { item: T; children: ReactNode; index: number; count: number; instructions: string; onMove: (position: number) => void }) {
   const controls = useDragControls()
   return (
     <Reorder.Item
@@ -63,7 +63,14 @@ function ReorderItem<T>({ item, children }: { item: T; children: ReactNode }) {
     >
       <button
         className="drag-handle"
-        aria-label="Drag to reorder"
+        aria-label={`Reorder color ${index + 1} of ${count}`}
+        aria-describedby={instructions}
+        onKeyDown={(e) => {
+          const target = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? count - 1 : null
+          if (target === null) return
+          e.preventDefault()
+          onMove(Math.max(0, Math.min(count - 1, target)))
+        }}
         onPointerDown={(e) => {
           e.preventDefault()
           controls.start(e)
@@ -105,7 +112,12 @@ export function ReorderList<T extends { id: number }>({
   generation?: number
   children: (item: T, index: number) => ReactNode
 }) {
+  const instructions = useId()
+  const [announcement, setAnnouncement] = useState('')
   return (
+    <>
+    <span id={instructions} className="sr-only">Use Up and Down arrows to move this color, or Home and End to move it to the first or last position.</span>
+    <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
     <Reorder.Group
       key={generation}
       as="div"
@@ -123,11 +135,19 @@ export function ReorderList<T extends { id: number }>({
           </ListEmptyState>
         )}
         {items.map((item, index) => (
-          <ReorderItem key={item.id} item={item}>
+          <ReorderItem key={item.id} item={item} index={index} count={items.length} instructions={instructions} onMove={(position) => {
+            if (position === index) return
+            const next = [...items]
+            next.splice(index, 1)
+            next.splice(position, 0, item)
+            onReorder(next)
+            setAnnouncement(`Color moved to position ${position + 1} of ${items.length}.`)
+          }}>
             {children(item, index)}
           </ReorderItem>
         ))}
       </AnimatePresence>
     </Reorder.Group>
+    </>
   )
 }

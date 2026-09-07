@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
-import { MANUAL, type ManualEntry } from '@/lib/manual'
+import type { ManualEntry } from '@/lib/manual'
 import { useWindowEscape, useWindowFocusReturn } from '@/lib/use-window-escape'
 import { ScrollOverlay } from '@/components/ScrollOverlay'
 import { BookIcon, XIcon } from '@/components/panels/icons'
@@ -30,6 +30,15 @@ const matches = (entry: ManualEntry, query: string) =>
  * focus trap or the inert page — both are the point of a non-modal window.
  */
 function ManualWindow({ onClose }: { onClose: () => void }) {
+  const [manual, setManual] = useState<typeof import('@/lib/manual').MANUAL | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let active = true
+    setLoadError(false)
+    import('@/lib/manual').then((m) => { if (active) setManual(m.MANUAL) }, () => { if (active) setLoadError(true) })
+    return () => { active = false }
+  }, [attempt])
   const layerRef = useRef<HTMLDivElement>(null)
   const windowRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -48,10 +57,10 @@ function ManualWindow({ onClose }: { onClose: () => void }) {
 
   const q = query.trim().toLowerCase()
   const sections = q
-    ? MANUAL.map((s) => ({ ...s, entries: s.entries.filter((e) => matches(e, q)) })).filter(
+    ? (manual ?? []).map((s) => ({ ...s, entries: s.entries.filter((e) => matches(e, q)) })).filter(
         (s) => s.entries.length > 0
       )
-    : MANUAL
+    : manual ?? []
 
   return createPortal(
     <motion.div ref={layerRef} className="window-layer">
@@ -133,7 +142,9 @@ function ManualWindow({ onClose }: { onClose: () => void }) {
                 </dl>
               </section>
             ))}
-            {sections.length === 0 && (
+            {!manual && !loadError && <p role="status">Loading the manual…</p>}
+            {loadError && <p role="alert">The manual couldn’t load. <button className="underline" onClick={() => setAttempt((a) => a + 1)}>Retry</button></p>}
+            {manual && sections.length === 0 && (
               <p className="manual-nothing">Nothing in the manual matches “{query.trim()}”.</p>
             )}
           </div>

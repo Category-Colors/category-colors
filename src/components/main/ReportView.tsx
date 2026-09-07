@@ -4,6 +4,9 @@ import type { PaletteVersion } from '@/lib/palette'
 import { ColorSpaceMap } from './ColorSpaceMap'
 import { PairGrid } from './PairGrid'
 import { StatsPanel } from './StatsPanel'
+import { useTheme } from '@/lib/theme'
+import { reportTextColors } from '@/lib/contrast'
+import type { CSSProperties } from 'react'
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-[12px] font-medium tracking-[-0.01em] text-ink">{children}</p>
@@ -18,6 +21,8 @@ export function ReportView({
   version: PaletteVersion
   report: JndReport | null
 }) {
+  const { tokens } = useTheme()
+  const textColors = reportTextColors(tokens.bg, tokens.ink, tokens.danger)
   if (!report) {
     return (
       <p className="pt-6 tabular-nums text-[12px] text-ink/50">
@@ -33,7 +38,7 @@ export function ReportView({
     // (.app-main pads by --panel-width, and either panel can collapse) rather
     // than by the viewport — a viewport breakpoint reads a width this column
     // never has
-    <div className="@container flex flex-col gap-5">
+    <div className="report-content @container flex flex-col gap-5" aria-label="Palette analysis" style={{ '--report-text': textColors.text, '--report-danger': textColors.danger } as CSSProperties}>
       <section className="flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionLabel>Pairs</SectionLabel>

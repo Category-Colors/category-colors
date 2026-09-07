@@ -42,6 +42,9 @@ interface PaletteItem {
 
 let nextItemId = 1
 const MAX_PALETTE_BYTES = 5_000_000
+// Reports compare every pair; an ordinary text file can contain hundreds of
+// thousands of colors and otherwise freeze the main thread on import.
+const MAX_IMPORTED_COLORS = 256
 
 const COLOR_FORMATS: { value: Space; label: string }[] = [
   { value: 'hex', label: 'Hex' },
@@ -69,6 +72,8 @@ function VersionRow({
         type="button"
         className="color-row-chip"
         data-open={String(active)}
+        aria-label={`Restore palette ${version.id}, ${version.colors.length} colors`}
+        aria-pressed={active}
         onClick={onRestore}
       >
         <span className="version-facepile">
@@ -78,7 +83,7 @@ function VersionRow({
         </span>
       </button>
       <div className="color-row-actions">
-        <button className="color-row-icon" aria-label="Remove" onClick={onDelete}>
+        <button className="color-row-icon" aria-label={`Remove palette ${version.id}`} onClick={onDelete}>
           <XIcon />
         </button>
       </div>
@@ -157,6 +162,10 @@ export function HistoryPanel({
   }, [currentId])
 
   const commit = (next: PaletteItem[]) => {
+    if (next.length > MAX_IMPORTED_COLORS) {
+      alert(`A palette can contain up to ${MAX_IMPORTED_COLORS} colors.`)
+      return
+    }
     setPalette((prev) => ({ ...prev, items: next }))
     onColorsChange(next.map((item) => valueToCss(item.value)))
   }
@@ -195,9 +204,14 @@ export function HistoryPanel({
     }
     file.text().then(
       (text) => {
+        try {
         const colors = parsePalette(text)
-        if (colors.length > 0) onPaletteReplace(colors)
+        if (colors.length > MAX_IMPORTED_COLORS) alert(`Import up to ${MAX_IMPORTED_COLORS} colors at a time.`)
+        else if (colors.length > 0) onPaletteReplace(colors)
         else alert('No colors found in that file.')
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'That palette could not be imported.')
+        }
       },
       () => alert("That file couldn't be read.")
     )
@@ -335,7 +349,8 @@ export function HistoryPanel({
               </button>
             }
           >
-            <div className="version-list" onPointerOver={onListOver} onPointerLeave={onListLeave}>
+            {/* data-no-tooltip: this list answers a hover with the popover below */}
+            <div className="version-list" data-no-tooltip onPointerOver={onListOver} onPointerLeave={onListLeave}>
               {newestFirst.map((v) => (
                 <VersionRow
                   key={v.id}

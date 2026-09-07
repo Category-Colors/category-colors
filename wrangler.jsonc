@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "category-colors",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-07",
+  "vars": { "WEATHER_NON_COMMERCIAL": "true" }
+}
