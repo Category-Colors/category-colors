@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MANUAL, type ManualEntry } from '@/lib/manual'
 import { ScrollOverlay } from '@/components/ScrollOverlay'
@@ -7,8 +7,7 @@ import { BookIcon, XIcon } from '@/components/panels/icons'
 // ⌘? is ⌘⇧/ on a US layout, so the chord arrives as either '?' or '/' depending
 // on whether shift was held. Both open it, which also gives the ⌘/ that most
 // apps use for help. Ctrl elsewhere.
-const MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
-const SHORTCUT = MAC ? '⌘?' : 'Ctrl+?'
+const SHORTCUT = navigator.userAgent.includes('Mac') ? '⌘?' : 'Ctrl+?'
 
 const matches = (entry: ManualEntry, query: string) =>
   `${entry.term} ${entry.where ?? ''} ${entry.body}`.toLowerCase().includes(query)
@@ -25,14 +24,21 @@ const matches = (entry: ManualEntry, query: string) =>
  * The trigger travels with it. The manual is one thing, and splitting the
  * button from the dialog would mean lifting `open` to the app root to reunite
  * them.
+ *
+ * Memoized because it takes no props and App re-renders on every frame of a
+ * slider drag: without it, dragging a dial rebuilds the whole closed glossary
+ * — a few hundred elements — for nothing, on the frame budget the drag needs.
  */
-export function Manual() {
+export const Manual = memo(function Manual() {
   const ref = useRef<HTMLDialogElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const fromBackdrop = useRef(false)
   const [query, setQuery] = useState('')
 
+  // Everything a fresh open resets lives here rather than on close: clearing
+  // the filter as the dialog leaves would swap the unfiltered list back in
+  // under the exit fade.
   const open = useCallback(() => {
     setQuery('')
     ref.current?.showModal()
@@ -47,11 +53,15 @@ export function Manual() {
   // lets the Escape branch below keep the modal's dismissal to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // The dialog's own Escape handling is the UA's, not a listener, so
-      // stopping propagation dismisses the manual without also reaching the
-      // background listeners that close on Escape (use-dropdown, Sheet). One
-      // press, one dismissal: without this, a Theme popover left open behind
-      // the manual is quietly closed along with it.
+      // While a modal is up it owns Escape: one press dismisses the thing on
+      // top and nothing else. The dialog's own handling of the key is the
+      // UA's rather than a listener, so stopping propagation here dismisses
+      // the manual while leaving every other Escape handler on the page
+      // untouched — including any added later, which is why this claims the
+      // key centrally rather than teaching each listener to stand down.
+      // Without it, a popover left open behind the manual closes along with
+      // it. (SpaceSelect declines Escape at the listener instead, but that
+      // is a nesting known when it is written; a modal's layering is not.)
       if (e.key === 'Escape') {
         if (ref.current?.open) e.stopPropagation()
         return
@@ -70,10 +80,8 @@ export function Manual() {
   }, [open])
 
   const q = query.trim().toLowerCase()
-  // Blurbs orient a reader browsing the section; while filtering they are
-  // noise around the two entries that matched, so only the entries survive.
   const sections = q
-    ? MANUAL.map((s) => ({ ...s, blurb: '', entries: s.entries.filter((e) => matches(e, q)) })).filter(
+    ? MANUAL.map((s) => ({ ...s, entries: s.entries.filter((e) => matches(e, q)) })).filter(
         (s) => s.entries.length > 0
       )
     : MANUAL
@@ -88,7 +96,7 @@ export function Manual() {
       {createPortal(
         <dialog
           ref={ref}
-          className="manual"
+          className="manual popover-surface"
           aria-labelledby="manual-title"
           // The backdrop is not a child, so its clicks are dispatched to the
           // dialog itself; anything inside targets that instead. Both ends of
@@ -102,7 +110,6 @@ export function Manual() {
           onClick={(e) => {
             if (e.target === ref.current && fromBackdrop.current) ref.current.close()
           }}
-          onClose={() => setQuery('')}
         >
           <div className="manual-head">
             <div className="manual-title-row">
@@ -110,7 +117,10 @@ export function Manual() {
                 Manual
               </h2>
               <kbd className="manual-kbd">{SHORTCUT}</kbd>
-              <button className="manual-close" onClick={() => ref.current?.close()}>
+              <button
+                className="color-row-icon manual-close"
+                onClick={() => ref.current?.close()}
+              >
                 <XIcon />
                 {/* the visible glyph is the label, so no aria-label: one would
                     earn this button a tooltip drawn under the top layer */}
@@ -143,7 +153,9 @@ export function Manual() {
               {sections.map((section) => (
                 <section key={section.title} className="manual-section">
                   <h3 className="manual-section-title">{section.title}</h3>
-                  {section.blurb && <p className="manual-blurb">{section.blurb}</p>}
+                  {/* A blurb orients a reader browsing the section; around the
+                      two entries a search turned up it is just noise. */}
+                  {!q && <p className="manual-blurb">{section.blurb}</p>}
                   <dl className="manual-list">
                     {section.entries.map((entry) => (
                       <div key={entry.term} className="manual-entry">
@@ -170,4 +182,4 @@ export function Manual() {
       )}
     </>
   )
-}
+})

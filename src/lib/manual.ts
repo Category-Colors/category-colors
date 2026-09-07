@@ -13,7 +13,7 @@ export interface ManualEntry {
   body: string
 }
 
-export interface ManualSection {
+interface ManualSection {
   title: string
   blurb: string
   entries: ManualEntry[]

@@ -105,12 +105,14 @@
   /* Mirror DialKit tokens of the same name (theme.css), for the chrome that
      portals to <body> or otherwise falls outside .dialkit-root — the panel
      toggles, the tab pill, which borrows PILL_TRANSITION so it slides on
-     exactly the curve a segmented control's background does, and the header
-     scrim, which is glass on the same recipe as the panels. */
+     exactly the curve a segmented control's background does, the header
+     scrim, which is glass on the same recipe as the panels, and the nav row's
+     two triggers and the manual they open. */
   --dial-anim-press: 0.16s;
   --dial-anim-fast: 0.1s;
   --dial-anim-reveal: var(--dial-anim-fast);
   --dial-backdrop-blur: 20px;
+  --dial-surface: color-mix(in oklab, var(--theme-ink) 5%, transparent);
 
   /* The phone chrome (index.css, phone layout below). Its islands float off
      the bottom edge by --bar-float and are --bar-size square; .app-main pads
@@ -1766,14 +1768,6 @@ body {
   font-size: 12px;
   line-height: 1.5;
   color: var(--dial-text-primary);
-  /* the native bar is replaced by .scroll-overlay so it can't reserve a
-     gutter when the OS is set to always-visible scrollbars */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.export-preview::-webkit-scrollbar {
-  display: none;
 }
 
 /* Restores what the <pre> did for free: shrink to the palette's own line
@@ -1789,6 +1783,20 @@ body {
 .export-preview:focus-visible {
   outline: 1px solid var(--dial-border-hover);
   outline-offset: -1px;
+}
+
+/* Every scroller that mounts a ScrollOverlay hides its native bar first —
+   letting one draw a gutter where the OS is set to always-visible scrollbars
+   is the whole reason the thumb below is drawn by hand. */
+.export-preview,
+.manual-body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.export-preview::-webkit-scrollbar,
+.manual-body::-webkit-scrollbar {
+  display: none;
 }
 
 /* Floating scrollbar: overlays the text instead of reserving a gutter, so the
@@ -1967,8 +1975,8 @@ body {
 /* Both buttons at the right end of the nav row. They sit in the tab row, so
    they match the tabs' height, padding and weight rather than the panel
    buttons'. Theme's is wrapped in a .dialkit-root so the popover it opens gets
-   DialKit's tokens; the Manual button is not, so this writes its ink alphas
-   out rather than reaching for --dial-surface, and both opt back out of the
+   DialKit's tokens; the Manual button is not, and reaches --dial-surface
+   through the :root mirror at the top of this file. Both opt back out of the
    kit's system font — these read as header controls. */
 .nav-trigger {
   display: flex;
@@ -1994,13 +2002,13 @@ body {
 
 .nav-trigger[data-open='true'] {
   color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
-  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+  background: var(--dial-surface);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .nav-trigger:hover {
     color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
-    background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+    background: var(--dial-surface);
   }
 }
 
@@ -2440,8 +2448,10 @@ body {
   padding: 0;
   overflow: hidden;
   color: var(--theme-ink);
-  background: var(--theme-panel);
-  border: 1px solid color-mix(in oklab, var(--theme-ink) 10%, transparent);
+  /* The panel fill and hairline come from .popover-surface on the element
+     itself — the same chrome the pair grid and history popovers portal out
+     with. Only the radius and a shadow deep enough for a modal differ, and
+     this rule is later in the file, so they win. */
   border-radius: 14px;
   box-shadow: 0 24px 64px rgb(0 0 0 / calc(0.5 * var(--shadow-strength, 1)));
   opacity: 0;
@@ -2472,11 +2482,13 @@ body {
 
 .manual::backdrop {
   background: rgb(0 0 0 / 0);
+  /* no `display` here, unlike the dialog itself: nothing ever sets
+     display:none on the pseudo — leaving the top layer is what removes it,
+     and deferring that is what `overlay` is doing. */
   transition:
     background-color var(--dial-anim-reveal),
     backdrop-filter var(--dial-anim-reveal),
-    overlay var(--dial-anim-reveal) allow-discrete,
-    display var(--dial-anim-reveal) allow-discrete;
+    overlay var(--dial-anim-reveal) allow-discrete;
 }
 
 /* One value for both polarities, unlike the chrome shadows above: a shadow
@@ -2526,38 +2538,15 @@ body {
   font-size: 11px;
   line-height: 1;
   color: color-mix(in oklab, var(--theme-ink) 40%, transparent);
-  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+  background: var(--dial-surface);
   border-radius: 4px;
 }
 
+/* The app's own icon button, pushed to the end of the row. Size, radius, ink,
+   hover and the grouped press scale all come from .color-row-icon — the same
+   button every panel row closes itself with. */
 .manual-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
   margin-left: auto;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
-  transition: color var(--dial-anim-fast), background var(--dial-anim-fast);
-}
-
-.manual-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .manual-close:hover {
-    color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
-    background: color-mix(in oklab, var(--theme-ink) 8%, transparent);
-  }
-}
-
-.manual-close:active {
-  transform: scale(0.94);
 }
 
 .manual-search {
@@ -2567,7 +2556,7 @@ body {
   border-radius: 8px;
   font-size: 13px;
   color: color-mix(in oklab, var(--theme-ink) 95%, transparent);
-  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+  background: var(--dial-surface);
 }
 
 .manual-search::placeholder {
@@ -2595,19 +2584,6 @@ body {
   padding: 16px 18px 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* replaced by .scroll-overlay, for the same reason the export preview does
-     it: a classic scrollbar would reserve a gutter out of the text column */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.manual-body::-webkit-scrollbar {
-  display: none;
-}
-
-.manual-section {
-  display: flex;
-  flex-direction: column;
 }
 
 /* Sticky, because the sections are long enough that a reader scrolling into
@@ -2616,7 +2592,6 @@ body {
 .manual-section-title {
   position: sticky;
   top: -16px;
-  z-index: 1;
   padding: 4px 0 8px;
   margin-top: -4px;
   font-size: 12px;
@@ -2632,11 +2607,6 @@ body {
   font-size: 12px;
   line-height: 1.6;
   color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
-}
-
-.manual-list {
-  display: flex;
-  flex-direction: column;
 }
 
 /* Term beside definition: a glossary reads down the left edge, and a term
