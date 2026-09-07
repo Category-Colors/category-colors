@@ -113,7 +113,12 @@ void main() {
   // no falloff, brief flashes would read as noise instead of as a panel.
   float pulse = pow(sin(fract(phase) * PI), 1.4);
 
-  float a = led * amp * pulse * PEAK;
+  // The top row at half strength, so the strip thins out at its top edge
+  // instead of stopping on one. id.y counts up from the bottom, so the last
+  // row is the one furthest from the page edge.
+  float row = id.y < ROWS - 1.0 ? 1.0 : 0.5;
+
+  float a = led * amp * pulse * PEAK * row;
 
   outColor = vec4(uInk * a, a);
 }`

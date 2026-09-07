@@ -1535,12 +1535,14 @@ body {
 }
 
 /* Optically centred, not measured: dead centre of a tall canvas reads low.
-   A spacer below the block pushes it up by half the spacer — 7.5svh — and
+   A spacer below the block pushes it up by half the spacer — 2.5svh — and
    because it is the only thing here that shrinks, it gives that back before
-   the block could ever run under the nav row. Short viewports just centre. */
+   the block could ever run under the nav row. Short viewports just centre.
+   The lift used to be 7.5svh, which overshot; halving the spacer twice is
+   what sits it 5svh lower without giving up the mechanism. */
 .empty-canvas::after {
   content: '';
-  flex: 0 1 15svh;
+  flex: 0 1 5svh;
 }
 
 /* Bare on the canvas: no surface, no chart ghosts, just the steps */
@@ -2367,6 +2369,8 @@ body {
 .mobile-bar-button:active,
 .mobile-bar-generate:active {
   transform: scale(0.97);
+}
+
 /* ── LED edge ───────────────────────────────────────────────── */
 
 /* Hung off the end of the canvas rather than pinned to the viewport: it's the
