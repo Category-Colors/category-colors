@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { converter } from 'culori'
+import { clampChroma, converter } from 'culori'
 import { useTheme } from '@/lib/theme'
 
 // Three rows of LED matrix along the end of the page, seen close enough that
@@ -150,6 +150,8 @@ export function LedEdge() {
       gl.compileShader(shader)
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         console.error('LED edge shader failed to compile:', gl.getShaderInfoLog(shader))
+        gl.deleteShader(shader)
+        gl.deleteProgram(program)
         return
       }
       gl.attachShader(program, shader)
@@ -159,6 +161,7 @@ export function LedEdge() {
     gl.linkProgram(program)
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       console.error('LED edge program failed to link:', gl.getProgramInfoLog(program))
+      gl.deleteProgram(program)
       return
     }
     gl.useProgram(program)
@@ -166,8 +169,6 @@ export function LedEdge() {
     const uSize = gl.getUniformLocation(program, 'uSize')
     const uTime = gl.getUniformLocation(program, 'uTime')
     const uInk = gl.getUniformLocation(program, 'uInk')
-
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
 
     const render = (seconds: number) => {
       gl.uniform1f(uTime, seconds)
@@ -180,10 +181,21 @@ export function LedEdge() {
     let last = 0
 
     const resize = () => {
-      canvas.width = canvas.clientWidth * dpr
-      canvas.height = canvas.clientHeight * dpr
-      gl.viewport(0, 0, canvas.width, canvas.height)
-      gl.uniform2f(uSize, canvas.width, canvas.height)
+      // Read the ratio here rather than once on setup: browser zoom and a drag
+      // to a display of another density both move it, and a stale one leaves
+      // the emitters rasterised soft. Rounded, or the guard below never matches
+      // on a fractional ratio — the canvas truncates what it is assigned.
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      const w = Math.round(canvas.clientWidth * dpr)
+      const h = Math.round(canvas.clientHeight * dpr)
+      // Assigning either dimension reallocates and clears the drawing buffer
+      // even when the value is unchanged, and ResizeObserver delivers sub-pixel
+      // layout changes — a window drag would thrash allocation once a frame.
+      if (w === canvas.width && h === canvas.height) return
+      canvas.width = w
+      canvas.height = h
+      gl.viewport(0, 0, w, h)
+      gl.uniform2f(uSize, w, h)
       // Nothing redraws it on its own when the loop isn't running.
       if (reduced) render(0)
     }
@@ -231,7 +243,14 @@ export function LedEdge() {
   }, [])
 
   useEffect(() => {
-    const rgb = toRgb(tokens.ink)
+    // Gamut-map rather than just convert. A custom theme's ink is whatever the
+    // Theme editor's field parses (ThemeMenu.tsx), oklch() included, and those
+    // sit outside sRGB routinely — oklch(0.9 0.4 140) converts to r -0.39, g
+    // 1.08. Channels outside 0–1 break the invariant the shader writes under,
+    // since uInk * a must never exceed a on a premultiplied context. Reducing
+    // chroma is also what CSS does to paint that same ink everywhere else, so
+    // this keeps the strip the colour the rest of the UI is.
+    const rgb = toRgb(clampChroma(tokens.ink, 'oklch'))
     if (rgb) ink.current = [rgb.r, rgb.g, rgb.b]
     redraw.current?.()
   }, [tokens.ink])

@@ -13,7 +13,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
     "@tailwindcss/vite": "^4.3.2",
-    "category-colors": "^1.0.0",
+    "category-colors": "^1.1.0",
     "clsx": "^2.1.1",
     "culori": "^4.0.2",
     "motion": "^12.42.2",
