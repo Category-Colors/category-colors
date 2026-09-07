@@ -79,6 +79,23 @@ try {
   assert.equal(imported.evaluators[0].avoidRadius, 0.5)
   assert.equal(palette.parseParams('x'.repeat(1_000_001)), null)
 
+  // Grayscale is a print check with no meaningful degree: the editor hides the
+  // Severity control, so the value that reaches the library has to be pinned
+  // here rather than read off the spec — and switching back to a deficiency
+  // must return the severity the user actually set.
+  assert.equal(palette.cvdSeverityFor({ cvd: 'grayscale', cvdSeverity: 0.5 }), 1)
+  assert.equal(palette.cvdSeverityFor({ cvd: 'grayscale', cvdSeverity: 0 }), 1)
+  assert.equal(palette.cvdSeverityFor({ cvd: 'deuteranomaly', cvdSeverity: 0.35 }), 0.35)
+  // and a hand-edited file can still name it (parseParams gates cvd on CVD_TYPES)
+  const gs = palette.parseParams(
+    JSON.stringify({
+      initColors: [],
+      targets: [],
+      evaluators: [{ type: 'cvd', cvd: 'grayscale', weight: 0.1 }],
+    })
+  )
+  assert.equal(gs.evaluators[0].cvd, 'grayscale')
+
   const colors = ['#FF0000', 'rgb(0, 255, 0)', 'oklch(0.5 0.2 250)']
   for (const format of ['raw', 'css', 'json']) {
     const formatted = exporters.formatPalette(colors, format)

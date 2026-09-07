@@ -8,6 +8,7 @@ import {
   type EvalFunction,
 } from 'category-colors'
 import { toCulori } from '@/lib/color'
+import { cvdSeverityFor } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
 
 // The bridge between the app's serializable params and the category-colors
@@ -22,7 +23,7 @@ function toEvalFunction(spec: EvaluatorSpec): EvalFunction {
     weight: spec.weight,
   }
   if (spec.type === 'cvd') {
-    entry.cvd = { type: spec.cvd, severity: spec.cvdSeverity }
+    entry.cvd = { type: spec.cvd, severity: cvdSeverityFor(spec) }
   }
   if (spec.type === 'avoid') {
     entry.colors = spec.avoidColors.map((c) => toCulori(c.value))

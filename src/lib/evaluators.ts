@@ -20,7 +20,7 @@ export const TYPE_HINTS: Record<EvaluatorType, string> = {
   energy: 'Pushes colors apart from each other',
   range: 'Evens out the spacing between colors',
   jnd: 'Penalizes pairs below the JND threshold',
-  cvd: 'JND under simulated color-vision deficiency',
+  cvd: 'JND under a simulated viewing condition',
   similarity: 'Pulls the palette toward the targets',
   avoid: 'Pushes the palette away from these colors',
   contrast: 'Holds WCAG contrast against a background',
@@ -36,10 +36,25 @@ export const TYPE_OPTIONS = EVALUATOR_TYPES.map((value) => ({
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-export const CVD_TYPES: CvdType[] = ['protanomaly', 'deuteranomaly', 'tritanomaly']
+// Grayscale trails the three deficiencies because it isn't one — it's the
+// print check (see CvdType) — and its label says so, since a bare "Grayscale"
+// sitting in this list would read as a fourth vision condition.
+export const CVD_TYPES: CvdType[] = [
+  'protanomaly',
+  'deuteranomaly',
+  'tritanomaly',
+  'grayscale',
+]
 
-export const CVD_OPTIONS = CVD_TYPES.map((value) => ({ value, label: capitalize(value) }))
+const CVD_LABELS: Partial<Record<CvdType, string>> = { grayscale: 'Grayscale (print)' }
 
-// CVD rows read better as the deficiency itself than as a generic "CVD"
+export const CVD_OPTIONS = CVD_TYPES.map((value) => ({
+  value,
+  label: CVD_LABELS[value] ?? capitalize(value),
+}))
+
+// CVD rows read better as the simulation itself than as a generic "CVD", and
+// they borrow the option labels so a grayscale row doesn't sit in the list
+// looking like a fourth deficiency.
 export const evaluatorLabel = (spec: EvaluatorSpec) =>
-  spec.type === 'cvd' ? capitalize(spec.cvd) : TYPE_LABELS[spec.type]
+  spec.type === 'cvd' ? (CVD_LABELS[spec.cvd] ?? capitalize(spec.cvd)) : TYPE_LABELS[spec.type]

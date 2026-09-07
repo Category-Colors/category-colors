@@ -103,7 +103,7 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'CVD',
-        body: 'The JND evaluator run against a copy of the palette simulated under a color vision deficiency. Every pair still has to clear the threshold, but for a viewer who cannot separate the two colors the way you can. Choose the deficiency and its severity on the evaluator itself.',
+        body: 'The JND evaluator run against a simulated copy of the palette. Every pair still has to clear the threshold, but under a condition where some pairs collapse that look distinct to you. Choose the simulation and its severity on the evaluator itself: three color vision deficiencies, or Grayscale (print), which is not one.',
       },
       {
         term: 'Similarity',
@@ -297,11 +297,16 @@ export const MANUAL: ManualSection[] = [
       {
         term: 'Severity',
         where: 'Configuration › Evaluators › CVD',
-        body: 'How pronounced the deficiency being simulated is, 0 to 1, default 0.5. At 0 the simulation is normal vision; at 1 the affected cone contributes nothing. Optimizing against 1 is the conservative choice and costs the palette some of its range.',
+        body: 'How pronounced the simulation is, 0 to 1, default 0.5. At 0 it is normal vision; at 1 the affected cone contributes nothing. Optimizing against 1 is the conservative choice and costs the palette some of its range. The control is absent on Grayscale (print), which has no meaningful degree — it always runs at full.',
       },
       {
         term: 'CVD simulation',
-        body: 'The transform used to produce the palette as it would appear with a deficiency, from a physiologically-based model (Machado et al., 2009) that interpolates smoothly with severity. The same transform drives both the evaluators and the report’s columns.',
+        body: 'The transform used to produce the palette as it would appear with a deficiency, from a physiologically-based model (Machado et al., 2009) that interpolates smoothly with severity. The same transform drives both the evaluators and the report’s columns. Any claim about CVD is relative to the model behind it, which is why this one is named here.',
+      },
+      {
+        term: 'Grayscale (print)',
+        where: 'Configuration › Evaluators › CVD › Simulation',
+        body: 'The fourth option on a CVD evaluator, and the one that is not a vision condition: a luminance projection — the same matrix CSS filter: grayscale() uses — standing in for a palette that gets printed or photocopied. It has no Severity, so that control disappears when you pick it; a half-desaturated palette is not something anything prints, so it always runs at full. Worth a low weight if your charts end up on paper. It is not a model of achromatopsia and should not be described as one; the three deficiencies above it are.',
       },
     ],
   },

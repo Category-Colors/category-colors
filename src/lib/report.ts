@@ -1,6 +1,7 @@
 // Imports the package's report subpath so the tab badge can score a palette
 // without pulling in the optimizer or its saliency table (see MainTabs).
 import { reportJndIssues, type CvdSimulation, type JndReport, type JndTest } from 'category-colors/report'
+import { cvdSeverityFor } from './palette'
 import type { PaletteParams, PaletteVersion } from './palette'
 
 export type { JndReport }
@@ -26,7 +27,7 @@ function cvdSimulationsFor(params: PaletteParams): CvdSimulation[] {
   const seen = new Set<string>()
   return params.evaluators
     .filter((e) => e.type === 'cvd' && e.weight > 0)
-    .map((e) => ({ type: e.cvd, severity: e.cvdSeverity }))
+    .map((e) => ({ type: e.cvd, severity: cvdSeverityFor(e) }))
     .filter((s) => {
       const key = `${s.type}:${s.severity}`
       if (seen.has(key)) return false

@@ -18,7 +18,20 @@ export type EvaluatorType =
   | 'contrast'
   | 'saliency'
 
-export type CvdType = 'protanomaly' | 'deuteranomaly' | 'tritanomaly'
+// 'grayscale' is the odd one out: culori's luminance projection, the same
+// matrix CSS `filter: grayscale()` uses, standing in for print or a
+// photocopier. The other three are Machado et al. (2009) simulations of an
+// actual vision deficiency. Keep them apart in any copy — grayscale is not a
+// model of achromatopsia.
+export type CvdType = 'protanomaly' | 'deuteranomaly' | 'tritanomaly' | 'grayscale'
+
+// Grayscale has no severity to set: it stands in for print, and a
+// half-desaturated palette is not something anything prints. The editor hides
+// the control and both library boundaries read severity through here, so the
+// value stored on the spec — the user's setting for the real deficiencies —
+// survives a round trip through grayscale and back.
+export const cvdSeverityFor = (spec: Pick<EvaluatorSpec, 'cvd' | 'cvdSeverity'>) =>
+  spec.cvd === 'grayscale' ? 1 : spec.cvdSeverity
 
 // Flat spec: every field always present so control wiring stays simple;
 // only the fields relevant to the chosen type reach the algorithm config.
