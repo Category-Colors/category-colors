@@ -30,6 +30,7 @@ export function Manual() {
   const ref = useRef<HTMLDialogElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
+  const fromBackdrop = useRef(false)
   const [query, setQuery] = useState('')
 
   const open = useCallback(() => {
@@ -42,17 +43,30 @@ export function Manual() {
     if (bodyRef.current) bodyRef.current.scrollTop = 0
   }, [])
 
+  // Capture, so this sees the key before anything else does — which is what
+  // lets the Escape branch below keep the modal's dismissal to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || (e.key !== '?' && e.key !== '/')) return
+      // The dialog's own Escape handling is the UA's, not a listener, so
+      // stopping propagation dismisses the manual without also reaching the
+      // background listeners that close on Escape (use-dropdown, Sheet). One
+      // press, one dismissal: without this, a Theme popover left open behind
+      // the manual is quietly closed along with it.
+      if (e.key === 'Escape') {
+        if (ref.current?.open) e.stopPropagation()
+        return
+      }
+      // e.repeat: held down, the chord would otherwise toggle the dialog for
+      // as long as the key is held, replaying the entrance on every cycle.
+      if (e.repeat || !(e.metaKey || e.ctrlKey) || (e.key !== '?' && e.key !== '/')) return
       e.preventDefault()
       // A shortcut that only opens is a shortcut you have to leave the
       // keyboard to undo.
       if (ref.current?.open) ref.current.close()
       else open()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [open])
 
   const q = query.trim().toLowerCase()
@@ -77,9 +91,16 @@ export function Manual() {
           className="manual"
           aria-labelledby="manual-title"
           // The backdrop is not a child, so its clicks are dispatched to the
-          // dialog itself; anything inside targets that instead.
+          // dialog itself; anything inside targets that instead. Both ends of
+          // the click have to land there: a definition selected by dragging
+          // out past the dialog's edge releases on the backdrop, and the click
+          // that synthesizes lands on the dialog — closing the manual out from
+          // under the selection.
+          onPointerDown={(e) => {
+            fromBackdrop.current = e.target === ref.current
+          }}
           onClick={(e) => {
-            if (e.target === ref.current) ref.current.close()
+            if (e.target === ref.current && fromBackdrop.current) ref.current.close()
           }}
           onClose={() => setQuery('')}
         >

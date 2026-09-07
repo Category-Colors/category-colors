@@ -1913,8 +1913,15 @@ body {
 
 /* Short of room, the wordmark and both trigger labels fold away (kept in the
    accessibility tree, so the buttons keep their names) and the mark, book and
-   brush carry the row. */
-@container (width < 500px) {
+   brush carry the row.
+   The threshold is set by the grid, not by when the text stops fitting. Both
+   outer columns are 1fr, so they hold whichever's min-content is larger — and
+   that is column 3, at ~184px for two labelled buttons. Below (184 * 2 + the
+   two 20px gaps + the tab list) the share can no longer cover it, column 1
+   gives up the difference, and the "centred" tab list slides off centre by as
+   much as 32px. 600px clears that with room for the tab list to grow a badge.
+   It was 500 when this column held the Theme button alone. */
+@container (width < 600px) {
   .app-wordmark,
   .nav-trigger-label {
     position: absolute;
@@ -2420,7 +2427,12 @@ body {
    transition list, which leaves the fade on entry and an instant dismissal. */
 .manual {
   width: min(720px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 96px));
+  /* dvh, where the rest of the app uses vh: those surfaces are the docked
+     panels, whose vh term only ever binds on a desktop, where the two units
+     agree. This is the one surface that fills a phone's screen, and there
+     100vh is the *large* viewport — the bottom of the list would sit under
+     the browser's own chrome with no way to scroll it into reach. */
+  max-height: min(680px, calc(100dvh - 96px));
   /* A modal dialog is centred by the UA's own `margin: auto` against inset 0
      — which Tailwind's preflight zeroes along with every other margin, and
      without it this sits in the top-left corner. */
