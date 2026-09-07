@@ -37,11 +37,6 @@ export function AddColorBar({
   const presetsRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const imagePopRef = useRef<HTMLDivElement>(null)
-  const [menuPos, setMenuPos] = useState<{
-    top: number
-    right: number
-    maxHeight: number
-  } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [imageOpen, setImageOpen] = useState(false)
   const [extracted, setExtracted] = useState<Extracted | null>(null)
@@ -55,21 +50,13 @@ export function AddColorBar({
     dropdownHeight: 300,
   })
 
-  // The presets menu is right-aligned to its trigger rather than left-aligned
-  // and trigger-width, so it measures itself instead of using the shared helper.
-  // It also caps itself: the list is long enough to outrun a laptop viewport,
-  // and unlike the shared helper it can't flip above — the trigger sits low in
-  // the panel, so there is even less room up there. Scroll instead.
-  useEffect(() => {
-    if (!menuOpen || !presetsRef.current || !portalTarget) return
-    const t = presetsRef.current.getBoundingClientRect()
-    const root = portalTarget.getBoundingClientRect()
-    setMenuPos({
-      top: t.bottom - root.top + 4,
-      right: root.right - t.right,
-      maxHeight: Math.max(160, window.innerHeight - t.bottom - 16),
-    })
-  }, [menuOpen, portalTarget])
+  // Right-aligned to its trigger rather than left-aligned and trigger-width, so
+  // it reads `right` off the shared position rather than `left`. Everything
+  // else is the ordinary anchored-dropdown treatment, including the re-measure
+  // on scroll and resize this used to go without. It never flips above: the
+  // trigger sits low in the panel, so there is even less room up there, and it
+  // scrolls inside its cap instead.
+  const { pos: menuPos } = useAnchoredPortal(menuOpen, presetsRef, { allowAbove: false })
 
   // Every preview url is revoked exactly once — when it's replaced, cleared,
   // or the bar unmounts — so a session of retries can't strand blobs.

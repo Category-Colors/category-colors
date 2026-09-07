@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { createDefaultConfig } from 'category-colors'
+import { createDefaultConfig, palettes } from 'category-colors'
+import { formatHex } from 'culori'
 import { createServer } from 'vite'
 import { testLaunch } from './test-launch.mjs'
 
@@ -194,6 +195,23 @@ try {
       shape(createDefaultConfig().evalFunctions),
       'app DEFAULT_EVALUATORS have drifted from the library default config'
     )
+  }
+
+  // PRESET_PALETTES duplicates the package's `palettes` on purpose: presets.ts
+  // is main-bundle code (EmptyState imports it) and the package root pulls the
+  // optimizer with it, which MainTabs deliberately keeps in the lazy report
+  // chunk. So the values are copied and checked here instead, where importing
+  // the root costs nothing.
+  {
+    const presets = await server.ssrLoadModule('/src/lib/presets.ts')
+    const byName = new Map(presets.PRESET_PALETTES.map((p) => [p.name, p.colors]))
+    for (const [name, source] of [['Petroff 6', 'petroff6'], ['Petroff 8', 'petroff8'], ['Petroff 10', 'petroff10']]) {
+      assert.deepEqual(
+        byName.get(name)?.map((hex) => hex.toLowerCase()),
+        palettes[source].map((color) => formatHex(color)),
+        `${name} has drifted from the package's ${source}`
+      )
+    }
   }
 
   for (const mode of ['rgb', 'hsl', 'okhsl', 'oklch', 'oklab']) {

@@ -83,6 +83,7 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
                 left: pos.left,
                 top: pos.top,
                 width: pos.width,
+                maxHeight: pos.maxHeight,
                 transformOrigin: pos.above ? 'bottom' : 'top',
               }}
             >

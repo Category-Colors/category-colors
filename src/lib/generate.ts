@@ -76,4 +76,11 @@ export function generatePaletteAsync(params: PaletteParams): Promise<GenerateRes
 
 export function cancelPaletteGeneration() {
   retireWorker(new DOMException('Generation cancelled', 'AbortError'))
+  // Stopping is not abandoning: the reason to stop is almost always to change
+  // a dial and run again, and the worker is a 500 kB module that has to be
+  // compiled from scratch once it is terminated. Rebuild it now, during the
+  // user's think time, rather than in front of the next Generate. Deliberately
+  // not inside retireWorker — the error and messageerror handlers call that
+  // too, and respawning there would rebuild a worker that failed at init.
+  getWorker()
 }

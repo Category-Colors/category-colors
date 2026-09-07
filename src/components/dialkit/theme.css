@@ -1041,6 +1041,9 @@
   padding: 4px;
   z-index: 10000;
   box-shadow: var(--dial-shadow-dropdown);
+  /* paired with the max-height getDropdownPosition hands every dropdown: past
+     that height the list scrolls rather than running off the viewport */
+  overflow-y: auto;
 }
 
 .dialkit-select-option {

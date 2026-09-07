@@ -462,6 +462,9 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         style={{
           gridTemplateColumns: `minmax(28px, auto) repeat(${colors.length - 1}, minmax(48px, 1fr))`,
         }}
+        // every cell in here is a labelled button, and every one of them
+        // already answers a hover with PairPopover
+        data-no-tooltip
         onPointerOver={onPointerOver}
         onPointerLeave={onPointerLeave}
         onClick={(e) => selectDetail(e.target)}

@@ -41,13 +41,14 @@ const toLab = converter('oklab')
 
 // Preserve perceptual and wide-gamut colors. Plain RGB/named inputs keep the
 // familiar hex presentation; unsupported editor spaces convert through OKLAB.
-// Set when a color was dropped for transparency, so parsePalette can tell a
-// file that merely contained one from a file that was nothing but. Reset at
-// the top of every parsePalette call, which is the only entry point and is
-// synchronous throughout.
-let droppedNonOpaque = false
+// Carried down the scan so parsePalette can tell a file that merely contained
+// a translucent color from one that was nothing but. Threaded rather than held
+// at module scope: a shared flag would only stay correct while there is exactly
+// one entry point and nothing in the scan ever awaits, and neither of those
+// would fail loudly the day it stopped being true.
+interface Scan { droppedNonOpaque: boolean }
 
-const tokenToColor = (raw: string): string | null => {
+const tokenToColor = (raw: string, scan?: Scan): string | null => {
   const parsed = parse(raw.trim())
   if (!parsed) return null
   // Dropped rather than thrown here: this runs over every declaration in a
@@ -55,7 +56,7 @@ const tokenToColor = (raw: string): string | null => {
   // whose palette colors are all fine. parsePalette still raises the opaque
   // error when dropping them leaves nothing, which is the case worth naming.
   if (parsed.alpha !== undefined && parsed.alpha !== 1) {
-    droppedNonOpaque = true
+    if (scan) scan.droppedNonOpaque = true
     return null
   }
   if (parsed.mode === 'rgb') {
@@ -77,15 +78,15 @@ const DTCG_SPACES: Record<string, [Color['mode'], string[]]> = {
   'xyz-d65': ['xyz65', ['x', 'y', 'z']], 'xyz-d50': ['xyz50', ['x', 'y', 'z']],
 }
 
-function fromDtcg(value: unknown): string | null {
+function fromDtcg(value: unknown, scan: Scan): string | null {
   // `$value` is very often just a CSS color string — the pre-2024 spelling and
   // still what most exporters emit. Only the object form carries a colorSpace
   // and components, so a string is read as CSS rather than rejected.
-  if (typeof value === 'string') return tokenToColor(value)
+  if (typeof value === 'string') return tokenToColor(value, scan)
   if (!value || typeof value !== 'object') throw new Error('Invalid color token value.')
   const v = value as Record<string, unknown>
   if (v.alpha !== undefined && v.alpha !== 1) {
-    droppedNonOpaque = true
+    scan.droppedNonOpaque = true
     return null
   }
   const definition = typeof v.colorSpace === 'string' ? DTCG_SPACES[v.colorSpace] : undefined
@@ -104,7 +105,7 @@ function fromDtcg(value: unknown): string | null {
   return formatCss(mode === 'oklab' || mode === 'oklch' || mode === 'hsl' ? input : lab)
 }
 
-function parseTokenFile(root: object): string[] {
+function parseTokenFile(root: object, scan: Scan): string[] {
   const entries = new Map<string, { value: unknown; type: unknown }>()
   const walk = (node: unknown, path: string[], inherited: unknown, depth: number) => {
     if (depth > 40) throw new Error('Token groups are nested too deeply.')
@@ -123,7 +124,7 @@ function parseTokenFile(root: object): string[] {
       seen.add(path)
       return resolve(token.value.slice(1, -1), seen)
     }
-    return fromDtcg(token.value)
+    return fromDtcg(token.value, scan)
   }
   return [...entries]
     .filter(([, token]) => token.type === 'color')
@@ -134,33 +135,42 @@ function parseTokenFile(root: object): string[] {
 const NON_OPAQUE = 'Palettes use opaque colors. Remove transparency before importing.'
 
 export function parsePalette(text: string): string[] {
-  droppedNonOpaque = false
+  const scan: Scan = { droppedNonOpaque: false }
   let parsed: unknown
   try { parsed = JSON.parse(text) } catch { /* raw text or CSS */ }
-  const colors = scan(text, parsed)
+  const colors = scanText(text, parsed, scan)
   // Nothing survived and transparency is why: name it, rather than reporting
   // an empty file to someone who pasted exactly one translucent color.
-  if (!colors.length && droppedNonOpaque) throw new Error(NON_OPAQUE)
+  if (!colors.length && scan.droppedNonOpaque) throw new Error(NON_OPAQUE)
   return colors
 }
 
-function scan(text: string, parsed: unknown): string[] {
-  if (Array.isArray(parsed)) return parsed.filter((c): c is string => typeof c === 'string').map((c) => tokenToColor(c)).filter((c): c is string => c !== null)
+function scanText(text: string, parsed: unknown, scan: Scan): string[] {
+  if (Array.isArray(parsed)) return parsed.filter((c): c is string => typeof c === 'string').map((c) => tokenToColor(c, scan)).filter((c): c is string => c !== null)
   if (parsed && typeof parsed === 'object') {
     // A plain `{"primary":"#ff0000"}` map has no $value anywhere, so it walks
     // to nothing; fall through to the scans below rather than calling the file
     // empty. A real token file that yields colors returns here.
-    const tokens = parseTokenFile(parsed)
+    const tokens = parseTokenFile(parsed, scan)
     if (tokens.length) return tokens
   }
   // Parse declarations individually so named colors and functions can mix.
   const declarations = [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|[;{])\s*--[\w-]+\s*:\s*([^;{}]+)(?=;|}|$)/g)]
-  if (declarations.length) return declarations.map((m) => tokenToColor(m[1].trim())).filter((c): c is string => c !== null)
+  if (declarations.length) return declarations.map((m) => tokenToColor(m[1].trim(), scan)).filter((c): c is string => c !== null)
+  // Every line or nothing, and it stops at the first line that isn't a color.
+  // Running the whole file through culori before asking whether the pass was
+  // usable costs ~100ms of discarded parsing on a multi-megabyte non-palette
+  // file, on the main thread, right before the token scan re-reads it anyway.
   const lines = text.split(/\r?\n/).map((line) => line.trim().replace(/[,;]$/, '')).filter(Boolean)
-  const lineColors = lines.map((line) => tokenToColor(line))
-  if (lineColors.length > 0 && lineColors.every((value) => value !== null)) return lineColors as string[]
+  const lineColors: string[] = []
+  for (const line of lines) {
+    const color = tokenToColor(line, scan)
+    if (color === null) { lineColors.length = 0; break }
+    lineColors.push(color)
+  }
+  if (lineColors.length) return lineColors
   const tokens = text.match(/#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab|color)\([^)]*\)/gi) ?? []
-  return tokens.map((t) => tokenToColor(t)).filter((c): c is string => c !== null)
+  return tokens.map((t) => tokenToColor(t, scan)).filter((c): c is string => c !== null)
 }
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [

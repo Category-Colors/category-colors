@@ -73,8 +73,6 @@ function VersionRow({
         className="color-row-chip"
         data-open={String(active)}
         aria-label={`Restore palette ${version.id}, ${version.colors.length} colors`}
-        // the popover beside it already says what this row is
-        data-no-tooltip
         aria-pressed={active}
         onClick={onRestore}
       >
@@ -351,7 +349,8 @@ export function HistoryPanel({
               </button>
             }
           >
-            <div className="version-list" onPointerOver={onListOver} onPointerLeave={onListLeave}>
+            {/* data-no-tooltip: this list answers a hover with the popover below */}
+            <div className="version-list" data-no-tooltip onPointerOver={onListOver} onPointerLeave={onListLeave}>
               {newestFirst.map((v) => (
                 <VersionRow
                   key={v.id}

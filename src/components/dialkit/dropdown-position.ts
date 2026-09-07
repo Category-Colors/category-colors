@@ -1,14 +1,26 @@
 export type DropdownPosition = {
   top: number;
   left: number;
+  /** Distance from the portal root's right edge, for menus aligned to that
+   *  side instead — the presets menu is wider than its trigger. */
+  right: number;
   width: number;
   above: boolean;
+  /**
+   * How tall the dropdown may be on the side it landed on. Flipping alone
+   * doesn't keep a list on screen — a menu taller than either side still runs
+   * off the bottom — so the side that wins also says how much room it has, and
+   * the dropdown scrolls inside it. `minHeight` keeps a trigger pinned near an
+   * edge from capping its own menu to nothing.
+   */
+  maxHeight: number;
 };
 
 export type DropdownPositionOptions = {
   dropdownHeight?: number;
   gap?: number;
   allowAbove?: boolean;
+  minHeight?: number;
 };
 
 export function getDropdownPosition(
@@ -16,7 +28,7 @@ export function getDropdownPosition(
   portalRoot: HTMLElement,
   options: DropdownPositionOptions = {}
 ): DropdownPosition {
-  const { dropdownHeight = 0, gap = 4, allowAbove = true } = options;
+  const { dropdownHeight = 0, gap = 4, allowAbove = true, minHeight = 160 } = options;
   const triggerRect = trigger.getBoundingClientRect();
   const rootRect = portalRoot.getBoundingClientRect();
   const spaceBelow = window.innerHeight - triggerRect.bottom - gap;
@@ -27,8 +39,12 @@ export function getDropdownPosition(
       ? triggerRect.top - rootRect.top - dropdownHeight - gap
       : triggerRect.bottom - rootRect.top + gap,
     left: triggerRect.left - rootRect.left,
+    right: rootRect.right - triggerRect.right,
     width: triggerRect.width,
     above,
+    // the same gap again on the far side, so a capped menu doesn't sit flush
+    // against the viewport edge
+    maxHeight: Math.max(minHeight, (above ? triggerRect.top - gap : spaceBelow) - gap),
   };
 }
 

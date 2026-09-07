@@ -662,11 +662,10 @@ body {
   height: 15px;
 }
 
-/* Presets menu: palette name over a swatch strip. The height cap is measured
-   against the viewport in AddColorBar; this just lets the overflow scroll. */
+/* Presets menu: palette name over a swatch strip. Height cap and scrolling come
+   from .dialkit-select-dropdown, which it also carries. */
 .preset-menu {
   width: 216px;
-  overflow-y: auto;
 }
 
 .preset-option {

@@ -60,6 +60,7 @@ export function AddEvaluatorMenu({
                   left: pos.left,
                   top: pos.top,
                   width: pos.width,
+                  maxHeight: pos.maxHeight,
                   transformOrigin: pos.above ? 'bottom' : 'top',
                 }}
               >

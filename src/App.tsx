@@ -22,11 +22,23 @@ import { loadSession, saveSession } from '@/lib/session'
 // they float over, so at those widths both start collapsed.
 const panelsFloat = () => !matchMedia(DOCKED).matches
 
+// Three independent things can want to warn about storage, so each owns a key
+// rather than sharing one string slot. Sharing it meant a writer had to compare
+// message text to know whether a warning was its own to clear — which the
+// reload notice below never satisfied, so it stayed on screen for the rest of
+// the session even after saving started working again.
+type StorageWarnings = { restore?: string; save?: string; reload?: string }
 const SAVE_FAILED = 'Your work could not be saved in this browser. Download it before leaving.'
+const RELOAD_PAUSED = 'Reload was paused because your session could not be saved. Download your palette first.'
 
 export default function App() {
   const [restored] = useState(loadSession)
-  const [storageWarning, setStorageWarning] = useState(restored.warning)
+  const [warnings, setWarnings] = useState<StorageWarnings>(() =>
+    restored.warning ? { restore: restored.warning } : {}
+  )
+  // Newest cause first: a failed save or a paused reload is the more urgent
+  // thing to say, and both arrive after the restore notice.
+  const storageWarning = warnings.save ?? warnings.reload ?? warnings.restore ?? null
   const [params, setParams] = useState<PaletteParams>(restored.session.params)
   // Boots empty: the canvas explains the app until the first palette exists
   const [versions, setVersions] = useState<PaletteVersion[]>(restored.session.versions)
@@ -63,15 +75,14 @@ export default function App() {
   const sessionRef = useRef({ params, versions, currentId })
   sessionRef.current = { params, versions, currentId }
   useEffect(() => {
-    // Clears only its own message. The first flush lands 250ms after mount, so
-    // clearing unconditionally would wipe whatever loadSession reported — the
-    // "could not be restored" notice would be gone before it could be read,
-    // and by then this flush has already overwritten the session it was about.
+    // Touches only its own key. The first flush lands 250ms after mount, so a
+    // writer that cleared the whole slot would wipe whatever loadSession
+    // reported — the "could not be restored" notice would be gone before it
+    // could be read, and by then this flush has overwritten the session it was
+    // about.
     const flush = () => {
       const saved = saveSession(sessionRef.current)
-      setStorageWarning((previous) =>
-        saved ? (previous === SAVE_FAILED ? null : previous) : SAVE_FAILED
-      )
+      setWarnings((previous) => ({ ...previous, save: saved ? undefined : SAVE_FAILED }))
     }
     const timer = window.setTimeout(flush, 250)
     window.addEventListener('pagehide', flush)
@@ -215,7 +226,7 @@ export default function App() {
         {storageWarning && <p role="status" className="rounded-lg bg-panel p-3 text-[13px] text-ink">{storageWarning}</p>}
         <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} onReload={() => {
           if (saveSession(sessionRef.current)) window.location.reload()
-          else setStorageWarning('Reload was paused because your session could not be saved. Download your palette first.')
+          else setWarnings((previous) => ({ ...previous, reload: RELOAD_PAUSED }))
         }} />
         <LedEdge />
       </main>
