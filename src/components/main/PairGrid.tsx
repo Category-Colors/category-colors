@@ -424,6 +424,10 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
     if (!el) return
     detailAnchor.current = el
     popover.current?.hide()
+    // onPointerOver is inert while a detail is open, so without this the cell
+    // stays latched as the last hovered one: closing the detail and returning
+    // to the same cell would short-circuit and never re-show the popover.
+    lastTarget.current = null
     setSelected(el.dataset.pair ?? null)
   }
 

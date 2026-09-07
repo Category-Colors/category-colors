@@ -1,4 +1,4 @@
-import { forecastParams } from '../../src/lib/weather-cities'
+import { CITIES, forecastParams } from '../../src/lib/weather-cities'
 
 interface Env { OPEN_METEO_API_KEY?: string; WEATHER_NON_COMMERCIAL?: string }
 interface Context { request: Request; env: Env; waitUntil: (task: Promise<unknown>) => void }
@@ -25,7 +25,10 @@ export async function onRequest({ request, env, waitUntil }: Context): Promise<R
     const response = await fetch(`https://${host}/v1/forecast?${params}`, { signal: AbortSignal.timeout(15_000) })
     if (!response.ok) return failure('The forecast provider is temporarily unavailable.', 502)
     const body: unknown = await response.json()
-    if (!Array.isArray(body) || body.length !== 20) return failure('The forecast provider returned incomplete data.', 502)
+    // Read from CITIES rather than written out: the request is built from that
+    // same list, so a literal here turns adding a city into a production-only
+    // 502 that local dev (which calls Open-Meteo directly) never reproduces.
+    if (!Array.isArray(body) || body.length !== CITIES.length) return failure('The forecast provider returned incomplete data.', 502)
     const result = Response.json(body, { headers: {
       'Cache-Control': 'public, max-age=600',
       'X-Content-Type-Options': 'nosniff',

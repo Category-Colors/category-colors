@@ -22,6 +22,8 @@ import { loadSession, saveSession } from '@/lib/session'
 // they float over, so at those widths both start collapsed.
 const panelsFloat = () => !matchMedia(DOCKED).matches
 
+const SAVE_FAILED = 'Your work could not be saved in this browser. Download it before leaving.'
+
 export default function App() {
   const [restored] = useState(loadSession)
   const [storageWarning, setStorageWarning] = useState(restored.warning)
@@ -61,9 +63,15 @@ export default function App() {
   const sessionRef = useRef({ params, versions, currentId })
   sessionRef.current = { params, versions, currentId }
   useEffect(() => {
+    // Clears only its own message. The first flush lands 250ms after mount, so
+    // clearing unconditionally would wipe whatever loadSession reported — the
+    // "could not be restored" notice would be gone before it could be read,
+    // and by then this flush has already overwritten the session it was about.
     const flush = () => {
       const saved = saveSession(sessionRef.current)
-      setStorageWarning(saved ? null : 'Your work could not be saved in this browser. Download it before leaving.')
+      setStorageWarning((previous) =>
+        saved ? (previous === SAVE_FAILED ? null : previous) : SAVE_FAILED
+      )
     }
     const timer = window.setTimeout(flush, 250)
     window.addEventListener('pagehide', flush)

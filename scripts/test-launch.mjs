@@ -60,8 +60,16 @@ export async function testLaunch(server) {
   imported.forEach((c) => closeColor(c, 'color(display-p3 0 1 0)'))
   assert.equal(parsePalette(':root { --one: red; --two: #fff; --three: blue; }').length, 3)
   assert.throws(() => parsePalette(JSON.stringify({ a: { $type: 'color', $value: '{a}' } })), /Circular/)
+  // Transparency is fatal only when dropping it leaves nothing: someone who
+  // pastes one translucent color needs to be told why, but a theme file whose
+  // palette is fine should not be refused over an unrelated --shadow.
   assert.throws(() => parsePalette(JSON.stringify({ a: { $type: 'color', $value: { colorSpace: 'srgb', components: [1, 0, 0], alpha: 0.5 } } })), /opaque/)
   assert.throws(() => parsePalette('rgba(255, 0, 0, 0.5)'), /opaque/)
+  assert.deepEqual(parsePalette(':root { --a:#ff0000; --b:rgba(0,0,0,0.4); --c:#00ff00; }'), ['#FF0000', '#00FF00'])
+  // A string $value is the older, and still commonest, DTCG spelling; a plain
+  // JSON colour map is not a token file at all and falls through to scanning.
+  assert.deepEqual(parsePalette(JSON.stringify({ brand: { $type: 'color', primary: { $value: '#4269D0' }, secondary: { $value: '#EFB118' } } })), ['#4269D0', '#EFB118'])
+  assert.deepEqual(parsePalette(JSON.stringify({ primary: '#ff0000', secondary: '#00ff00' })), ['#FF0000', '#00FF00'])
 
   for (const t of [...THEME_PRESETS.flatMap((p) => Object.values(p.modes)), { bg: '#777777', panel: '#777777', ink: '#888888', danger: '#ff0000' }, { bg: '#ffffff', panel: '#ffffff', ink: '#ffffff', danger: '#ffffff' }]) {
     const text = reportTextColors(t.bg, t.ink, t.danger)
