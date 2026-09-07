@@ -10,6 +10,7 @@ import { generatePaletteAsync } from '@/lib/generate'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { MainTabs } from '@/components/main/MainTabs'
 import { TooltipLayer } from '@/components/TooltipLayer'
+import { LedEdge } from '@/components/LedEdge'
 import { ParametersPanel } from '@/components/panels/ParametersPanel'
 import { HistoryPanel } from '@/components/panels/HistoryPanel'
 import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
@@ -182,6 +183,7 @@ export default function App() {
       />
       <main className="app-main">
         <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} />
+        <LedEdge />
       </main>
       <HistoryPanel
         versions={versions}

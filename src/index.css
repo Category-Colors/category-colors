@@ -94,6 +94,13 @@
   /* The empty state's ideal width. The floating footprints measure the
      gutter it leaves from this, so the two stay in step. */
   --empty-width: 460px;
+  /* The LED strip's height, and the room the canvas leaves for it below the
+     last card. One value: the strip must never have content over it, so the
+     space it clears and the space it draws in are the same measurement.
+     The shader divides this by its row count rather than taking a pitch of
+     its own (LedEdge.tsx), so this is three rows at a 12px pitch — change it
+     and the emitters resize, they don't multiply. */
+  --led-band: 36px;
 
   /* Mirror DialKit tokens of the same name (theme.css), for the chrome that
      portals to <body> or otherwise falls outside .dialkit-root — the panel
@@ -169,13 +176,16 @@ body {
 }
 
 .app-main {
+  /* the anchor for .led-edge, which hangs off the end of the canvas */
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100svh;
   /* The nav row shares the docks' top line and is 44 tall, which centres it
      on the panel toggles: gap 16 + border 1 + toggle top 6 + half of 30. */
   padding-top: var(--panel-gap);
-  padding-bottom: 24px;
+  /* 24 of breathing room, then the strip's own clear band */
+  padding-bottom: calc(24px + var(--led-band));
   /* 88px clears the collapsed puck; past that the canvas reserves however far
      the panel currently reaches, read from the same motion value the panel's
      own width animates on — the nav row and empty state already ride it, so
@@ -2352,4 +2362,34 @@ body {
 .mobile-bar-button:active,
 .mobile-bar-generate:active {
   transform: scale(0.97);
+/* ── LED edge ───────────────────────────────────────────────── */
+
+/* Hung off the end of the canvas rather than pinned to the viewport: it's the
+   bottom of the page, not the bottom of the screen, so a page that fits shows
+   it at rest under the content and a page that scrolls keeps it at the end,
+   where you arrive rather than where you always are.
+   Out of flow, and sized to the band the canvas already clears for it in its
+   own bottom padding, so nothing is ever drawn over: the strip is a margin,
+   not a wash over the last card.
+   Full-bleed because the containing block is .app-main's padding box, so the
+   canvas insets the charts ride don't apply here.
+   The band is only the area the shader may draw in; the falloff inside it is
+   the shader's own, not a mask, so the sparks thin out on their own curve. */
+.led-edge {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: -1;
+  /* An explicit width, not left:0 + right:0 — a canvas is a replaced element,
+     so it keeps its intrinsic width in spite of the pair, and the
+     ResizeObserver then doubles that width on every pass. */
+  width: 100%;
+  height: var(--led-band);
+  pointer-events: none;
+}
+
+/* The same trade --shadow-strength makes: ink that reads as emitted light
+   over a dark page reads as dirt over a light one. */
+:root[data-polarity='light'] .led-edge {
+  opacity: 0.45;
 }
