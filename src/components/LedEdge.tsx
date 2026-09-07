@@ -52,6 +52,11 @@ const float ROWS = 3.0;
 // the strip reads hot or dim.
 const float PEAK = 0.6;
 
+// One time scale governs both pulse cycles and the field drifting through
+// them. At roughly a third speed, changes register as a slow current rather
+// than a twinkle.
+const float SPEED = 0.32;
+
 // Integer bit-mixing, not the usual fract(sin(dot(p, k))). That one bands into
 // visible diagonals at exactly the frequency a pixel grid samples it at, which
 // is what the eye picks up as a pattern.
@@ -90,11 +95,13 @@ void main() {
   float aa = fwidth(sd);
   float led = 1.0 - smoothstep(-aa, aa, sd);
 
+  float time = uTime * SPEED;
+
   // Each emitter runs its own cycle at its own rate. The cycle index reseeds
   // the pick, so which ones light changes every time round rather than
   // settling into a pattern the eye can learn.
   float period = mix(2.4, 6.0, hash(id + 19.0));
-  float phase = uTime / period + hash(id);
+  float phase = time / period + hash(id);
   // Offset, or the first cycle's pick would be hash(id) itself — and the phase
   // is built from that too, so the two would cancel and the strip would open
   // with no sparks at all. Reduced motion renders exactly that frame.
@@ -103,20 +110,21 @@ void main() {
   // A slow noise field drifting along the strip decides where emitters are
   // likely to light. Without it every one is equally likely and the result is
   // evenly salted; with it they arrive in loose groups that move.
-  float cluster = valueNoise(id * 0.07 + vec2(uTime * 0.05, uTime * 0.015));
+  float cluster = valueNoise(id * 0.07 + vec2(time * 0.05, time * 0.015));
 
   // AMOLED, not backlit: an emitter that isn't lit emits nothing at all, so
-  // the grid itself is invisible and only what's on gets drawn. Emitters only
-  // just over the threshold come up dim; the ones well over it spark.
-  float amp = smoothstep(mix(0.50, 0.10, cluster), 1.0, pick);
+  // the grid itself is invisible and only what's on gets drawn. Roughly one
+  // cell in seven clears the typical threshold; the drifting field varies
+  // that between sparse dark stretches and loose, still-dark-majority groups.
+  // Emitters only just over the threshold come up dim; those well over it spark.
+  float amp = smoothstep(mix(0.94, 0.78, cluster), 1.0, pick);
   // Wide, so a lit emitter dwells rather than blinking — with three rows and
   // no falloff, brief flashes would read as noise instead of as a panel.
   float pulse = pow(sin(fract(phase) * PI), 1.4);
 
-  // The top row at a quarter strength, so the strip thins out at its top edge
-  // instead of stopping on one. id.y counts up from the bottom, so the last
-  // row is the one furthest from the page edge.
-  float row = id.y < ROWS - 1.0 ? 1.0 : 0.25;
+  // Strength falls away from the page edge: full at the bottom, half through
+  // the middle, and just 12% on top. id.y counts upward from the bottom.
+  float row = id.y < 1.0 ? 1.0 : (id.y < 2.0 ? 0.50 : 0.12);
 
   float a = led * amp * pulse * PEAK * row;
 

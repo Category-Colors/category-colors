@@ -1904,6 +1904,13 @@ body {
   container-type: inline-size;
 }
 
+/* A popover cannot escape its nav stacking context. Lift that context while
+   Theme is mounted so it wins hit-testing over the empty-panel footprints as
+   well as painting above them; :has(.theme-popover) also covers its exit. */
+.app-nav:has(.theme-popover) {
+  z-index: 50;
+}
+
 /* The scrim behind it. Full-bleed and viewport-fixed rather than hung off the
    nav, whose box stops at the canvas inset — a band that ended there would
    seam against the bare page beside it. Sits under the nav and the docks, over
@@ -2054,15 +2061,12 @@ body {
    warm paper in light mode, black print stock in dark. */
 .about-layer {
   position: fixed;
-  inset: 0;
+  inset: 24px;
   z-index: 100;
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  padding: 24px;
-  background: rgb(4 5 12 / 0.72);
-  backdrop-filter: blur(9px) saturate(0.82);
-  -webkit-backdrop-filter: blur(9px) saturate(0.82);
+  pointer-events: none;
 }
 
 .about-dialog {
@@ -2079,16 +2083,18 @@ body {
     0 4px 16px rgb(0 0 0 / 0.42);
 
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(660px, 100%);
   max-height: 100%;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--about-edge);
-  border-radius: 2px;
+  border-radius: 9px;
   background: var(--about-paper);
   color: var(--about-ink);
   box-shadow: var(--about-shadow);
-  cursor: pointer;
   isolation: isolate;
+  pointer-events: auto;
   transform-origin: center;
 }
 
@@ -2096,23 +2102,51 @@ body {
   outline: none;
 }
 
+.about-window-bar {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 0 5px 0 10px;
+  border-bottom: 1px solid var(--about-rule);
+  background: var(--about-paper);
+  color: var(--about-ink);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.about-window-bar:active {
+  cursor: grabbing;
+}
+
+.about-window-title {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about-window-content {
+  min-height: 0;
+  overflow: auto;
+}
+
 .about-close {
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  z-index: 5;
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   padding: 0;
-  border: 1px solid rgb(255 255 255 / 0.22);
-  border-radius: 50%;
-  background: rgb(5 7 18 / 0.24);
-  color: rgb(255 255 255 / 0.72);
-  opacity: 0.58;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.5;
   transition: opacity 100ms, background-color 100ms, transform 120ms;
 }
 
@@ -2126,7 +2160,7 @@ body {
 
 @media (hover: hover) and (pointer: fine) {
   .about-close:hover {
-    background: rgb(5 7 18 / 0.52);
+    background: var(--about-rule);
     opacity: 1;
   }
 }
@@ -2136,8 +2170,8 @@ body {
 }
 
 .about-close:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
+  outline: 2px solid currentColor;
+  outline-offset: 0;
   opacity: 1;
 }
 
@@ -2443,7 +2477,7 @@ body {
 
 @media (max-width: 560px) {
   .about-layer {
-    padding: 12px;
+    inset: 12px;
   }
 
   .about-artwork {

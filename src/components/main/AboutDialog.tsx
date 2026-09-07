@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import { SPRING } from '@/components/dialkit'
 
 function CloseIcon() {
@@ -44,102 +44,101 @@ function SplashArtwork() {
 }
 
 function AboutSplash({ onClose }: { onClose: () => void }) {
+  const layerRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const dragControls = useDragControls()
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
-    const app = document.getElementById('root')
-    const previousOverflow = document.body.style.overflow
-
-    app?.setAttribute('inert', '')
-    document.body.style.overflow = 'hidden'
-    dialogRef.current?.focus({ preventScroll: true })
+    const dialog = dialogRef.current
+    dialog?.focus({ preventScroll: true })
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        // This modal can sit over a phone sheet. Capture Escape before that
-        // sheet's window listener sees it, so one press dismisses one layer.
+        // This window can sit over a phone sheet. Capture Escape before that
+        // sheet's listener sees it, so one press dismisses one layer.
         event.preventDefault()
         event.stopImmediatePropagation()
         onClose()
-        return
-      }
-      // There is one control in this deliberately spare dialog. Keep keyboard
-      // focus on it rather than letting Tab wander into the browser chrome.
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
 
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
-      app?.removeAttribute('inert')
-      document.body.style.overflow = previousOverflow
-      opener?.focus?.({ preventScroll: true })
+      // A non-modal window may have handed focus back to the page already.
+      // Restore its opener only when focus is still leaving with the window.
+      if (dialog?.contains(document.activeElement)) {
+        opener?.focus?.({ preventScroll: true })
+      }
     }
   }, [onClose])
 
   return createPortal(
-    <motion.div
-      className="about-layer"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.14 }}
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
+    <motion.div ref={layerRef} className="about-layer">
       <motion.div
         ref={dialogRef}
         className="about-dialog"
         role="dialog"
-        aria-modal="true"
         aria-labelledby="about-title"
         aria-describedby="about-description"
         tabIndex={-1}
-        initial={{ opacity: 0, transform: 'translateY(12px) scale(0.965)' }}
-        animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
-        exit={{ opacity: 0, transform: 'translateY(6px) scale(0.98)', transition: SPRING.morphOut }}
+        drag
+        dragListener={false}
+        dragControls={dragControls}
+        dragConstraints={layerRef}
+        dragElastic={0}
+        dragMomentum={false}
+        initial={{ opacity: 0, y: 12, scale: 0.965 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 6, scale: 0.98, transition: SPRING.morphOut }}
         transition={SPRING.morphIn}
-        onClick={onClose}
       >
-        <button
-          type="button"
-          className="about-close"
-          aria-label="Close About dialog"
-          onClick={onClose}
+        <div
+          className="about-window-bar"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            dragControls.start(event)
+          }}
         >
-          <CloseIcon />
-        </button>
+          <span className="about-window-title">About</span>
+          <button
+            type="button"
+            className="about-close"
+            aria-label="Close About window"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
 
-        <SplashArtwork />
+        <div className="about-window-content">
+          <SplashArtwork />
 
-        <div className="about-colophon">
-          <div className="about-colophon-lead">
-            <p id="about-title">Category colors</p>
-            <p id="about-description">
-              A browser-based palette optimizer for colors that belong together
-              without disappearing into one another.
-            </p>
-          </div>
-          <div className="about-colophon-details">
-            <p>
-              SIMULATED ANNEALING<br />
-              PERCEPTUAL COLOR SPACES<br />
-              COLOR VISION SIMULATION
-            </p>
-            <p>
-              BUILT FOR THE WEB<br />
-              WITH CATEGORY-COLORS<br />
-              RELEASE 1.1
-            </p>
-          </div>
-          <div className="about-colophon-foot">
-            <p>© 2026 CATEGORY COLORS</p>
-            <p>Click anywhere to continue</p>
+          <div className="about-colophon">
+            <div className="about-colophon-lead">
+              <p id="about-title">Category colors</p>
+              <p id="about-description">
+                A browser-based palette optimizer for colors that belong together
+                without disappearing into one another.
+              </p>
+            </div>
+            <div className="about-colophon-details">
+              <p>
+                SIMULATED ANNEALING<br />
+                PERCEPTUAL COLOR SPACES<br />
+                COLOR VISION SIMULATION
+              </p>
+              <p>
+                BUILT FOR THE WEB<br />
+                WITH CATEGORY-COLORS<br />
+                RELEASE 1.1
+              </p>
+            </div>
+            <div className="about-colophon-foot">
+              <p>© 2026 CATEGORY COLORS</p>
+            </div>
           </div>
         </div>
       </motion.div>
