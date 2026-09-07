@@ -14,6 +14,7 @@ Every control in the interface maps onto a field of the package's config object,
 - Palette extraction from images and a set of established starting palettes
 - Pairwise JND/WCAG reporting, loss history, and color-space visualization
 - Persistent light, dark, and custom themes
+- A searchable manual (`⌘?`) defining every technical term in the interface
 
 The optimizer runs in a Web Worker so generation does not block the interface. The large reporting code is loaded only when the Report tab is opened.
 

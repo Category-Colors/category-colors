@@ -55,13 +55,13 @@ export function ThemeMenu() {
           row folds it away (index.css), and a redundant one only earns the
           button a tooltip it doesn't need */}
       <button
-        className="theme-trigger"
+        className="nav-trigger"
         data-open={String(open)}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         <BrushIcon />
-        <span className="theme-trigger-label">Theme</span>
+        <span className="nav-trigger-label">Theme</span>
       </button>
 
       <AnimatePresence>

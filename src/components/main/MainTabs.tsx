@@ -4,6 +4,7 @@ import { buildJndReport } from '@/lib/report'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { PILL_TRANSITION } from '@/components/dialkit'
 import { ThemeMenu } from './ThemeMenu'
+import { Manual } from './Manual'
 import { EmptyState } from './EmptyState'
 
 // The report's rendering stays split out — the map, the pair grid and the stats
@@ -129,6 +130,7 @@ export function MainTabs({
           </div>
         )}
         <div className="col-start-3 flex justify-end">
+          <Manual />
           <ThemeMenu />
         </div>
       </div>

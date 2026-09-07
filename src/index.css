@@ -1818,7 +1818,8 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .export-preview-frame:hover .scroll-overlay-thumb {
+  .export-preview-frame:hover .scroll-overlay-thumb,
+  .manual-scroll:hover .scroll-overlay-thumb {
     background: color-mix(in oklab, var(--theme-ink) 36%, transparent);
   }
 }
@@ -1910,11 +1911,12 @@ body {
   -webkit-backdrop-filter: blur(var(--dial-backdrop-blur));
 }
 
-/* Short of room, the wordmark and the Theme label fold away (kept in the
-   accessibility tree) and the mark and brush carry the row. */
+/* Short of room, the wordmark and both trigger labels fold away (kept in the
+   accessibility tree, so the buttons keep their names) and the mark, book and
+   brush carry the row. */
 @container (width < 500px) {
   .app-wordmark,
-  .theme-trigger-label {
+  .nav-trigger-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1923,7 +1925,7 @@ body {
     white-space: nowrap;
   }
 
-  .theme-trigger {
+  .nav-trigger {
     width: 30px;
     padding: 0;
     justify-content: center;
@@ -1953,15 +1955,15 @@ body {
   }
 }
 
-/* ── Theme menu ──────────────────────────────────────────────── */
+/* ── Nav row triggers (Manual, Theme) ────────────────────────── */
 
-.theme-menu {
-  position: relative;
-}
-
-/* Sits in the tab row, so it matches the tabs' height, padding and weight
-   rather than the panel buttons'. */
-.theme-trigger {
+/* Both buttons at the right end of the nav row. They sit in the tab row, so
+   they match the tabs' height, padding and weight rather than the panel
+   buttons'. Theme's is wrapped in a .dialkit-root so the popover it opens gets
+   DialKit's tokens; the Manual button is not, so this writes its ink alphas
+   out rather than reaching for --dial-surface, and both opt back out of the
+   kit's system font — these read as header controls. */
+.nav-trigger {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1970,9 +1972,6 @@ body {
   border: none;
   border-radius: 6px;
   background: transparent;
-  /* the trigger is wrapped in a .dialkit-root only so the popover it opens
-     gets DialKit's tokens; it reads as a header control, so it opts back out
-     of the kit's system font */
   font-family: 'Geist Variable', sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -1980,22 +1979,28 @@ body {
   transition: color var(--dial-anim-fast), background var(--dial-anim-fast);
 }
 
-.theme-trigger svg {
+.nav-trigger svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
 
-.theme-trigger[data-open='true'] {
+.nav-trigger[data-open='true'] {
   color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
-  background: var(--dial-surface);
+  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .theme-trigger:hover {
+  .nav-trigger:hover {
     color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
-    background: var(--dial-surface);
+    background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
   }
+}
+
+/* ── Theme menu ──────────────────────────────────────────────── */
+
+.theme-menu {
+  position: relative;
 }
 
 .theme-popover {
@@ -2063,7 +2068,7 @@ body {
 /* Popover triggers are excluded too, hence :not([data-open]) — the attribute
    every trigger in the app renders. Pressing one doesn't complete an action,
    it reveals a surface, and the popover's own entrance is the feedback; a
-   press scale under it is a second, competing animation. (.theme-trigger and
+   press scale under it is a second, competing animation. (.nav-trigger and
    .picker-space-trigger are absent for the same reason.) */
 .ghost-button:active:not([data-open]),
 .color-row-icon:active:not([data-open]),
@@ -2403,4 +2408,268 @@ body {
   height: var(--led-band);
   pointer-events: none;
   opacity: var(--led-strength);
+}
+
+/* ── Manual ──────────────────────────────────────────────────── */
+
+/* A native modal dialog, so the page behind it is inert and Escape already
+   works. It lives in the top layer, which is why nothing here sets z-index and
+   why the tooltip layer — a fixed node under <body> — cannot draw over it.
+   `display` and `overlay` transition as discrete properties so the exit is
+   still animated; the reduced-motion block above drops both from the
+   transition list, which leaves the fade on entry and an instant dismissal. */
+.manual {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 96px));
+  /* A modal dialog is centred by the UA's own `margin: auto` against inset 0
+     — which Tailwind's preflight zeroes along with every other margin, and
+     without it this sits in the top-left corner. */
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--theme-ink);
+  background: var(--theme-panel);
+  border: 1px solid color-mix(in oklab, var(--theme-ink) 10%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgb(0 0 0 / calc(0.5 * var(--shadow-strength, 1)));
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  transition:
+    opacity var(--dial-anim-reveal),
+    transform var(--dial-anim-reveal),
+    overlay var(--dial-anim-reveal) allow-discrete,
+    display var(--dial-anim-reveal) allow-discrete;
+}
+
+/* The UA rule is `dialog:not([open]) { display: none }`, so the open state has
+   to carry the layout mode — a bare `display: flex` above would show the
+   dialog while it is closed. */
+.manual[open] {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  .manual[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+.manual::backdrop {
+  background: rgb(0 0 0 / 0);
+  transition:
+    background-color var(--dial-anim-reveal),
+    backdrop-filter var(--dial-anim-reveal),
+    overlay var(--dial-anim-reveal) allow-discrete,
+    display var(--dial-anim-reveal) allow-discrete;
+}
+
+/* One value for both polarities, unlike the chrome shadows above: a shadow
+   describes how far a surface is lifted, which depends on what it is lifted
+   over, but a scrim's job is to take the page out of play — and 42% black
+   plus a light blur does that over a saturated dashboard either way. */
+.manual[open]::backdrop {
+  background: rgb(0 0 0 / 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+@starting-style {
+  .manual[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+}
+
+.manual-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid color-mix(in oklab, var(--theme-ink) 8%, transparent);
+}
+
+.manual-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-title {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: color-mix(in oklab, var(--theme-ink) 95%, transparent);
+}
+
+/* The chord that opened it, so the next visit doesn't need the button. */
+.manual-kbd {
+  padding: 2px 5px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: color-mix(in oklab, var(--theme-ink) 40%, transparent);
+  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+  border-radius: 4px;
+}
+
+.manual-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
+  transition: color var(--dial-anim-fast), background var(--dial-anim-fast);
+}
+
+.manual-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .manual-close:hover {
+    color: color-mix(in oklab, var(--theme-ink) 80%, transparent);
+    background: color-mix(in oklab, var(--theme-ink) 8%, transparent);
+  }
+}
+
+.manual-close:active {
+  transform: scale(0.94);
+}
+
+.manual-search {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--theme-ink) 95%, transparent);
+  background: color-mix(in oklab, var(--theme-ink) 5%, transparent);
+}
+
+.manual-search::placeholder {
+  color: color-mix(in oklab, var(--theme-ink) 35%, transparent);
+}
+
+.manual-search:focus {
+  outline: 2px solid color-mix(in oklab, var(--theme-ink) 30%, transparent);
+  outline-offset: -1px;
+}
+
+/* Holds the floating thumb, which has to be positioned against something that
+   doesn't scroll with the text it measures. */
+.manual-scroll {
+  position: relative;
+  display: flex;
+  min-height: 0;
+}
+
+.manual-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 26px;
+  padding: 16px 18px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* replaced by .scroll-overlay, for the same reason the export preview does
+     it: a classic scrollbar would reserve a gutter out of the text column */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.manual-body::-webkit-scrollbar {
+  display: none;
+}
+
+.manual-section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sticky, because the sections are long enough that a reader scrolling into
+   the middle of one loses which it is. It rides its own section only, so the
+   heading changes over as the next one arrives rather than stacking. */
+.manual-section-title {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  padding: 4px 0 8px;
+  margin-top: -4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--theme-ink);
+  background: var(--theme-panel);
+}
+
+.manual-blurb {
+  max-width: 68ch;
+  padding-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
+}
+
+.manual-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Term beside definition: a glossary reads down the left edge, and a term
+   that has a home in the interface names it under itself rather than inside
+   the prose, where it would have to be repeated in every entry. */
+.manual-entry {
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr);
+  column-gap: 20px;
+  padding: 9px 0;
+  border-top: 1px solid color-mix(in oklab, var(--theme-ink) 6%, transparent);
+}
+
+.manual-entry dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--theme-ink) 95%, transparent);
+}
+
+.manual-where {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: color-mix(in oklab, var(--theme-ink) 32%, transparent);
+}
+
+.manual-entry dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: color-mix(in oklab, var(--theme-ink) 62%, transparent);
+}
+
+.manual-nothing {
+  padding: 8px 0;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--theme-ink) 45%, transparent);
+}
+
+/* Too narrow for two columns: the definition drops under its term. */
+@media (width < 640px) {
+  .manual-entry {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+  }
 }
