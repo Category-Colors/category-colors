@@ -53,17 +53,22 @@ export const Manual = memo(function Manual() {
   // lets the Escape branch below keep the modal's dismissal to itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // While a modal is up it owns Escape: one press dismisses the thing on
-      // top and nothing else. The dialog's own handling of the key is the
-      // UA's rather than a listener, so stopping propagation here dismisses
-      // the manual while leaving every other Escape handler on the page
-      // untouched — including any added later, which is why this claims the
-      // key centrally rather than teaching each listener to stand down.
-      // Without it, a popover left open behind the manual closes along with
-      // it. (SpaceSelect declines Escape at the listener instead, but that
-      // is a nesting known when it is written; a modal's layering is not.)
+      // A modal is the topmost layer by construction, so while it is open it
+      // owns Escape outright: one press dismisses it and nothing else. The
+      // dialog's own handling of the key is the UA's rather than a listener,
+      // so taking the key here still closes the manual, while every other
+      // Escape handler on the page — including any added later — is left
+      // alone. Without it, a popover open behind the manual closes with it.
+      //
+      // stopImmediatePropagation, not stopPropagation: AboutDialog claims the
+      // key the same way (a window capture listener, for the same reason),
+      // and same-target listeners survive the plain version. Sharing a target
+      // makes this a registration race, which the manual wins by mounting
+      // with the app while About only listens once it opens — and losing it
+      // was visible, since About calls preventDefault and so suppressed the
+      // close request of the very dialog sitting on top of it.
       if (e.key === 'Escape') {
-        if (ref.current?.open) e.stopPropagation()
+        if (ref.current?.open) e.stopImmediatePropagation()
         return
       }
       // e.repeat: held down, the chord would otherwise toggle the dialog for
