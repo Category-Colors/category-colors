@@ -304,7 +304,6 @@ export function ParametersPanel({
               it is pressed. */}
           <button
             className="dialkit-button generate-button"
-            data-busy={busy ? '' : undefined}
             disabled={busy}
             // wrapped, not passed by reference: onGenerate's first argument is
             // structuredCloned to the worker, and a PointerEvent is not cloneable

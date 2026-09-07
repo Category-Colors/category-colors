@@ -1,5 +1,14 @@
 import { formatHex, interpolate, wcagContrast } from 'culori'
 
+// Perceived-luminance check for text set on an arbitrary color; accepts any
+// css color string (palette colors carry their own format). Lives here rather
+// than beside its first caller: it answers the same question readableColor
+// falls back to, and two copies of "pick black or white by WCAG" drift on the
+// tie case, which is exactly how they were found.
+export function inkFor(color: string): string {
+  return wcagContrast(color, '#000') >= wcagContrast(color, '#fff') ? '#000000' : '#ffffff'
+}
+
 // Find the nearest mixture that meets normal-text contrast on every surface
 // it is used on. Report cards are close to the page color; popovers use their
 // own panel background. This also protects reports in low-contrast custom themes.
@@ -12,7 +21,7 @@ export function readableColor(backgrounds: string[], preferred: string): string 
       if (passes(color)) return color
     }
   }
-  return wcagContrast('#000', backgrounds[0]) > wcagContrast('#fff', backgrounds[0]) ? '#000000' : '#ffffff'
+  return inkFor(backgrounds[0])
 }
 
 export function reportTextColors(bg: string, ink: string, danger: string) {

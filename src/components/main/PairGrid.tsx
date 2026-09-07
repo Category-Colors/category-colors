@@ -14,12 +14,26 @@ import { isHoverPointer } from '@/components/dialkit/dropdown-position'
 import type { PaletteVersion } from '@/lib/palette'
 import { colorVsBackground, testTitles, type JndReport } from '@/lib/report'
 import { useTheme } from '@/lib/theme'
-import { inkFor } from '@/lib/weather'
-import { readableColor } from '@/lib/contrast'
+import { inkFor, readableColor } from '@/lib/contrast'
 
 // Swatch popovers measure each color against the page it sits on, so this has
 // to be the live theme background — a stale constant would report contrast
 // against a page that isn't there.
+
+// Cell keys: "s:i" is a swatch against the page background, "a:b" is a pair of
+// palette colors. Decoded in two places, so the format is spelled out once.
+const pairColors = (key: string, colors: string[], pageBg: string): [string, string] => {
+  if (key.startsWith('s:')) return [colors[Number(key.slice(2))], pageBg]
+  const [a, b] = key.split(':').map(Number)
+  return [colors[a], colors[b]]
+}
+
+// Both detail surfaces sit on the panel background rather than the page, so
+// they resolve their own readable ink from it.
+const popoverInk = (tokens: { panel: string; ink: string; danger: string }) => ({
+  '--report-text': readableColor([tokens.panel], tokens.ink),
+  '--report-danger': readableColor([tokens.panel], tokens.danger),
+})
 
 interface PairCell {
   normal: number
@@ -288,8 +302,7 @@ function PairPopover({
       className="report-content popover-surface fixed top-0 left-0 z-50 w-56 will-change-transform"
       style={
         {
-          '--report-text': readableColor([tokens.panel], tokens.ink),
-          '--report-danger': readableColor([tokens.panel], tokens.danger),
+          ...popoverInk(tokens),
           opacity: 0,
           pointerEvents: 'none',
           transform: 'translate3d(0, 0, 0) scale(0.94)',
@@ -307,11 +320,7 @@ function PairPopover({
           // slots stay mounted even while empty so the opacity flip always
           // transitions — a fresh mount would pop in at full opacity
           const cell = slotKey ? cells.get(slotKey) : null
-          // "s:i" = swatch key (color vs page background); "a:b" = pair key
-          const swatch = slotKey?.startsWith('s:')
-          const [aIdx, bIdx] = slotKey && !swatch ? slotKey.split(':').map(Number) : [0, 0]
-          const a = swatch ? colors[Number(slotKey!.slice(2))] : colors[aIdx]
-          const b = swatch ? pageBg : colors[bIdx]
+          const [a, b] = slotKey ? pairColors(slotKey, colors, pageBg) : [colors[0], colors[0]]
           const front = view.front === idx
           return (
             <div
@@ -402,6 +411,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
   const [selected, setSelected] = useState<string | null>(null)
   const detailRef = useRef<HTMLElement>(null)
   const detailAnchor = useRef<HTMLElement | null>(null)
+  const detailPair = selected ? pairColors(selected, colors, pageBg) : null
   useEffect(() => {
     setSelected(null)
     popover.current?.hide()
@@ -527,11 +537,11 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         })}
       </div>
       <PairPopover ref={popover} cells={popCells} colors={colors} pageBg={pageBg} />
-      {selected && popCells.has(selected) && createPortal(
-        <aside ref={detailRef} aria-label="Color comparison details" className="report-content popover-surface fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl shadow-xl" style={{ '--report-text': readableColor([tokens.panel], tokens.ink), '--report-danger': readableColor([tokens.panel], tokens.danger) } as CSSProperties}>
+      {selected && detailPair && popCells.has(selected) && createPortal(
+        <aside ref={detailRef} aria-label="Color comparison details" className="report-content popover-surface fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl shadow-xl" style={popoverInk(tokens) as CSSProperties}>
           <button className="px-3 pt-2 text-[13px] text-ink underline" onClick={() => { detailAnchor.current?.focus(); setSelected(null) }}>Close details</button>
           <div role="status" aria-live="polite">
-            <PairDetail a={colors[Number(selected.startsWith('s:') ? selected.slice(2) : selected.split(':')[0])]} b={selected.startsWith('s:') ? pageBg : colors[Number(selected.split(':')[1])]} cell={popCells.get(selected)!} />
+            <PairDetail a={detailPair[0]} b={detailPair[1]} cell={popCells.get(selected)!} />
           </div>
         </aside>, document.body
       )}

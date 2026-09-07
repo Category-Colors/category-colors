@@ -59,13 +59,9 @@ const tokenToColor = (raw: string, scan?: Scan): string | null => {
     if (scan) scan.droppedNonOpaque = true
     return null
   }
-  if (parsed.mode === 'rgb') {
-    const value = parseCssColor(raw)
-    if (!value) return null
-    return valueToCss(convertValue(value, 'hex'))
-  }
   const value = parseCssColor(raw)
-  return value ? valueToCss(value) : null
+  if (!value) return null
+  return valueToCss(parsed.mode === 'rgb' ? convertValue(value, 'hex') : value)
 }
 
 const DTCG_SPACES: Record<string, [Color['mode'], string[]]> = {

@@ -1,4 +1,4 @@
-import { inkFor } from '@/lib/weather'
+import { inkFor } from '@/lib/contrast'
 
 export function CityBadge({
   code,

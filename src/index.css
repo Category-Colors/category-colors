@@ -877,7 +877,7 @@ body {
 /* Disabled while a run is in flight, but it is also the only progress the
    panel shows — the spinner and the cycling verb have to stay readable, so it
    keeps full contrast instead of the usual disabled dimming. */
-.generate-button[data-busy]:disabled {
+.generate-button:disabled {
   opacity: 1;
 }
 
@@ -2946,7 +2946,7 @@ body {
    the spinner says the button is working, the tint says it won't take another
    press — and now it genuinely won't, since stopping moved to the island
    beside it. Neither is worth losing the verb over. */
-.mobile-bar-generate[data-busy] {
+.mobile-bar-generate:disabled {
   background: color-mix(in oklab, var(--theme-ink) 78%, var(--theme-bg));
 }
 

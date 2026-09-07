@@ -123,7 +123,6 @@ export function MobileBar({
         transition={SPRING.toolbar}
         type="button"
         className="mobile-bar-generate"
-        data-busy={busy ? '' : undefined}
         disabled={busy}
         aria-label="Generate a palette"
         onClick={() => onGenerate()}

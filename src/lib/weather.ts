@@ -2,7 +2,6 @@
 // batched Open-Meteo request (no key required). Cached so palette edits and
 // re-renders never refetch; the dashboard slices the list to the palette size.
 
-import { wcagContrast } from 'culori'
 
 import { CITIES, forecastParams } from './weather-cities'
 export { CITIES, type City } from './weather-cities'
@@ -126,8 +125,3 @@ export function fetchWeather(): Promise<WeatherData> {
   return inflight
 }
 
-// Perceived-luminance check for text set on a palette color; accepts any
-// css color string (palette colors carry their own format)
-export function inkFor(color: string): string {
-  return wcagContrast(color, '#000') >= wcagContrast(color, '#fff') ? '#000000' : '#ffffff'
-}
