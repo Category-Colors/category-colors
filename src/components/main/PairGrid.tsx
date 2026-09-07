@@ -126,6 +126,10 @@ function PairDetail({ a, b, cell }: { a: string; b: string; cell: PairCell }) {
   )
 }
 
+// The detail panel is a disclosure target: cells point at it with
+// aria-controls, so it needs a stable id.
+const DETAIL_ID = 'pair-detail'
+
 interface PopoverHandle {
   show(key: string, el: Element): void
   hide(): void
@@ -354,17 +358,21 @@ function HeaderSwatch({
   index,
   cell,
   pageBg,
+  expanded,
 }: {
   color: string
   index: number
   cell?: PairCell
   pageBg: string
+  expanded: boolean
 }) {
   const ink = inkFor(color)
   return (
     <button
       type="button"
       aria-label={`Color ${index + 1}, ${color}, compared with page background`}
+      aria-expanded={expanded}
+      aria-controls={expanded ? DETAIL_ID : undefined}
       data-pair={`s:${index}`}
       className="flex size-[34px] shrink-0 cursor-default flex-col items-center justify-center rounded leading-[1.15] hover:ring-1 hover:ring-ink/40 data-active:ring-1 data-active:ring-ink/40"
       style={{ background: color }}
@@ -429,7 +437,14 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
     document.addEventListener('pointerdown', onOutside)
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onOutside) }
   }, [selected])
-  const selectDetail = (target: EventTarget) => {
+  // `activated` separates arriving at a cell from asking it for detail. Tabbing
+  // opens the panel visually — the keyboard equivalent of hovering — but only
+  // Enter/Space or a click moves focus into it. Opening on arrival alone left
+  // the panel unreachable: it portals to the end of <body>, so Tab from a cell
+  // goes to the next cell and never into the panel, which made its Close button
+  // impossible to reach by keyboard.
+  const focusPanel = useRef(false)
+  const selectDetail = (target: EventTarget, activated = false) => {
     const el = (target as HTMLElement).closest<HTMLElement>('[data-pair]')
     if (!el) return
     detailAnchor.current = el
@@ -438,8 +453,19 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
     // stays latched as the last hovered one: closing the detail and returning
     // to the same cell would short-circuit and never re-show the popover.
     lastTarget.current = null
-    setSelected(el.dataset.pair ?? null)
+    const key = el.dataset.pair ?? null
+    // Enter on an already-focused cell selects nothing new, so the effect below
+    // would never fire; focus the panel that is already open instead.
+    if (activated && key === selected) detailRef.current?.focus()
+    else if (activated) focusPanel.current = true
+    setSelected(key)
   }
+
+  useEffect(() => {
+    if (!selected || !focusPanel.current) return
+    focusPanel.current = false
+    detailRef.current?.focus()
+  }, [selected])
 
   // delegated: two listeners for the whole grid, one rect read per cell entry
   const onPointerOver = (e: React.PointerEvent) => {
@@ -477,7 +503,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         data-no-tooltip
         onPointerOver={onPointerOver}
         onPointerLeave={onPointerLeave}
-        onClick={(e) => selectDetail(e.target)}
+        onClick={(e) => selectDetail(e.target, true)}
         onFocus={(e) => selectDetail(e.target)}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget) && !detailRef.current?.contains(e.relatedTarget)) setSelected(null)
@@ -486,7 +512,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         <div />
         {colors.slice(0, -1).map((c, j) => (
           <div key={j} className="flex h-10 items-center justify-center">
-            <HeaderSwatch color={c} index={j} cell={swatchCells.get(`s:${j}`)} pageBg={pageBg} />
+            <HeaderSwatch color={c} index={j} cell={swatchCells.get(`s:${j}`)} pageBg={pageBg} expanded={selected === `s:${j}`} />
           </div>
         ))}
         {colors.slice(1).map((rowColor, r) => {
@@ -499,6 +525,7 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
                   index={i}
                   cell={swatchCells.get(`s:${i}`)}
                   pageBg={pageBg}
+                  expanded={selected === `s:${i}`}
                 />
               </div>
               {colors.slice(0, -1).map((colColor, j) => {
@@ -512,6 +539,8 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
                     key={j}
                     data-pair={`${j}:${i}`}
                     aria-label={`Colors ${j + 1} and ${i + 1}: delta E ${cell?.normal.toFixed(1) ?? 'unknown'}, contrast ${ratio.toFixed(2)}${failing ? ', issues detected' : ', no JND issues'}`}
+                    aria-expanded={selected === `${j}:${i}`}
+                    aria-controls={selected === `${j}:${i}` ? DETAIL_ID : undefined}
                     className="flex h-[34px] cursor-default flex-col items-center justify-center rounded-md leading-tight hover:bg-ink/[0.04] data-active:bg-ink/[0.04]"
                   >
                     <span
@@ -537,12 +566,17 @@ export function PairGrid({ report, version }: { report: JndReport; version: Pale
         })}
       </div>
       <PairPopover ref={popover} cells={popCells} colors={colors} pageBg={pageBg} />
+      {/* Focusable, but not a live region: the panel opens on arrival as well as
+          on activation, and announcing the whole table every time focus crossed
+          a cell buried the cell's own label. Activation moves focus here
+          instead, which announces it once, on request. It keeps the default
+          focus outline rather than suppressing it the way a tabindex="-1"
+          container usually would — at 1px translucent on a rounded corner it
+          costs nothing, and it is the only sign that Enter moved focus. */}
       {selected && detailPair && popCells.has(selected) && createPortal(
-        <aside ref={detailRef} aria-label="Color comparison details" className="report-content popover-surface fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl shadow-xl" style={popoverInk(tokens) as CSSProperties}>
+        <aside ref={detailRef} id={DETAIL_ID} tabIndex={-1} aria-label="Color comparison details" className="report-content popover-surface fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl shadow-xl" style={popoverInk(tokens) as CSSProperties}>
           <button className="px-3 pt-2 text-[13px] text-ink underline" onClick={() => { detailAnchor.current?.focus(); setSelected(null) }}>Close details</button>
-          <div role="status" aria-live="polite">
-            <PairDetail a={detailPair[0]} b={detailPair[1]} cell={popCells.get(selected)!} />
-          </div>
+          <PairDetail a={detailPair[0]} b={detailPair[1]} cell={popCells.get(selected)!} />
         </aside>, document.body
       )}
     </>
