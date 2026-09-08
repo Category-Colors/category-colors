@@ -2465,18 +2465,16 @@ body {
 
 .about-version {
   margin-top: 14px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.005em;
 }
 
 .about-title-note {
   margin-top: 3px;
-  font-size: 8px;
+  font-size: 9.5px;
   font-weight: 540;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.005em;
 }
 
 .about-colophon {
@@ -2508,29 +2506,82 @@ body {
   line-height: 1.4;
 }
 
-.about-colophon-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  padding: 14px 0 18px;
-  font-size: 8px;
-  font-weight: 620;
-  line-height: 1.55;
-  letter-spacing: 0.12em;
+/* Credits the way a splash screen has always set them: one dense paragraph of
+   fine print, mixed case so the unfamiliar spellings stay legible at this size,
+   dimmed to the footer's ink so it reads as a colophon and not as body copy.
+   The label above it borrows the details block's caps. */
+/* No rule of its own: the lead's bottom border already draws the line above. */
+.about-thanks {
+  padding: 15px 0 17px;
+}
+
+.about-thanks-label {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0.005em;
+}
+
+.about-thanks-names {
+  /* a step down from the ink, not all the way to the footer's grey: these are
+     people's names, and the block is the substance of the colophon */
+  color: color-mix(in srgb, var(--about-ink) 78%, transparent);
+  font-size: 10px;
+  font-weight: 460;
+  line-height: 1.7;
+  letter-spacing: 0.005em;
+  /* the last line of a credit block shouldn't strand one name */
+  text-wrap: pretty;
+}
+
+.about-thanks-name {
+  white-space: nowrap;
+}
+
+.about-colophon-links {
+  display: flex;
+  gap: 16px;
+}
+
+.about-thanks-names a,
+.about-colophon-links a {
+  color: inherit;
+  text-decoration: none;
+  /* an underline under every name would stripe the block; the rule sits low
+     and faint until you're on one, so the paragraph still reads as a paragraph */
+  border-bottom: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  transition: color 100ms, border-color 100ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .about-thanks-names a:hover,
+  .about-colophon-links a:hover {
+    color: var(--about-ink);
+    border-bottom-color: currentColor;
+  }
+}
+
+.about-thanks-names a:focus-visible,
+.about-colophon-links a:focus-visible {
+  outline: 2px solid var(--about-ink);
+  outline-offset: 2px;
+  color: var(--about-ink);
 }
 
 .about-colophon-foot {
   display: flex;
+  /* the byline and the two links overrun a narrow phone on one line */
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 20px;
+  gap: 8px 20px;
   padding-top: 10px;
   border-top: 1px solid var(--about-rule);
   color: var(--about-foot);
-  font-size: 7px;
-  font-weight: 650;
+  font-size: 8.5px;
+  font-weight: 620;
   line-height: 1;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0.005em;
 }
 
 :root[data-polarity='dark'] .about-dialog {
@@ -2597,10 +2648,6 @@ body {
   .about-colophon-lead {
     grid-template-columns: 1fr;
     gap: 7px;
-  }
-
-  .about-colophon-details {
-    gap: 14px;
   }
 }
 
