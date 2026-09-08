@@ -202,10 +202,30 @@ try {
   // optimizer with it, which MainTabs deliberately keeps in the lazy report
   // chunk. So the values are copied and checked here instead, where importing
   // the root costs nothing.
+  //
+  // Hexes, not scores. A palette can shift without any measured number moving —
+  // correcting Tableau 10's yellow to #edc948 left the minimum deltaE identical
+  // to nine decimals, because the closest pair doesn't involve the yellow — so a
+  // guard keyed to a metric would assert on a difference that carries no meaning
+  // and go red whenever the metric code changed.
+  //
+  // Two shared names are deliberately absent. "Okabe–Ito" here is the eight
+  // colour colorblindr variant; the package carries all nine, including black.
+  // "ColorBrewer Set3" is the full twelve; the package's `colorBrewer3_10` is
+  // the ten colour cut. Neither is drift, and neither should be "fixed" into
+  // agreement.
   {
     const presets = await server.ssrLoadModule('/src/lib/presets.ts')
     const byName = new Map(presets.PRESET_PALETTES.map((p) => [p.name, p.colors]))
-    for (const [name, source] of [['Petroff 6', 'petroff6'], ['Petroff 8', 'petroff8'], ['Petroff 10', 'petroff10']]) {
+    const tracked = [
+      ['Tableau 10', 'tableau10'],
+      ['Observable 10', 'observable10'],
+      ['IBM Carbon', 'carbon'],
+      ['Petroff 6', 'petroff6'],
+      ['Petroff 8', 'petroff8'],
+      ['Petroff 10', 'petroff10'],
+    ]
+    for (const [name, source] of tracked) {
       assert.deepEqual(
         byName.get(name)?.map((hex) => hex.toLowerCase()),
         palettes[source].map((color) => formatHex(color)),
