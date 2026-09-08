@@ -209,26 +209,45 @@ try {
   // guard keyed to a metric would assert on a difference that carries no meaning
   // and go red whenever the metric code changed.
   //
-  // Two shared names are deliberately absent. "Okabe–Ito" here is the eight
-  // colour colorblindr variant; the package carries all nine, including black.
-  // "ColorBrewer Set3" is the full twelve; the package's `colorBrewer3_10` is
-  // the ten colour cut. Neither is drift, and neither should be "fixed" into
-  // agreement.
+  // Two of these agree on a prefix rather than end to end, and are checked on
+  // that prefix rather than left to a comment. "Okabe–Ito" here is Wilke's
+  // eight colour colorblindr set, which is exactly the package's first eight —
+  // the package adds black as a ninth. Note colorblindr also ships an eight
+  // colour variant ending in black instead of grey; only the grey one is a
+  // clean prefix, and this is the grey one. "ColorBrewer Set3" runs the other
+  // way: the app carries the full twelve and the package's `colorBrewer3_10`
+  // is its first ten.
+  //
+  // `shared` is asserted against the shorter of the two, so a length change on
+  // either side fails rather than quietly shrinking what this covers. If the
+  // package ever grows a full Set3 or a colorblindr-shaped Okabe–Ito, that is
+  // a one number edit here and more coverage, not a false alarm.
   {
     const presets = await server.ssrLoadModule('/src/lib/presets.ts')
     const byName = new Map(presets.PRESET_PALETTES.map((p) => [p.name, p.colors]))
     const tracked = [
-      ['Tableau 10', 'tableau10'],
-      ['Observable 10', 'observable10'],
-      ['IBM Carbon', 'carbon'],
-      ['Petroff 6', 'petroff6'],
-      ['Petroff 8', 'petroff8'],
-      ['Petroff 10', 'petroff10'],
+      // [preset name, package export, colours the two are expected to share]
+      ['Tableau 10', 'tableau10', 10],
+      ['Observable 10', 'observable10', 10],
+      ['IBM Carbon', 'carbon', 14],
+      ['Petroff 6', 'petroff6', 6],
+      ['Petroff 8', 'petroff8', 8],
+      ['Petroff 10', 'petroff10', 10],
+      ['Okabe–Ito', 'okabeIto', 8],
+      ['ColorBrewer Set3', 'colorBrewer3_10', 10],
     ]
-    for (const [name, source] of tracked) {
+    for (const [name, source, shared] of tracked) {
+      const app = byName.get(name)?.map((hex) => hex.toLowerCase())
+      const pkg = palettes[source].map((color) => formatHex(color))
+      assert.ok(app, `${name} is missing from PRESET_PALETTES`)
+      assert.equal(
+        Math.min(app.length, pkg.length),
+        shared,
+        `${name} and the package's ${source} no longer overlap by ${shared} colors`
+      )
       assert.deepEqual(
-        byName.get(name)?.map((hex) => hex.toLowerCase()),
-        palettes[source].map((color) => formatHex(color)),
+        app.slice(0, shared),
+        pkg.slice(0, shared),
         `${name} has drifted from the package's ${source}`
       )
     }
