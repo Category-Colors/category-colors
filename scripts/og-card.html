@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Category Colors — social card</title>
+    <!--
+      Source for public/og.png. Open it through the dev server (it needs the
+      Geist files out of node_modules) and screenshot the .og element at
+      1200×630 — see the header comment in scripts/build-og.mjs.
+
+      It restates the About splash rather than importing it: the splash is a
+      660px window that reflows down to a phone, and the card is one fixed
+      1200×630 plate. Same parts, different proportions — the artwork row is
+      wider and shorter here, and the type is sized to survive a feed's
+      thumbnail. The 'thanks' block stays out on purpose; it's unreadable at
+      card size and belongs to the window.
+    -->
+    <link rel="stylesheet" href="/node_modules/@fontsource-variable/geist/index.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0b0c12;
+      }
+
+      .og {
+        position: relative;
+        display: grid;
+        grid-template-rows: 452px 178px;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #f0eee8;
+        color: #11131c;
+        font-family: 'Geist Variable', sans-serif;
+        font-variation-settings: 'wght' 400;
+      }
+
+      /* ── artwork ─────────────────────────────────────────────── */
+
+      .og-artwork {
+        display: grid;
+        grid-template-columns: minmax(0, 1.78fr) minmax(0, 0.92fr);
+        overflow: hidden;
+        border-bottom: 1px solid #11131c;
+        background: #11131c;
+      }
+
+      .og-field {
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 77% 11%, rgb(255 255 255 / 0.5) 0 2px, transparent 3px),
+          radial-gradient(circle at 12% 20%, rgb(255 255 255 / 0.25) 0 2px, transparent 3px),
+          linear-gradient(135deg, #17122f 0%, #24205b 40%, #3c1d78 68%, #111128 100%);
+      }
+
+      .og-field::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(90deg, transparent 0 25px, rgb(255 255 255 / 0.035) 26px),
+          repeating-linear-gradient(0deg, transparent 0 25px, rgb(255 255 255 / 0.035) 26px);
+        mix-blend-mode: screen;
+      }
+
+      /* the wide grazing ellipse the rings sit inside */
+      .og-field::after {
+        content: '';
+        position: absolute;
+        left: 47%;
+        top: 51%;
+        width: 82%;
+        height: 42%;
+        border: 1px solid rgb(255 255 255 / 0.45);
+        border-radius: 50%;
+        transform: translate(-50%, -50%) rotate(-12deg);
+        box-shadow:
+          0 0 0 12px rgb(255 255 255 / 0.025),
+          0 0 0 27px rgb(255 255 255 / 0.018);
+      }
+
+      .og-sun {
+        position: absolute;
+        left: -78px;
+        bottom: -132px;
+        width: 332px;
+        height: 332px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 55% 40%,
+          #fff5aa 0 7%,
+          #ffb229 8% 26%,
+          #fa3d55 27% 47%,
+          #db168b 48% 64%,
+          transparent 65%
+        );
+        filter: saturate(1.18);
+      }
+
+      .og-beam {
+        position: absolute;
+        clip-path: polygon(0 0, 100% 50%, 0 100%);
+        transform-origin: left center;
+        mix-blend-mode: screen;
+      }
+
+      .og-beam-a {
+        left: 127px;
+        top: 202px;
+        width: 498px;
+        height: 133px;
+        background: linear-gradient(90deg, rgb(255 235 80 / 0.9), rgb(255 88 91 / 0.18));
+        transform: rotate(-24deg);
+      }
+
+      .og-beam-b {
+        left: 106px;
+        top: 177px;
+        width: 529px;
+        height: 106px;
+        background: linear-gradient(90deg, rgb(65 235 255 / 0.95), rgb(93 128 255 / 0.12));
+        transform: rotate(-4deg);
+      }
+
+      .og-beam-c {
+        left: 116px;
+        top: 224px;
+        width: 544px;
+        height: 112px;
+        background: linear-gradient(90deg, rgb(255 62 183 / 0.84), rgb(125 63 255 / 0.08));
+        transform: rotate(18deg);
+      }
+
+      .og-orbit,
+      .og-pupil {
+        position: absolute;
+        left: 55%;
+        top: 50%;
+        width: var(--ring-size);
+        height: var(--ring-size);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .og-orbit-outer {
+        --ring-size: 330px;
+        border: 24px solid rgb(255 255 255 / 0.9);
+        border-right-color: #fa8e20;
+        border-bottom-color: #f23d8a;
+        box-shadow: 0 0 0 2px rgb(8 8 20 / 0.5), 0 27px 57px rgb(7 2 20 / 0.34);
+        transform: translate(-50%, -50%) rotate(24deg);
+      }
+
+      .og-orbit-middle {
+        --ring-size: 221px;
+        border: 36px solid #45d5e7;
+        border-top-color: #7055ea;
+        border-left-color: #f4429b;
+        transform: translate(-50%, -50%) rotate(-34deg);
+      }
+
+      .og-orbit-inner {
+        --ring-size: 112px;
+        border: 18px solid #ffe866;
+        border-left-color: #ff7935;
+        transform: translate(-50%, -50%) rotate(42deg);
+      }
+
+      .og-pupil {
+        --ring-size: 67px;
+        border: 11px solid rgb(255 255 255 / 0.9);
+        background: #10101e;
+        box-shadow: 0 0 0 2px #10101e;
+      }
+
+      .og-satellite {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 1px solid rgb(255 255 255 / 0.86);
+        border-radius: 50%;
+        background: #ffcf55;
+        box-shadow: 0 0 18px rgb(255 211 75 / 0.8);
+      }
+
+      .og-satellite-a { left: 14%; top: 20%; }
+      .og-satellite-b { right: 11%; top: 23%; background: #69e3ed; }
+      .og-satellite-c { right: 18%; bottom: 13%; background: #ff5eae; }
+
+      .og-index {
+        position: absolute;
+        right: 18px;
+        bottom: 14px;
+        color: rgb(255 255 255 / 0.52);
+        font-size: 12px;
+        font-variation-settings: 'wght' 600;
+        letter-spacing: 0.18em;
+      }
+
+      .og-title-panel {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 38px 36px 32px;
+        background: linear-gradient(155deg, rgb(255 255 255 / 0.12), transparent 46%), #eb542f;
+        color: #17131d;
+      }
+
+      .og-title-panel::after {
+        content: '';
+        position: absolute;
+        right: -118px;
+        bottom: -145px;
+        width: 348px;
+        height: 348px;
+        border: 57px solid rgb(255 213 74 / 0.52);
+        border-radius: 50%;
+      }
+
+      .og-title-panel > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .og-mini-mark {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border: 2px solid #17131d;
+      }
+
+      .og-mini-mark span {
+        width: 20px;
+        height: 20px;
+        border: 6px solid #17131d;
+        border-right-color: transparent;
+        border-radius: 50%;
+      }
+
+      .og-title-lockup {
+        margin: auto 0 0;
+        font-size: 62px;
+        font-variation-settings: 'wght' 650;
+        line-height: 0.83;
+        letter-spacing: -0.075em;
+      }
+
+      .og-title-lockup p {
+        margin: 0;
+      }
+
+      .og-title-lockup p:last-child {
+        margin-left: 24px;
+        font-variation-settings: 'wght' 360;
+        font-style: italic;
+      }
+
+      .og-version {
+        margin: 22px 0 0;
+        font-size: 17px;
+        font-variation-settings: 'wght' 650;
+        letter-spacing: 0.005em;
+      }
+
+      .og-title-note {
+        margin: 5px 0 0;
+        font-size: 15px;
+        font-variation-settings: 'wght' 540;
+        letter-spacing: 0.005em;
+      }
+
+      /* ── colophon ────────────────────────────────────────────── */
+
+      .og-colophon {
+        display: flex;
+        flex-direction: column;
+        padding: 26px 36px 20px;
+        background:
+          repeating-linear-gradient(0deg, transparent 0 22px, rgb(17 19 28 / 0.027) 23px),
+          #f0eee8;
+      }
+
+      .og-colophon-lead {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 36px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgb(17 19 28 / 0.28);
+      }
+
+      .og-colophon-lead p {
+        margin: 0;
+      }
+
+      .og-colophon-lead > p:first-child {
+        font-size: 25px;
+        font-variation-settings: 'wght' 680;
+        letter-spacing: -0.025em;
+      }
+
+      .og-colophon-lead > p:last-child {
+        max-width: 700px;
+        font-size: 19px;
+        font-variation-settings: 'wght' 470;
+        line-height: 1.35;
+      }
+
+      .og-colophon-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 36px;
+        margin-top: auto;
+        padding-top: 16px;
+        color: rgb(17 19 28 / 0.62);
+        font-size: 15px;
+        font-variation-settings: 'wght' 620;
+        line-height: 1;
+        letter-spacing: 0.005em;
+      }
+
+      .og-colophon-foot p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="og">
+      <div class="og-artwork">
+        <div class="og-field">
+          <span class="og-sun"></span>
+          <span class="og-beam og-beam-a"></span>
+          <span class="og-beam og-beam-b"></span>
+          <span class="og-beam og-beam-c"></span>
+          <span class="og-orbit og-orbit-outer"></span>
+          <span class="og-orbit og-orbit-middle"></span>
+          <span class="og-orbit og-orbit-inner"></span>
+          <span class="og-pupil"></span>
+          <span class="og-satellite og-satellite-a"></span>
+          <span class="og-satellite og-satellite-b"></span>
+          <span class="og-satellite og-satellite-c"></span>
+          <span class="og-index">01—08</span>
+        </div>
+        <div class="og-title-panel">
+          <span class="og-mini-mark"><span></span></span>
+          <div class="og-title-lockup">
+            <p>Category</p>
+            <p>colors</p>
+          </div>
+          <p class="og-version">Version 1.1</p>
+          <p class="og-title-note">Perceptual palette system</p>
+        </div>
+      </div>
+
+      <div class="og-colophon">
+        <div class="og-colophon-lead">
+          <p>Category colors</p>
+          <p>
+            A browser-based optimizer for categorical color palettes.
+          </p>
+        </div>
+        <div class="og-colophon-foot">
+          <p>Simulated annealing · Perceptual color spaces · Color vision simulation</p>
+          <p>categorycolors.com</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
