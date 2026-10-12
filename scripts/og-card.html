@@ -233,12 +233,13 @@
         border: 2px solid #17131d;
       }
 
+      /* the About window's mini mark, scaled up with its box */
       .og-mini-mark span {
-        width: 20px;
-        height: 20px;
-        border: 6px solid #17131d;
-        border-right-color: transparent;
-        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        background: #17131d;
+        -webkit-mask: url('/src/assets/mark.svg') center / contain no-repeat;
+        mask: url('/src/assets/mark.svg') center / contain no-repeat;
       }
 
       .og-title-lockup {
