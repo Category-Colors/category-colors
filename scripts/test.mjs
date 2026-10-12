@@ -3,6 +3,8 @@ import { createDefaultConfig, palettes } from 'category-colors'
 import { formatHex } from 'culori'
 import { createServer } from 'vite'
 import { testLaunch } from './test-launch.mjs'
+import { testWebMcp } from './test-webmcp.mjs'
+import { testAgents } from './test-agents.mjs'
 
 const server = await createServer({
   appType: 'custom',
@@ -265,6 +267,8 @@ try {
 
   console.log('Core regression checks passed.')
   await testLaunch(server)
+  await testWebMcp(server)
+  await testAgents(server)
 } finally {
   await server.close()
 }

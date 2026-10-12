@@ -27,9 +27,52 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Concentric rings of orange, pink, cyan and yellow over a violet field, beside an orange panel reading Category colors." />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="alternate" type="text/markdown" href="/llms.txt" title="Category Colors for agents" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Category Colors",
+        "url": "https://categorycolors.com/",
+        "description": "A free, browser-based optimizer for categorical color palettes that stay distinguishable, including under color vision deficiency.",
+        "image": "https://categorycolors.com/og.png",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Matt Ström-Awn", "url": "https://mattstromawn.com/", "sameAs": ["https://x.com/mattstromawn"] },
+        "sameAs": ["https://github.com/ilikescience/category-colors", "https://www.npmjs.com/package/category-colors"]
+      }
+    </script>
+    <!-- The #root fallback below is what crawlers and no-JS visitors read. With
+         JavaScript it stays hidden until React replaces it on mount, so the app
+         never flashes it. -->
+    <style>
+      .static-fallback { display: none; }
+    </style>
+    <noscript>
+      <style>
+        .static-fallback { display: block; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #fff; font: 16px/1.5 system-ui, sans-serif; }
+        .static-fallback h1 { margin: 0 0 1rem; font-size: 2rem; font-weight: 600; }
+        .static-fallback h2 { margin: 1.5rem 0 0.5rem; font-size: 1.25rem; font-weight: 600; }
+        .static-fallback p { margin: 0 0 1rem; }
+        .static-fallback a { color: inherit; text-decoration: underline; }
+      </style>
+    </noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="static-fallback">
+        <h1>Category Colors</h1>
+        <p>A free, browser-based optimizer for categorical color palettes: colors for chart series, map categories, tags and legends that stay distinguishable from one another, including for people with color vision deficiencies.</p>
+        <h2>What it does</h2>
+        <p>Category Colors generates palettes of 2 to 20 colors with simulated annealing, maximizing the perceptual distance between every pair. You can fix brand colors and let it choose the rest, limit the color space, lightness and saturation, require contrast against a background, and avoid particular colors. It checks every pair under normal vision and simulated protanomaly, deuteranomaly, tritanomaly and grayscale, previews the palette on live charts, and exports it as CSS custom properties or W3C design tokens.</p>
+        <h2>How to use it</h2>
+        <p>The app needs JavaScript. Developers can use the same optimizer through the open-source <a href="https://www.npmjs.com/package/category-colors">category-colors npm package</a>. AI agents can read <a href="/llms.txt">llms.txt</a>, and in browsers that support WebMCP the page registers tools to generate, check and export palettes.</p>
+        <p>The method is explained in <a href="https://mattstromawn.com/writing/how-to-pick-the-least-wrong-colors/">How to pick the least wrong colors</a>, by Matt Ström-Awn.</p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
