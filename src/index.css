@@ -168,21 +168,13 @@ body {
   background: var(--surface-page);
 }
 
-/* The mark was the last piece of chrome carrying baked-in greys, so it stayed
-   put while the rest of the app changed theme — and read as a dark smudge on a
-   light page. The file supplies the silhouette and the ink ladder supplies the
-   ramp, the same split DialKit uses for --dial-check-mask. The two stops are
-   the mock's #565656 → #666666 solved back into ink alphas over the default
-   dark bg, so the default theme still renders the design's greys. */
+/* Two solid Cs, each opened by a slot. A flat, theme-relative ink keeps them
+   legible and lets the generated palette supply the interface color. */
 .app-mark {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in oklab, var(--theme-ink) 28%, transparent),
-    color-mix(in oklab, var(--theme-ink) 35%, transparent)
-  );
+  background: color-mix(in oklab, var(--theme-ink) 65%, transparent);
   -webkit-mask: url('./assets/mark.svg') center / contain no-repeat;
   mask: url('./assets/mark.svg') center / contain no-repeat;
 }
@@ -2444,11 +2436,11 @@ body {
 }
 
 .about-mini-mark span {
-  width: 13px;
-  height: 13px;
-  border: 4px solid #17131d;
-  border-right-color: transparent;
-  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  background: #17131d;
+  -webkit-mask: url('./assets/mark.svg') center / contain no-repeat;
+  mask: url('./assets/mark.svg') center / contain no-repeat;
 }
 
 .about-title-lockup {

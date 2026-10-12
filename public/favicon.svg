@@ -1,12 +1,5 @@
-<!-- The header mark (src/assets/mark.svg), painted rather than masked.
-     .app-mark fills that silhouette from the theme's ink token, but a favicon
-     sits on the browser's tab bar rather than on our canvas, so it carries its
-     own ink and flips with the browser's colour scheme. Full strength, not the
-     header's 28-35% ramp: at 16px a muted mark reads as a smudge. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
-  <style>
-    path { fill: #18181b }
-    @media (prefers-color-scheme: dark) { path { fill: #ffffff } }
-  </style>
-  <path d="M9.01074 0C13.7897 0 17.6973 3.71618 18 8.41309H12.791V5.92969C12.7908 5.57473 12.5034 5.28638 12.1484 5.28613H5.87305C5.51809 5.28638 5.23071 5.57473 5.23047 5.92969V12.1953C5.23063 12.5503 5.51804 12.8376 5.87305 12.8379H12.1484C12.5034 12.8376 12.7909 12.5503 12.791 12.1953V9.58496H18C17.6981 14.2826 13.7902 18 9.01074 18C4.03454 17.9999 0.000131578 13.9703 0 9C0 4.02961 4.03446 6.07307e-05 9.01074 0Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>path{fill:#18181b}@media(prefers-color-scheme:dark){path{fill:#fff}}</style>
+  <path d="M15.1 4.1358A12 12 0 1 0 15.1 27.8642V19H6.82V13H15.1Z"/>
+  <path d="M30.7 4.1358A12 12 0 1 0 30.7 27.8642V19H22.42V13H30.7Z"/>
 </svg>
