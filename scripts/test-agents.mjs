@@ -69,6 +69,17 @@ export async function testAgents(server) {
   assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/)
   assert.match(sitemap, /<loc>https:\/\/categorycolors\.com\/<\/loc>\s*<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/)
   assert.match(await read('public/robots.txt'), /^Sitemap: https:\/\/categorycolors\.com\/sitemap\.xml$/m)
+  // The WebMCP origin trial token rides on the document. It has to name this
+  // origin and the WebMCP feature, or Chrome ignores it silently.
+  const headers = await read('public/_headers')
+  for (const path of ['/', '/index.html']) {
+    const block = headers.split(/\n(?=\S)/).find((b) => b.split('\n')[0] === path)
+    const token = block?.match(/^ {2}Origin-Trial: (\S+)$/m)?.[1]
+    assert.ok(token, `${path} is missing its Origin-Trial header`)
+    const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf8').replace(/^[\s\S]*?(?=\{"origin")/, ''))
+    assert.equal(payload.origin, 'https://categorycolors.com:443')
+    assert.equal(payload.feature, 'WebMCP')
+  }
   const routes = JSON.parse(await read('public/_routes.json'))
   assert.ok(routes.include.includes('/*') && routes.exclude.includes('/assets/*'))
 
