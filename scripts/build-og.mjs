@@ -10,7 +10,8 @@
 //   npx playwright install chromium   # if you don't already have a build
 //   node <repo>/scripts/build-og.mjs  # run from that dir so the import resolves
 //
-// CHROME can override the executable path if the cached build isn't found.
+// CHROME can override the executable path if the cached build isn't found, and
+// PORT the dev server's port if Vite had to move off 5173.
 
 import { createRequire } from 'node:module'
 import { readdir } from 'node:fs/promises'
@@ -38,7 +39,7 @@ async function findChrome() {
 const out = fileURLToPath(new URL('../public/og.png', import.meta.url))
 const browser = await chromium.launch({ executablePath: await findChrome() })
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } })
-await page.goto('http://localhost:5174/scripts/og-card.html', { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${process.env.PORT ?? 5173}/scripts/og-card.html`, { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
 await page.locator('.og').screenshot({ path: out })
 await browser.close()

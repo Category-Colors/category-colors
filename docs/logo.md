@@ -33,4 +33,6 @@ slot is 0.5r tall and runs 60% of the C's width in from the flat edge. The Cs
 are 0.15r apart. Run `node scripts/build-brand.mjs` to regenerate the three
 standalone marks.
 
-The existing social-card artwork is outside this change.
+The social card (`public/og.png`, from `scripts/og-card.html`) carries the mark
+in its title panel the way the About window does. Run `scripts/build-og.mjs` to
+re-render it after changing the mark.
