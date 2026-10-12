@@ -16,6 +16,7 @@ import { PANEL_WIDTH, PUCK_SIZE } from '@/components/panels/MorphPanel'
 import { MobileBar, type MobileSheet } from '@/components/mobile/MobileBar'
 import { DOCKED, useIsPhone } from '@/lib/use-media'
 import { loadSession, saveSession } from '@/lib/session'
+import { registerWebMcpTools, type WebMcpApi } from '@/lib/webmcp'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
@@ -96,18 +97,19 @@ export default function App() {
   }, [params, versions, currentId])
 
   // With `override`, the run uses those params and the panel adopts them
-  // (the empty state's recipes); otherwise it uses whatever the panel holds.
-  const generate = (override?: PaletteParams) => {
+  // (the empty state's recipes, WebMCP's generate_palette); otherwise it uses
+  // whatever the panel holds. Resolves null if a run is already going.
+  const runGeneration = (override?: PaletteParams): Promise<PaletteVersion | null> => {
     // State updates are asynchronous, so two clicks in the same frame can both
     // observe busy=false. The ref closes that small window and keeps the UI's
     // single-run contract honest.
-    if (generating.current) return
+    if (generating.current) return Promise.resolve(null)
     generating.current = true
     setBusy(true)
     if (override) setParams(override)
     const snapshot = structuredClone(override ?? paramsRef.current)
     // annealing runs in a web worker, so the UI stays live throughout
-    generatePaletteAsync(snapshot)
+    return generatePaletteAsync(snapshot)
       .then((result) => {
         const version: PaletteVersion = {
           id: nextId.current++,
@@ -117,16 +119,22 @@ export default function App() {
         }
         setVersions((prev) => [...prev, version])
         setCurrentId(version.id)
-      })
-      .catch((err) => {
-        if (err?.name === 'AbortError') return
-        console.error('Palette generation failed:', err)
-        alert('Palette generation failed — see the console for details.')
+        return version
       })
       .finally(() => {
         generating.current = false
         setBusy(false)
       })
+  }
+
+  // The buttons' path: a failure is the person's to see. An agent's call gets
+  // the rejection instead, rather than an alert nobody is watching.
+  const generate = (override?: PaletteParams) => {
+    runGeneration(override).catch((err) => {
+      if (err?.name === 'AbortError') return
+      console.error('Palette generation failed:', err)
+      alert('Palette generation failed — see the console for details.')
+    })
   }
 
   // The header sticks to the top of the canvas; the moment anything has
@@ -202,7 +210,23 @@ export default function App() {
     }
     setVersions((prev) => [...prev, version])
     setCurrentId(version.id)
+    return version
   }
+
+  // Tools read the latest state and callbacks through this ref, so they're
+  // registered once rather than on every render.
+  const webMcp = useRef<WebMcpApi>(null!)
+  webMcp.current = {
+    getState: () => ({ params: paramsRef.current, current, busy: generating.current }),
+    generate: runGeneration,
+    cancel: cancelPaletteGeneration,
+    addPalette,
+  }
+  useEffect(() => {
+    const registration = new AbortController()
+    registerWebMcpTools(() => webMcp.current, registration.signal)
+    return () => registration.abort()
+  }, [])
 
   return (
     <ThemeProvider>

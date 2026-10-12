@@ -1,4 +1,4 @@
-import { DEFAULT_PARAMS, defaultColorSpace, type PaletteParams } from '@/lib/palette'
+import { PARAM_PRESETS, presetParams, type PaletteParams } from '@/lib/palette'
 import { PRESET_PALETTES } from '@/lib/presets'
 import { useIsPhone } from '@/lib/use-media'
 
@@ -25,24 +25,6 @@ const steps = (phone: boolean) =>
       phone ? 'Copy or download, from the toolbar below ↓.' : 'Copy or download, on the right →.',
     ],
   ] as const
-
-// Presets of the panel's own settings: a count plus OKHSL saturation and
-// lightness bands, over the defaults. The panel adopts them, so each is also a
-// worked example of step 1. (PRESET_PALETTES below are finished palettes.)
-const PARAM_PRESETS: { label: string; count: number; s: [number, number]; l: [number, number] }[] = [
-  { label: 'Vivid', count: 8, s: [0.75, 1], l: [0.5, 0.75] },
-  { label: 'Dusky', count: 12, s: [0.2, 0.5], l: [0.25, 0.55] },
-  { label: 'Pastel', count: 6, s: [0.35, 0.65], l: [0.78, 0.92] },
-]
-
-const presetParams = (p: (typeof PARAM_PRESETS)[number]): PaletteParams => {
-  const space = defaultColorSpace('okhsl')
-  return {
-    ...DEFAULT_PARAMS,
-    colorCount: p.count,
-    colorSpace: { ...space, ranges: [space.ranges[0], p.s, p.l] },
-  }
-}
 
 // The canvas before any palette exists: four steps and ways to start.
 export function EmptyState({
