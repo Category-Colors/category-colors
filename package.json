@@ -10,7 +10,7 @@
     "test": "node scripts/test.mjs",
     "preview": "vite preview",
     "preview:cloudflare": "wrangler pages dev dist --ip 127.0.0.1 --port 4173",
-    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy": "npm run build && wrangler pages deploy dist --branch main",
     "benchmark": "node scripts/benchmark.mjs"
   },
   "dependencies": {
