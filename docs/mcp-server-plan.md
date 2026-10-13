@@ -94,7 +94,8 @@ resources, so clients can attach them as context.
 ## Also worth deciding
 
 - **Shareable palette URLs (done).** `https://categorycolors.com/?colors=…`
-  opens a palette in the app, each color exactly as written (any CSS notation),
+  (or the packed `?p=` the app writes) opens a palette in the app, each color
+  exactly as written (any CSS notation),
   and `#config=` carries the Configure panel's settings that differ from the
   defaults, deflated. `linkFor` in `src/lib/share.ts` builds one; the WebMCP
   tools already return it as `link`, and every remote server response should

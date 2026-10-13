@@ -21,8 +21,27 @@ export async function testShare(server) {
   assert.equal(await linkFor([], palette.DEFAULT_PARAMS), '/')
   // including after a reload, which runs settings through the import validator
   assert.equal(await linkFor([], palette.parseParams(settings(palette.DEFAULT_PARAMS))), '/')
-  assert.equal(await linkFor(['#e8a33d', 'oklch(0.5997 0.1773 260.75)'], palette.DEFAULT_PARAMS), '/?colors=%23e8a33d,oklch(0.5997%200.1773%20260.75)')
   assert.equal(await read('/'), null)
+
+  // Every notation the app writes packs into ?p=: a format letter and fixed-width
+  // digits, 9 characters for OKLCH and 5 for hex or rgb()
+  const packable = ['oklch(0.7649 0.1399 72.9499)', 'oklch(0.5999 0 0)', 'oklch(1 0.5 360)', 'oklch(0 0 0)', '#E8A33D', '#e8a33d', '#000000', 'rgb(12, 200, 99)', 'hsl(210 50% 40%)', 'hsl(359.9 0.1% 100%)']
+  const compact = await linkFor(packable, palette.DEFAULT_PARAMS)
+  assert.match(compact, /^\/\?p=[\w-]+$/)
+  assert.equal(compact.length, '/?p='.length + 4 * 9 + 4 * 5 + 2 * 7)
+  assert.deepEqual((await read(compact)).colors, packable)
+  // A generated palette of 8 colors
+  const generated = Array.from({ length: 8 }, (_, i) => oklchCss({ mode: 'okhsl', h: i * 45, s: 0.8, l: 0.6 }))
+  assert.equal((await linkFor(generated, palette.DEFAULT_PARAMS)).length, '/?p='.length + 8 * 9)
+  // Anything the packing can't reproduce character for character sends the
+  // whole palette written out, still exact
+  for (const odd of ['oklch(0.764902 0.1399 72.9499)', 'oklab(0.5 -0.1 0.05)', '#abc', '#E8a33d', 'red', 'rgb(1 2 3)', 'oklch(0.5 0.6 30)']) {
+    const link = await linkFor(['#E8A33D', odd], palette.DEFAULT_PARAMS)
+    assert.match(link, /^\/\?colors=/, odd)
+    assert.deepEqual((await read(link)).colors, ['#E8A33D', odd], odd)
+  }
+  // Damaged tokens carry no colors rather than wrong ones
+  for (const bad of ['o', 'oAAA', 'x12345678', 'H___', 'o________', 'H!!!!']) assert.deepEqual((await read(`/?p=${bad}`)).colors, [], bad)
 
   // Every notation and digit survives, including the commas inside rgb()
   const colors = ['#E8A33D', 'oklch(0.7649 0.1399 72.9499)', 'rgb(12, 200, 99)', 'hsl(210 50% 40%)', 'oklab(0.5 -0.1 0.05)']
@@ -33,7 +52,7 @@ export async function testShare(server) {
     evaluators: [...palette.DEFAULT_PARAMS.evaluators, palette.newEvaluatorSpec('avoid', { avoidColors: [palette.newTargetColor({ space: 'hex', hex: '#FF0000' })] })],
   }
   const link = await linkFor(colors, custom)
-  assert.match(link, /^\/\?colors=[^#]+#config=[\w-]+$/)
+  assert.match(link, /^\/\?colors=[^#]+#config=[\w-]+$/) // oklab() can't pack
   const shared = await read(link)
   assert.deepEqual(shared.colors, colors)
   assert.equal(settings(shared.params), settings(palette.parseParams(settings(custom))))

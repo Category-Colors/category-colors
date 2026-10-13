@@ -23,7 +23,7 @@ import { ScrollOverlay } from '@/components/ScrollOverlay'
 import { AddColorBar } from './AddColorBar'
 import { ColorRow } from './ColorRow'
 import { HistoryPopover, type HistoryPopoverHandle } from './HistoryPopover'
-import { CheckIcon, CopyIcon, TrashIcon, XIcon } from './icons'
+import { CheckIcon, CopyIcon, LinkIcon, TrashIcon, XIcon } from './icons'
 import { PanelShell } from './PanelShell'
 import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
@@ -127,7 +127,7 @@ export function HistoryPanel({
     ['preview'],
     hasHistory ? (['palette', 'history', 'preview'] as const) : (['palette', 'preview'] as const)
   )
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'export' | 'link' | null>(null)
   const previewRef = useRef<HTMLTextAreaElement>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const popover = useRef<HistoryPopoverHandle>(null)
@@ -246,13 +246,15 @@ export function HistoryPanel({
   // version colors are css strings that already carry each color's format
   const formatted = current?.colors ?? []
 
-  const copy = async () => {
+  // The address bar already links to the palette and the panel (App keeps it
+  // in sync), so the link button copies it as it stands.
+  const copy = async (what: 'export' | 'link') => {
     if (!current) return
-    const success = await copyText(formatPalette(formatted, format))
+    const success = await copyText(what === 'link' ? window.location.href : formatPalette(formatted, format))
     if (!success) return
-    setCopied(true)
+    setCopied(what)
     if (copyTimer.current) clearTimeout(copyTimer.current)
-    copyTimer.current = setTimeout(() => setCopied(false), 1000)
+    copyTimer.current = setTimeout(() => setCopied(null), 1000)
   }
 
   return (
@@ -395,14 +397,23 @@ export function HistoryPanel({
         <div className="dialkit-button-group">
           <button
             className="dialkit-button square-button"
-            data-active={String(copied)}
+            data-active={String(copied === 'link')}
             // static name: the checkmark carries the confirmation, and a
             // label that changes mid-hover leaves the tooltip stale
+            aria-label="Copy link"
+            disabled={!current}
+            onClick={() => copy('link')}
+          >
+            {copied === 'link' ? <CheckIcon /> : <LinkIcon />}
+          </button>
+          <button
+            className="dialkit-button square-button"
+            data-active={String(copied === 'export')}
             aria-label="Copy to clipboard"
             disabled={!current}
-            onClick={copy}
+            onClick={() => copy('export')}
           >
-            {copied ? <CheckIcon /> : <CopyIcon />}
+            {copied === 'export' ? <CheckIcon /> : <CopyIcon />}
           </button>
           <button
             className="dialkit-button"
