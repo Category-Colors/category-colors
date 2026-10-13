@@ -3,7 +3,8 @@
   "name": "category-colors",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-09-07",
-  "vars": { "WEATHER_NON_COMMERCIAL": "true" },
+  // MCP_ENABLED: anything but "true" turns /mcp into a 404
+  "vars": { "WEATHER_NON_COMMERCIAL": "true", "MCP_ENABLED": "true" },
   // Needs Workers Paid. A 20-color generation takes about 1.2 s of CPU; this
   // stops anything that runs far past that.
   "limits": { "cpu_ms": 5000 },

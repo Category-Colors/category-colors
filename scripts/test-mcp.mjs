@@ -5,11 +5,11 @@ import { readFile } from 'node:fs/promises'
 // the way 2026-07-28 and 2025-era clients send them.
 export async function testMcp(server) {
   const { onRequest } = await server.ssrLoadModule('/functions/mcp.ts')
-  const env = { MCP_TOKEN: 'test-token' }
+  const env = { MCP_ENABLED: 'true' }
   const call = async (request, environment = env) => onRequest({ request, env: environment })
   const post = (headers, body) => new Request('https://categorycolors.com/mcp', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: 'Bearer test-token', ...headers },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, ...body }),
   })
   const modern = (method, params = {}) => post(
@@ -24,15 +24,9 @@ export async function testMcp(server) {
   }
   const tool = async (name, args) => result(modern('tools/call', { name, arguments: args }))
 
-  // The gate: no secret, no endpoint; with one, the right bearer token only
-  assert.equal((await call(modern('tools/list'), {})).status, 404)
-  for (const auth of [undefined, 'Bearer wrong', 'test-token']) {
-    const request = modern('tools/list')
-    if (auth) request.headers.set('Authorization', auth)
-    else request.headers.delete('Authorization')
-    assert.equal((await call(request)).status, 401, String(auth))
-  }
-  // A browser page elsewhere can't use a token it has somehow obtained
+  // The off switch: anything but MCP_ENABLED=true and the endpoint doesn't exist
+  for (const off of [{}, { MCP_ENABLED: 'false' }]) assert.equal((await call(modern('tools/list'), off)).status, 404)
+  // A browser page elsewhere can't call it
   const foreign = modern('tools/list')
   foreign.headers.set('Origin', 'https://evil.example')
   assert.equal((await call(foreign)).status, 403)
@@ -77,13 +71,11 @@ export async function testMcp(server) {
   const limited = (quota) => ({ ...env, LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), seen.filter((s) => s === `${action} ${key}`).length <= quota) } })
   const from = (ip, request) => (request.headers.set('CF-Connecting-IP', ip), request)
   const generate = (args) => modern('tools/call', { name: 'generate_palette', arguments: args })
-  // Past the request limit an IP gets 429 before its token is even checked
+  // Past the request limit an IP gets 429
   const strict = limited(2)
   assert.equal((await call(from('1.1.1.1', modern('tools/list')), strict)).status, 200)
   assert.equal((await call(from('1.1.1.1', modern('tools/list')), strict)).status, 200)
-  const wrong = from('1.1.1.1', modern('tools/list'))
-  wrong.headers.set('Authorization', 'Bearer wrong')
-  const response = await call(wrong, strict)
+  const response = await call(from('1.1.1.1', modern('tools/list')), strict)
   assert.equal(response.status, 429)
   assert.equal(response.headers.get('Retry-After'), '60')
   assert.equal((await call(from('2.2.2.2', modern('tools/list')), strict)).status, 200)
@@ -106,6 +98,7 @@ export async function testMcp(server) {
   // what the endpoint asks for
   const jsonc = async (path) => JSON.parse((await readFile(new URL(`../${path}`, import.meta.url), 'utf8')).replace(/^\s*\/\/.*$/gm, ''))
   const site = await jsonc('wrangler.jsonc')
+  assert.equal(site.vars.MCP_ENABLED, 'true')
   assert.deepEqual(site.services, [{ binding: 'LIMITS', service: 'category-colors-limits' }])
   assert.ok(site.limits.cpu_ms >= 2000)
   const worker = await jsonc('workers/limits/wrangler.jsonc')

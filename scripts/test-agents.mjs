@@ -64,6 +64,7 @@ export async function testAgents(server) {
   for (const tool of ['generate_palette', 'load_preset_palette', 'set_palette', 'check_palette', 'export_palette', 'get_current_palette']) {
     assert.ok(llms.includes(`\`${tool}\``), `llms.txt should name ${tool}`)
   }
+  assert.ok(llms.includes('https://categorycolors.com/mcp'), 'llms.txt should point to the MCP server')
 
   const sitemap = await read('public/sitemap.xml')
   assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/)
