@@ -103,7 +103,7 @@ export async function testMcp(server) {
   assert.ok(site.limits.cpu_ms >= 2000)
   const worker = await jsonc('workers/limits/wrangler.jsonc')
   assert.equal(worker.name, 'category-colors-limits')
-  assert.deepEqual(worker.ratelimits.map((r) => r.name), ['REQUESTS', 'GENERATIONS', 'ALL_GENERATIONS'])
+  assert.deepEqual(worker.durable_objects.bindings, [{ name: 'COUNTERS', class_name: 'Counter' }])
 
   console.log('MCP server checks passed.')
 }

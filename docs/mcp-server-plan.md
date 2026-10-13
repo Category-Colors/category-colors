@@ -29,16 +29,21 @@ error. `wrangler.jsonc` caps each request at 15 s of CPU; a 5 s cap turned
 away some 20-color generations.
 
 Rate limits (2026-10-13) live in `workers/limits`, a separate Worker, because
-Pages Functions can't hold a rate limiting binding; the site reaches it through
-the `LIMITS` service binding. Per Cloudflare location, over 60 seconds: 60
-requests per client IP (429 with `Retry-After`), 5 generations per client IP,
-and 10 generations from everyone (lowered from 10 and 30 once production CPU
-was measured). Saturating the global limit all month in one location would
-cost about $50 in CPU past the plan's included 30M CPU-ms (10 a minute at up to
-about 6 s each); real use is far below. One busy client can use up the global
-allowance for a minute. The included CPU covers about 13,000 eight-color
-generations a month. The counters are approximate by design. A local run
+Pages Functions can't define Durable Objects; the site reaches it through the
+`LIMITS` service binding. Over 60-second windows: 60 requests per client IP
+(429 with `Retry-After`), 5 generations per client IP, and 10 generations from
+everyone (lowered from 10 and 30 once production CPU was measured). Each
+counter is a Durable Object, so counts are exact and global rather than per
+location. Cloudflare's rate limiting binding was tried first and dropped: in
+production it let 76 calls from one key through a limit of 60 (workers-sdk
+issue #16097).
+
+Saturating the global limit all month would cost about $50 in CPU past the
+plan's included 30M CPU-ms (10 a minute at up to about 6 s each); real use is
+far below. One busy client can use up the global allowance for a minute. The
+included CPU covers about 13,000 eight-color generations a month. A local run
 without the limits Worker goes unlimited.
+
 Deploy it first:
 
 ```sh

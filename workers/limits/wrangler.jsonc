@@ -1,19 +1,13 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  // Rate limits for the MCP server. Pages Functions can't hold a rate limiting
-  // binding, so this Worker holds them and the site calls it over a service
-  // binding (LIMITS in the root wrangler.jsonc). Deploy it before the site.
+  // Rate limits for the MCP server, set in index.js. Pages Functions can't
+  // define Durable Objects, so this Worker holds them and the site calls it
+  // over a service binding (LIMITS in the root wrangler.jsonc). Deploy it
+  // before the site.
   "name": "category-colors-limits",
   "main": "index.js",
   "compatibility_date": "2026-09-07",
   "workers_dev": false,
-  // Counted per Cloudflare location and per key, over 60 seconds
-  "ratelimits": [
-    // Every /mcp request, per client IP
-    { "name": "REQUESTS", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } },
-    // Palette generations, per client IP: each costs 2–4 s of CPU
-    { "name": "GENERATIONS", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } },
-    // Palette generations from everyone, which caps the CPU bill
-    { "name": "ALL_GENERATIONS", "namespace_id": "1003", "simple": { "limit": 10, "period": 60 } }
-  ]
+  "durable_objects": { "bindings": [{ "name": "COUNTERS", "class_name": "Counter" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Counter"] }]
 }
