@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "preview:cloudflare": "wrangler pages dev dist --ip 127.0.0.1 --port 4173",
     "deploy": "npm run build && wrangler pages deploy dist --branch main",
+    "deploy:limits": "wrangler deploy --config workers/limits/wrangler.jsonc",
     "benchmark": "node scripts/benchmark.mjs"
   },
   "dependencies": {
