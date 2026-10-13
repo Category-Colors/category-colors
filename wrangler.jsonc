@@ -3,5 +3,10 @@
   "name": "category-colors",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-09-07",
-  "vars": { "WEATHER_NON_COMMERCIAL": "true" }
+  "vars": { "WEATHER_NON_COMMERCIAL": "true" },
+  // Needs Workers Paid. A 20-color generation takes about 1.2 s of CPU; this
+  // stops anything that runs far past that.
+  "limits": { "cpu_ms": 5000 },
+  // Rate limits for /mcp, held by workers/limits
+  "services": [{ "binding": "LIMITS", "service": "category-colors-limits" }]
 }

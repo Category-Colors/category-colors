@@ -13,8 +13,12 @@ import { GENERATE_INPUT, PRESET_NAMES, colorList, generateParams, readColors, sc
 // Gated for now: without an MCP_TOKEN secret the endpoint doesn't exist, and
 // with one every request needs `Authorization: Bearer <token>`. Generation
 // costs about a second of CPU per palette, which only Workers Paid allows.
+//
+// Rate limits live in workers/limits: requests and generations per client IP,
+// and generations from everyone. Local runs without that Worker go unlimited.
 
-interface Env { MCP_TOKEN?: string }
+interface Limits { allow(action: 'request' | 'generate', key: string): Promise<boolean> }
+interface Env { MCP_TOKEN?: string; LIMITS?: Limits }
 interface Context { request: Request; env: Env }
 
 // Browsers may only call from the site itself; CLI and desktop clients send no Origin
@@ -32,7 +36,7 @@ const tool = (run: (input: Record<string, unknown>) => Promise<object> | object)
   }
 }
 
-function server() {
+function server(allowGeneration: () => Promise<boolean>) {
   const mcp = new McpServer({ name: 'category-colors', title: 'Category Colors', version: '1.0.0' }, { maxToolInputElements: 200 })
   mcp.registerTool('generate_palette', {
     title: 'Generate palette',
@@ -41,6 +45,7 @@ function server() {
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, tool(async (input) => {
     const params = generateParams(input, DEFAULT_PARAMS)
+    if (!(await allowGeneration())) throw new Error('Too many palettes generated in the last minute. Wait a minute and try again.')
     return summarize({ id: 1, params, ...generatePalette(params), createdAt: Date.now() })
   }))
   mcp.registerTool('check_palette', {
@@ -81,8 +86,6 @@ function server() {
   return mcp
 }
 
-const handler = createMcpHandler(server)
-
 // Compares digests rather than the strings, so the time taken says nothing
 // about how much of the token matched
 async function sameToken(given: string, expected: string) {
@@ -93,9 +96,14 @@ async function sameToken(given: string, expected: string) {
 
 export async function onRequest({ request, env }: Context): Promise<Response> {
   if (!env.MCP_TOKEN) return new Response('Not found', { status: 404 })
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+  if (env.LIMITS && !(await env.LIMITS.allow('request', ip))) {
+    return new Response('Too many requests', { status: 429, headers: { 'Retry-After': '60' } })
+  }
   const given = request.headers.get('Authorization')?.match(/^Bearer (.+)$/)?.[1] ?? ''
   if (!(await sameToken(given, env.MCP_TOKEN))) {
     return new Response('Unauthorized', { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="category-colors"' } })
   }
-  return originValidationResponse(request, ALLOWED_ORIGINS) ?? handler.fetch(request)
+  const allowGeneration = async () => !env.LIMITS || env.LIMITS.allow('generate', ip)
+  return originValidationResponse(request, ALLOWED_ORIGINS) ?? createMcpHandler(() => server(allowGeneration)).fetch(request)
 }

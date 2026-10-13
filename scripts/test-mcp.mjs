@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 
 // The remote MCP server through its Pages Function entry, with requests shaped
 // the way 2026-07-28 and 2025-era clients send them.
@@ -69,6 +70,47 @@ export async function testMcp(server) {
   assert.equal(init.serverInfo.name, 'category-colors')
   const legacy = await result(post({ 'MCP-Protocol-Version': '2025-06-18' }, { method: 'tools/call', params: { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } } }))
   assert.equal(legacy.structuredContent.text.trim(), 'red')
+
+  // Rate limits, with a stand-in for workers/limits that allows `quota` calls
+  // per action and client IP
+  const seen = []
+  const limited = (quota) => ({ ...env, LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), seen.filter((s) => s === `${action} ${key}`).length <= quota) } })
+  const from = (ip, request) => (request.headers.set('CF-Connecting-IP', ip), request)
+  const generate = (args) => modern('tools/call', { name: 'generate_palette', arguments: args })
+  // Past the request limit an IP gets 429 before its token is even checked
+  const strict = limited(2)
+  assert.equal((await call(from('1.1.1.1', modern('tools/list')), strict)).status, 200)
+  assert.equal((await call(from('1.1.1.1', modern('tools/list')), strict)).status, 200)
+  const wrong = from('1.1.1.1', modern('tools/list'))
+  wrong.headers.set('Authorization', 'Bearer wrong')
+  const response = await call(wrong, strict)
+  assert.equal(response.status, 429)
+  assert.equal(response.headers.get('Retry-After'), '60')
+  assert.equal((await call(from('2.2.2.2', modern('tools/list')), strict)).status, 200)
+  // Past the generation limit, generate_palette says so in a result the agent
+  // can read; bad arguments don't use up the quota, and other tools still work
+  seen.length = 0
+  const once = limited(100)
+  once.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 1)
+  const read = async (request) => JSON.parse((await (await call(request, once)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 99 })))).isError, true)
+  assert.equal(seen.filter((s) => s.startsWith('generate')).length, 0)
+  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 2 })))).structuredContent.colors.length, 2)
+  out = await read(from('3.3.3.3', generate({ colorCount: 2 })))
+  assert.equal(out.isError, true)
+  assert.match(out.content[0].text, /Too many palettes/)
+  assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })))).isError, undefined)
+  assert.deepEqual(seen.filter((s) => s.startsWith('generate')), ['generate 3.3.3.3', 'generate 3.3.3.3'])
+
+  // Production has the limits bound, a CPU cap, and the limits Worker declares
+  // what the endpoint asks for
+  const jsonc = async (path) => JSON.parse((await readFile(new URL(`../${path}`, import.meta.url), 'utf8')).replace(/^\s*\/\/.*$/gm, ''))
+  const site = await jsonc('wrangler.jsonc')
+  assert.deepEqual(site.services, [{ binding: 'LIMITS', service: 'category-colors-limits' }])
+  assert.ok(site.limits.cpu_ms >= 2000)
+  const worker = await jsonc('workers/limits/wrangler.jsonc')
+  assert.equal(worker.name, 'category-colors-limits')
+  assert.deepEqual(worker.ratelimits.map((r) => r.name), ['REQUESTS', 'GENERATIONS', 'ALL_GENERATIONS'])
 
   console.log('MCP server checks passed.')
 }
