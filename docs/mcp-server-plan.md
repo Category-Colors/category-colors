@@ -4,24 +4,22 @@ Written 2026-10-12. Targets the [2026-07-28 MCP specification](https://modelcont
 (stateless core, Streamable HTTP) and v2 of the TypeScript SDK
 (`@modelcontextprotocol/server` 2.3.1, which implements that revision).
 
-## Status (2026-10-13): built, gated, rate-limited
+## Status (2026-10-13): live and open, rate-limited
 
 `functions/mcp.ts` serves four stateless tools at `/mcp`: `generate_palette`,
 `check_palette`, `get_preset_palette` and `export_palette`. The protocol
 belongs to the official SDK (`@modelcontextprotocol/server` 2.3.1,
 `createMcpHandler`), which answers 2026-07-28 clients and 2025-era clients that
 still send `initialize`. `src/lib/tools.ts` holds what it shares with the
-WebMCP tools. `scripts/test-mcp.mjs` covers the gate and both protocol eras, and
-the official client was run end to end against `wrangler pages dev`.
+WebMCP tools. `scripts/test-mcp.mjs` covers both protocol eras and the limits,
+and the official client was run end to end against `wrangler pages dev`.
 
-The gate: with no `MCP_TOKEN` secret the endpoint is a 404, and with one every
-request needs `Authorization: Bearer <token>`. Browsers may only call it from
-categorycolors.com. To turn it on:
+Anyone can connect, without auth; `llms.txt` lists it. Browsers may only call
+it from categorycolors.com. The off switch is `MCP_ENABLED` in
+`wrangler.jsonc`: anything but `"true"`, deployed, makes `/mcp` a 404.
 
 ```sh
-npx wrangler pages secret put MCP_TOKEN --project-name <project>
-claude mcp add --transport http category-colors https://categorycolors.com/mcp \
-  --header "Authorization: Bearer <token>"
+claude mcp add --transport http category-colors https://categorycolors.com/mcp
 ```
 
 Generation uses 0.5–1.2 s of CPU (category-colors 3.1.0, 8–20 colors), so it
@@ -32,7 +30,7 @@ error while the other three tools work. `wrangler.jsonc` caps each request at
 Rate limits (2026-10-13) live in `workers/limits`, a separate Worker, because
 Pages Functions can't hold a rate limiting binding; the site reaches it through
 the `LIMITS` service binding. Per Cloudflare location, over 60 seconds: 60
-requests per client IP (429 with `Retry-After`, checked before the token), 10
+requests per client IP (429 with `Retry-After`), 10
 generations per client IP, and 30 generations from everyone. Saturating the
 global limit all month in one location would cost about $30 in CPU past the
 plan's included 30M CPU-ms; real use is far below. The counters are
@@ -44,9 +42,9 @@ npm run deploy:limits   # once, and whenever the limits change
 npm run deploy
 ```
 
-Not yet done: server cards, listing in `llms.txt` and the MCP Registry, and
-resources. Claude.ai custom connectors expect OAuth rather than a static bearer
-token, so they wait for whatever replaces the gate.
+Not yet done: server cards, listing in the MCP Registry, and resources. If the
+global limit starts turning away real use, raise it in
+`workers/limits/wrangler.jsonc`.
 
 ## Where things stood before
 

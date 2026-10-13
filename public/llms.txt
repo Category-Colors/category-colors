@@ -2,7 +2,7 @@
 
 > A free, browser-based optimizer for categorical color palettes: sets of colors for chart series, map categories, tags and legends that stay distinguishable from one another, including for people with color vision deficiencies. It is the reference app for the open-source `category-colors` npm package.
 
-Category Colors generates palettes with simulated annealing, maximizing the perceptual distance (CIEDE2000) between every pair of colors while respecting constraints you set: fixed brand colors, a color space and lightness or saturation range, contrast against a background, and colors to avoid. It then checks every pair under normal vision and simulated protanomaly, deuteranomaly, tritanomaly and grayscale, and previews the palette on live charts. Everything runs in the browser; there is no account, no server-side generation and no cost.
+Category Colors generates palettes with simulated annealing, maximizing the perceptual distance (CIEDE2000) between every pair of colors while respecting constraints you set: fixed brand colors, a color space and lightness or saturation range, contrast against a background, and colors to avoid. It then checks every pair under normal vision and simulated protanomaly, deuteranomaly, tritanomaly and grayscale, and previews the palette on live charts. The app runs in the browser, with no account and no cost.
 
 ## When to use this
 
@@ -16,6 +16,7 @@ It is not the right tool for sequential or diverging scales (ordered data), UI t
 
 ## How an agent should use it
 
+- Over MCP, from any agent: the remote server at `https://categorycolors.com/mcp` (Streamable HTTP, no auth) has `generate_palette` (colorCount, optional style, fixedColors, jnd), `check_palette`, `get_preset_palette` and `export_palette`. Every tool takes its colors as input and returns a `link`. For Claude Code: `claude mcp add --transport http category-colors https://categorycolors.com/mcp`. Rate limited to 10 generations a minute per client.
 - In a browser that supports WebMCP (`document.modelContext`), https://categorycolors.com/ registers these tools: `generate_palette` (colorCount, optional style vivid/dusky/pastel, fixedColors, jnd), `load_preset_palette`, `set_palette`, `check_palette`, `export_palette` (raw, css or json) and `get_current_palette`. Results include each color as hex and OKLCH plus the distinguishability report. Generation takes a few seconds.
 - In code, use the `category-colors` npm package directly: `npm install category-colors`. The app's controls map one-to-one onto the package's config object.
 - To show someone a palette, link to `https://categorycolors.com/?colors=` followed by its colors, comma-separated, each URL-encoded (any CSS notation: `?colors=%23e8a33d,oklch(0.6%200.17%20260)`). The app opens it with its charts and distinguishability report. The WebMCP tools return such a link as `link`, including the settings that made the palette.

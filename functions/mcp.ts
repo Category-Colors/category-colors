@@ -10,15 +10,15 @@ import { GENERATE_INPUT, PRESET_NAMES, colorList, generateParams, readColors, sc
 // speaks both the 2026-07-28 revision and 2025-era clients that still send
 // `initialize`; the SDK owns the protocol.
 //
-// Gated for now: without an MCP_TOKEN secret the endpoint doesn't exist, and
-// with one every request needs `Authorization: Bearer <token>`. Generation
-// costs about a second of CPU per palette, which only Workers Paid allows.
-//
-// Rate limits live in workers/limits: requests and generations per client IP,
-// and generations from everyone. Local runs without that Worker go unlimited.
+// Open to anyone, without auth. Rate limits keep that affordable: they live in
+// workers/limits, counting requests and generations per client IP and
+// generations from everyone (a generation costs 0.5–1.2 s of CPU, which only
+// Workers Paid allows). Local runs without that Worker go unlimited. To take
+// the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
+// and deploy.
 
 interface Limits { allow(action: 'request' | 'generate', key: string): Promise<boolean> }
-interface Env { MCP_TOKEN?: string; LIMITS?: Limits }
+interface Env { MCP_ENABLED?: string; LIMITS?: Limits }
 interface Context { request: Request; env: Env }
 
 // Browsers may only call from the site itself; CLI and desktop clients send no Origin
@@ -86,23 +86,11 @@ function server(allowGeneration: () => Promise<boolean>) {
   return mcp
 }
 
-// Compares digests rather than the strings, so the time taken says nothing
-// about how much of the token matched
-async function sameToken(given: string, expected: string) {
-  const digest = async (text: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
-  const [a, b] = await Promise.all([digest(given), digest(expected)])
-  return a.reduce((diff, byte, i) => diff | (byte ^ b[i]), 0) === 0
-}
-
 export async function onRequest({ request, env }: Context): Promise<Response> {
-  if (!env.MCP_TOKEN) return new Response('Not found', { status: 404 })
+  if (env.MCP_ENABLED !== 'true') return new Response('Not found', { status: 404 })
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
   if (env.LIMITS && !(await env.LIMITS.allow('request', ip))) {
     return new Response('Too many requests', { status: 429, headers: { 'Retry-After': '60' } })
-  }
-  const given = request.headers.get('Authorization')?.match(/^Bearer (.+)$/)?.[1] ?? ''
-  if (!(await sameToken(given, env.MCP_TOKEN))) {
-    return new Response('Unauthorized', { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="category-colors"' } })
   }
   const allowGeneration = async () => !env.LIMITS || env.LIMITS.allow('generate', ip)
   return originValidationResponse(request, ALLOWED_ORIGINS) ?? createMcpHandler(() => server(allowGeneration)).fetch(request)
