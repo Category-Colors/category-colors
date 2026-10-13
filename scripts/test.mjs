@@ -6,6 +6,7 @@ import { testLaunch } from './test-launch.mjs'
 import { testWebMcp } from './test-webmcp.mjs'
 import { testAgents } from './test-agents.mjs'
 import { testShare } from './test-share.mjs'
+import { testMcp } from './test-mcp.mjs'
 
 const server = await createServer({
   appType: 'custom',
@@ -271,6 +272,7 @@ try {
   await testWebMcp(server)
   await testAgents(server)
   await testShare(server)
+  await testMcp(server)
 } finally {
   await server.close()
 }
