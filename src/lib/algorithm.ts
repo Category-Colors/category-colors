@@ -10,7 +10,7 @@ import {
 // Not in the `evaluators` barrel: its naming table is ~260 kB, so the package
 // keeps it on a subpath of its own the way it does saliency's.
 import names from 'category-colors/evaluators/names'
-import { toCulori } from '@/lib/color'
+import { oklchCss, toCulori } from '@/lib/color'
 import { cvdSeverityFor } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
 
@@ -76,7 +76,7 @@ export function generatePalette(params: PaletteParams) {
   const finalState = run(initialState, config)
 
   return {
-    colors: finalState.colors.map(String),
+    colors: finalState.colors.map(oklchCss),
     cost: finalState.cost,
     iterations: finalState.iterations,
     costHistory: finalState.costHistory ?? [],

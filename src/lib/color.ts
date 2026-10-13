@@ -170,3 +170,12 @@ export function hsvToValue(space: Space, hsv: Hsv): ColorValue {
 
 export const hsvToHex = (hsv: Hsv) =>
   formatHex({ mode: 'hsv', h: hsv[0], s: hsv[1], v: hsv[2] }).toUpperCase()
+
+// How generated colors are stored: OKLCH at 4 decimals is finer than any
+// display can show, where 8-bit hex would round the optimizer's result.
+// Takes any culori-shaped color, including category-colors' own, which carry
+// extra fields culori's types don't know.
+export function oklchCss(color: { mode: string } | string): string {
+  const { l, c, h } = toOklchMode(resolve(color as Color | string))
+  return `oklch(${round(l, 4)} ${round(c, 4)} ${round(h ?? 0, 4)})`
+}

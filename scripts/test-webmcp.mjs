@@ -62,6 +62,8 @@ export async function testWebMcp(server) {
   assert.equal(result.colors[0].hex, '#FF0000')
   assert.equal(result.colors[1].css, 'oklch(0.7 0.15 250)')
   assert.match(result.colors[1].hex, /^#[0-9A-F]{6}$/)
+  // and a link that opens it exactly as given
+  assert.match(result.link, /^https:\/\/categorycolors\.com\/\?colors=red,oklch\(0\.7%200\.15%20250\)/)
   assert.match((await call('set_palette', { colors: ['red', 'blurple', 42] })).error, /Not valid CSS colors: "blurple", 42/)
   assert.match((await call('set_palette', { colors: ['red'] })).error, /between 2 and 20/)
 

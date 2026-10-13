@@ -56,7 +56,7 @@ summary for clients that only show text.
 
 | Tool | Input | Output |
 |---|---|---|
-| `generate_palette` | `colorCount`, `fixedColors?`, `style?` (vivid, dusky, pastel), `jnd?`, `colorSpace?` and ranges, `background?` (adds a contrast evaluator), `avoidColors?`, `seedColors?` | colors (hex and OKLCH), cost, iterations, report |
+| `generate_palette` | `colorCount`, `fixedColors?`, `style?` (vivid, dusky, pastel), `jnd?`, `colorSpace?` and ranges, `background?` (adds a contrast evaluator), `avoidColors?`, `seedColors?` | colors (hex and OKLCH), cost, iterations, report, link |
 | `check_palette` | `colors`, `jnd?`, `cvd?` (which simulations), `includeMatrix?` | issues per vision test; full ΔE matrix if asked |
 | `simulate_cvd` | `colors`, `type`, `severity?` | the colors as seen under that deficiency |
 | `export_palette` | `colors`, `format` (raw, css, json/DTCG) | text |
@@ -93,16 +93,15 @@ resources, so clients can attach them as context.
 
 ## Also worth deciding
 
-- **A shareable palette URL.** The app has no URL state today. If it could open
-  `https://categorycolors.com/?colors=…`, every server response could include a
-  link that opens the palette in the app, with its charts and report. This is
-  the most useful addition for people working alongside an agent, and it needs a
-  product decision on the URL format.
+- **Shareable palette URLs (done).** `https://categorycolors.com/?colors=…`
+  opens a palette in the app, each color exactly as written (any CSS notation),
+  and `#config=` carries the Configure panel's settings that differ from the
+  defaults, deflated. `linkFor` in `src/lib/share.ts` builds one; the WebMCP
+  tools already return it as `link`, and every remote server response should
+  too.
 - **Determinism.** Annealing is random, so identical requests give different
   palettes. A `seed` input (if the package can take one) would make results
   reproducible and the remote server cacheable.
-- **WebMCP in production.** Chrome exposes `document.modelContext` to ordinary
-  visitors only through an origin trial (Chrome 149 to 156). Registering
-  categorycolors.com for the trial and adding its token (an `Origin-Trial`
-  header in `public/_headers`) turns the browser tools on for real users until
-  the trial ends.
+- **WebMCP in production (done).** categorycolors.com is registered for the
+  origin trial (Chrome 149 to 162), and its token in `public/_headers` turns the
+  browser tools on for real visitors until 2027-03-29.
