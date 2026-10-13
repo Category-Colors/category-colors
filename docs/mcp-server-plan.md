@@ -4,7 +4,33 @@ Written 2026-10-12. Targets the [2026-07-28 MCP specification](https://modelcont
 (stateless core, Streamable HTTP) and v2 of the TypeScript SDK
 (`@modelcontextprotocol/server` 2.3.1, which implements that revision).
 
-## Where things stand
+## Status (2026-10-12): built, gated
+
+`functions/mcp.ts` serves four stateless tools at `/mcp`: `generate_palette`,
+`check_palette`, `get_preset_palette` and `export_palette`. The protocol
+belongs to the official SDK (`@modelcontextprotocol/server` 2.3.1,
+`createMcpHandler`), which answers 2026-07-28 clients and 2025-era clients that
+still send `initialize`. `src/lib/tools.ts` holds what it shares with the
+WebMCP tools. `scripts/test-mcp.mjs` covers the gate and both protocol eras, and
+the official client was run end to end against `wrangler pages dev`.
+
+The gate: with no `MCP_TOKEN` secret the endpoint is a 404, and with one every
+request needs `Authorization: Bearer <token>`. Browsers may only call it from
+categorycolors.com. To turn it on:
+
+```sh
+npx wrangler pages secret put MCP_TOKEN --project-name <project>
+claude mcp add --transport http category-colors https://categorycolors.com/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+Generation uses about a second of CPU, so it needs Workers Paid; on the free
+plan's 10 ms it fails with a resource-limit error while the other three tools
+work. Not yet done: rate limiting, server cards, listing in `llms.txt` and the
+MCP Registry, and resources. Claude.ai custom connectors expect OAuth rather
+than a static bearer token, so they wait for whatever replaces the gate.
+
+## Where things stood before
 
 The app registers six WebMCP tools (`src/lib/webmcp.ts`): `generate_palette`,
 `load_preset_palette`, `set_palette`, `check_palette`, `export_palette` and
