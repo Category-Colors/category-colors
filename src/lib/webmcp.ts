@@ -10,6 +10,7 @@ import {
 } from './palette'
 import { PRESET_PALETTES } from './presets'
 import { buildJndReport, testTitles } from './report'
+import { linkFor } from './share'
 
 // WebMCP (https://webmachinelearning.github.io/webmcp/): the page registers
 // tools on document.modelContext, and an agent in the browser calls them
@@ -99,13 +100,15 @@ function report(version: PaletteVersion) {
   }
 }
 
-function describe(version: PaletteVersion) {
+async function describe(version: PaletteVersion) {
   return {
     versionId: version.id,
     source: version.costHistory.length ? 'generated' : 'imported',
     edited: Boolean(version.edited),
     colors: version.colors.map(swatch),
     report: report(version),
+    // Opens this palette, with the settings that made it, for whoever the agent shares it with
+    link: (globalThis.location?.origin ?? 'https://categorycolors.com') + (await linkFor(version.colors, version.params)),
   }
 }
 
@@ -133,7 +136,7 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       name: 'get_current_palette',
       title: 'Get current palette',
       description:
-        'Returns the palette currently shown in Category Colors: each color as CSS, hex and OKLCH, whether it was generated or imported, and an accessibility report listing color pairs that fall below the just-noticeable-difference threshold under normal vision and simulated color vision deficiencies.',
+        'Returns the palette currently shown in Category Colors: each color as CSS, hex and OKLCH, whether it was generated or imported, a link that opens it in the app, and an accessibility report listing color pairs that fall below the just-noticeable-difference threshold under normal vision and simulated color vision deficiencies.',
       inputSchema: { type: 'object', properties: {} },
       annotations: { readOnlyHint: true },
       async execute() {

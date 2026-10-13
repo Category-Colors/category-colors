@@ -18,6 +18,7 @@ It is not the right tool for sequential or diverging scales (ordered data), UI t
 
 - In a browser that supports WebMCP (`document.modelContext`), https://categorycolors.com/ registers these tools: `generate_palette` (colorCount, optional style vivid/dusky/pastel, fixedColors, jnd), `load_preset_palette`, `set_palette`, `check_palette`, `export_palette` (raw, css or json) and `get_current_palette`. Results include each color as hex and OKLCH plus the distinguishability report. Generation takes a few seconds.
 - In code, use the `category-colors` npm package directly: `npm install category-colors`. The app's controls map one-to-one onto the package's config object.
+- To show someone a palette, link to `https://categorycolors.com/?colors=` followed by its colors, comma-separated, each URL-encoded (any CSS notation: `?colors=%23e8a33d,oklch(0.6%200.17%20260)`). The app opens it with its charts and distinguishability report. The WebMCP tools return such a link as `link`, including the settings that made the palette.
 - Without either, open the app and use its Configure panel, Generate button and Output panel; it needs JavaScript.
 
 ## Docs

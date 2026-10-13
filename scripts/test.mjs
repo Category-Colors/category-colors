@@ -5,6 +5,7 @@ import { createServer } from 'vite'
 import { testLaunch } from './test-launch.mjs'
 import { testWebMcp } from './test-webmcp.mjs'
 import { testAgents } from './test-agents.mjs'
+import { testShare } from './test-share.mjs'
 
 const server = await createServer({
   appType: 'custom',
@@ -269,6 +270,7 @@ try {
   await testLaunch(server)
   await testWebMcp(server)
   await testAgents(server)
+  await testShare(server)
 } finally {
   await server.close()
 }

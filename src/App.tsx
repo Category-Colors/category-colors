@@ -17,6 +17,7 @@ import { MobileBar, type MobileSheet } from '@/components/mobile/MobileBar'
 import { DOCKED, useIsPhone } from '@/lib/use-media'
 import { loadSession, saveSession } from '@/lib/session'
 import { registerWebMcpTools, type WebMcpApi } from '@/lib/webmcp'
+import { linkFor, readLink } from '@/lib/share'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
@@ -198,10 +199,10 @@ export default function App() {
 
   // Wholesale palette loads (presets, imports) become their own history
   // entries; empty costHistory marks that the optimizer never ran
-  const addPalette = (colors: string[]) => {
+  const addPalette = (colors: string[], params = paramsRef.current) => {
     const version: PaletteVersion = {
       id: nextId.current++,
-      params: structuredClone(paramsRef.current),
+      params: structuredClone(params),
       colors,
       cost: 0,
       iterations: 0,
@@ -212,6 +213,37 @@ export default function App() {
     setCurrentId(version.id)
     return version
   }
+
+  // A shared link is read once, at boot, before the effect below rewrites the
+  // address. Its palette joins history unless it's the one already showing
+  // (a reload), and its settings take over the panel.
+  const [link] = useState(() => readLink(window.location))
+  useEffect(() => {
+    let live = true
+    link.then((shared) => {
+      if (!live || !shared) return
+      const showing = sessionRef.current.versions.find((v) => v.id === sessionRef.current.currentId)
+      if (shared.colors.length && shared.colors.join() !== showing?.colors.join()) addPalette(shared.colors, shared.params)
+      setParams(shared.params)
+    })
+    return () => { live = false }
+  }, [link])
+
+  // The address bar always links to what's on screen, so copying it shares
+  // the palette and the panel. replaceState, so editing doesn't fill the
+  // back button.
+  useEffect(() => {
+    let live = true
+    const timer = window.setTimeout(async () => {
+      const next = await linkFor(current?.colors ?? [], params, window.location.pathname)
+      const { pathname, search, hash } = window.location
+      if (live && next !== pathname + search + hash) history.replaceState(history.state, '', next)
+    }, 250)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [current?.colors, params])
 
   // Tools read the latest state and callbacks through this ref, so they're
   // registered once rather than on every render.
