@@ -5,9 +5,10 @@
   "compatibility_date": "2026-09-07",
   // MCP_ENABLED: anything but "true" turns /mcp into a 404
   "vars": { "WEATHER_NON_COMMERCIAL": "true", "MCP_ENABLED": "true" },
-  // Needs Workers Paid. A 20-color generation takes about 1.2 s of CPU; this
-  // stops anything that runs far past that.
-  "limits": { "cpu_ms": 5000 },
+  // Needs Workers Paid. In production a generation takes 2.2 s of CPU at 8
+  // colors and up to about 4 s at 20 (2026-10-13), so 5 s turned some away;
+  // this stops only what runs far past that.
+  "limits": { "cpu_ms": 15000 },
   // Rate limits for /mcp, held by workers/limits
   "services": [{ "binding": "LIMITS", "service": "category-colors-limits" }]
 }

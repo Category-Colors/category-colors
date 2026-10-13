@@ -12,8 +12,8 @@ import { GENERATE_INPUT, PRESET_NAMES, colorList, generateParams, readColors, sc
 //
 // Open to anyone, without auth. Rate limits keep that affordable: they live in
 // workers/limits, counting requests and generations per client IP and
-// generations from everyone (a generation costs 0.5–1.2 s of CPU, which only
-// Workers Paid allows). Local runs without that Worker go unlimited. To take
+// generations from everyone (a generation costs 2–4 s of CPU in production,
+// which only Workers Paid allows). Local runs without that Worker go unlimited. To take
 // the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
 // and deploy.
 

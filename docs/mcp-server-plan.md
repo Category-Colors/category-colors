@@ -22,18 +22,20 @@ it from categorycolors.com. The off switch is `MCP_ENABLED` in
 claude mcp add --transport http category-colors https://categorycolors.com/mcp
 ```
 
-Generation uses 0.5–1.2 s of CPU (category-colors 3.1.0, 8–20 colors), so it
+Generation uses about 2.2 s of CPU at 8 colors and 3.6–4.1 s at 20, measured
+in production on 2026-10-13 (about 3.5 times a laptop running Node), so it
 needs Workers Paid; on the free plan's 10 ms it fails with a resource-limit
-error while the other three tools work. `wrangler.jsonc` caps each request at
-5 s of CPU, which the free plan also rejects at deploy.
+error. `wrangler.jsonc` caps each request at 15 s of CPU; a 5 s cap turned
+away some 20-color generations.
 
 Rate limits (2026-10-13) live in `workers/limits`, a separate Worker, because
 Pages Functions can't hold a rate limiting binding; the site reaches it through
 the `LIMITS` service binding. Per Cloudflare location, over 60 seconds: 60
 requests per client IP (429 with `Retry-After`), 10
 generations per client IP, and 30 generations from everyone. Saturating the
-global limit all month in one location would cost about $30 in CPU past the
-plan's included 30M CPU-ms; real use is far below. The counters are
+global limit all month in one location would cost about $100 in CPU past the
+plan's included 30M CPU-ms (30 a minute at about 4 s each); real use is far
+below. The included CPU covers about 13,000 eight-color generations a month. The counters are
 approximate by design. A local run without the limits Worker goes unlimited.
 Deploy it first:
 
