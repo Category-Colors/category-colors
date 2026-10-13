@@ -12,8 +12,8 @@
     // Every /mcp request, per client IP
     { "name": "REQUESTS", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } },
     // Palette generations, per client IP: each costs 2–4 s of CPU
-    { "name": "GENERATIONS", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+    { "name": "GENERATIONS", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } },
     // Palette generations from everyone, which caps the CPU bill
-    { "name": "ALL_GENERATIONS", "namespace_id": "1003", "simple": { "limit": 30, "period": 60 } }
+    { "name": "ALL_GENERATIONS", "namespace_id": "1003", "simple": { "limit": 10, "period": 60 } }
   ]
 }
