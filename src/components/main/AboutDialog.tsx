@@ -74,9 +74,7 @@ function ThanksTo() {
 
 function SplashArtwork() {
   return (
-    <div className="about-artwork" aria-hidden="true">
-      <img className="about-artwork-image" src={artwork} alt="" />
-    </div>
+    <img className="about-artwork" src={artwork} alt="" />
   )
 }
 

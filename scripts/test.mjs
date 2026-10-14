@@ -71,12 +71,13 @@ try {
   assert.equal(imported.jnd, 5)
   assert.equal(imported.maxIterations, 100_000)
   assert.equal(imported.orderOptimization, false)
-  // Pairs as files before 3.3 wrote them, each clamped and put in order;
-  // on hue, a backwards pair is the arc through zero
+  // Pairs as files before 3.3 wrote them, each clamped; on hue, a backwards
+  // pair is the arc through zero, and [400, -20] clamps to [360, 0], an arc
+  // of no width: a point at 0, as the package reads the same JSON
   assert.deepEqual(imported.colorSpace.ranges, [
     [[0, 1]],
     [[0.1, 0.4]],
-    [[0, 360]],
+    [[0, 0]],
   ])
   const windows = palette.parseParams(
     JSON.stringify({
@@ -85,9 +86,9 @@ try {
     })
   )
   assert.deepEqual(windows.colorSpace.ranges, [[[0.2, 0.6]], [[0, 0.2]], [[0, 60], [300, 360]]])
-  // a backwards hue pair whose arc has no width means the whole circle
-  const whole = palette.parseParams(JSON.stringify({ initColors: [], targets: [], evaluators: [], colorSpace: { mode: 'okhsl', ranges: [[360, 0], [0, 1], [0, 1]] } }))
-  assert.deepEqual(whole.colorSpace.ranges[0], [[0, 360]])
+  // the arc rule lives in tidyWindows, keyed by the channel's period
+  assert.deepEqual(palette.tidyWindows([[300, 60]], 360), [[0, 60], [300, 360]])
+  assert.deepEqual(palette.tidyWindows([[300, 60]]), [[60, 300]])
   assert.deepEqual(palette.tidyWindows([[5, 5]]), [[5, 5]])
   assert.deepEqual(palette.tidyWindows([[3, 1], [5, 5], [2, 4]]), [[1, 4]])
   assert.equal(imported.initColors.length, 1)

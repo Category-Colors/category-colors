@@ -38,21 +38,15 @@
 
       /* ── artwork ─────────────────────────────────────────────── */
 
-      .og-artwork {
-        position: relative;
-        overflow: hidden;
-        border-bottom: 1px solid #11131c;
-        background: #17122f;
-      }
-
       /* the About window's painting, cropped to the plate with the eye kept */
-      .og-artwork img {
-        position: absolute;
-        inset: 0;
+      .og-artwork {
+        display: block;
         width: 100%;
         height: 100%;
         object-fit: cover;
         object-position: 40% 50%;
+        border-bottom: 1px solid #11131c;
+        background: #17122f;
       }
 
       .og-colophon {
@@ -100,9 +94,7 @@
   </head>
   <body>
     <div class="og">
-      <div class="og-artwork">
-        <img src="/src/assets/about-art.webp" alt="" />
-      </div>
+      <img class="og-artwork" src="/src/assets/about-art.webp" alt="" />
 
       <div class="og-colophon">
         <div class="og-colophon-lead">

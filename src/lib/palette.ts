@@ -49,6 +49,10 @@ export interface EvaluatorSpec {
   avoidRadius: number
 }
 
+// Windows a channel may carry; the importer keeps this many and the slider
+// stops adding at it
+export const MAX_WINDOWS = 20
+
 // Seeds state.colors: fixedColor pins the value through annealing,
 // fixedOrder pins the position through order optimization.
 export interface InitColor {
@@ -80,13 +84,17 @@ export const defaultColorSpace = (mode: WorkingSpace): ColorSpaceParams => ({
   ranges: spaceInitialRanges(mode).map((r) => [r]),
 })
 
-// Sorted, non-overlapping, non-empty windows from any list of them: touching
-// or overlapping windows merge, and ones with no width are dropped unless
-// nothing else is left.
-export function tidyWindows(windows: ChannelWindow[]): ChannelWindow[] {
-  const sorted = windows.map(([a, b]): ChannelWindow => (a <= b ? [a, b] : [b, a])).sort((a, b) => a[0] - b[0])
+// Sorted, non-overlapping, non-empty windows from any list of them, as the
+// package reads them: on a cyclic channel of the given period, a backwards
+// window is the arc through zero ([300, 60] is [0, 60] and [300, 360]);
+// otherwise backwards is just reversed. Touching or overlapping windows
+// merge, and ones with no width drop unless nothing else is left.
+export function tidyWindows(windows: ChannelWindow[], period?: number): ChannelWindow[] {
+  const split = windows.flatMap(([a, b]): ChannelWindow[] =>
+    a <= b ? [[a, b]] : period ? [[0, b], [a, period]] : [[b, a]]
+  )
   const merged: ChannelWindow[] = []
-  for (const w of sorted) {
+  for (const w of split.sort((a, b) => a[0] - b[0])) {
     const last = merged.at(-1)
     if (last && w[0] <= last[1]) last[1] = Math.max(last[1], w[1])
     else merged.push([...w])
@@ -214,8 +222,6 @@ export const presetParams = (p: (typeof PARAM_PRESETS)[number]): PaletteParams =
   }
 }
 
-// Windows a channel may carry; the slider stops adding at this many too
-export const MAX_WINDOWS = 20
 
 const IMPORT_LIMITS = {
   textLength: 1_000_000,
@@ -223,7 +229,6 @@ const IMPORT_LIMITS = {
   targets: 100,
   evaluators: 50,
   avoidColors: 100,
-  windows: MAX_WINDOWS,
 } as const
 
 const boundedNumber = (
@@ -246,9 +251,8 @@ const normalizedHex = (value: unknown, fallback: string) => {
 // A space is only honored when its mode is known and it carries one range per
 // channel of that mode; each bound is clamped to the channel's own limits so a
 // hand-edited file can't put the annealer outside the space. A channel's entry
-// is a list of windows, or a single [min, max] as files before 3.3 wrote it.
-// On hue, a pair with min > max is the arc through zero, so [300, 60] becomes
-// [0, 60] and [300, 360].
+// is a list of windows, or a single [min, max] as files before 3.3 wrote it;
+// tidyWindows reads them the way the package will.
 function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
   if (!isWorkingSpace(space?.mode)) return defaultColorSpace('okhsl')
   const channels = spaceChannels(space.mode)
@@ -263,20 +267,11 @@ function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpa
         typeof v === 'number' && Number.isFinite(v)
           ? Math.min(channel.max, Math.max(channel.min, v))
           : fallback
-      const pairs: unknown[] = Array.isArray(raw) && raw.every((n) => typeof n === 'number') ? [raw] : Array.isArray(raw) ? raw : []
-      const windows = pairs.slice(0, IMPORT_LIMITS.windows).flatMap((pair): ChannelWindow[] => {
-        if (!Array.isArray(pair)) return []
-        const lo = clamp(pair[0], channel.initial[0])
-        const hi = clamp(pair[1], channel.initial[1])
-        // only a pair written within the circle can mean the arc; one that
-        // had to be clamped is just backwards
-        const arc = channel.key === 'h' && lo > hi && lo === pair[0] && hi === pair[1]
-        if (!arc) return [[lo, hi]]
-        // [360, 0] is an arc of nothing, which can only mean everything
-        const halves: ChannelWindow[] = [[channel.min, hi], [lo, channel.max]].filter(([a, b]) => b > a) as ChannelWindow[]
-        return halves.length ? halves : [[channel.min, channel.max]]
-      })
-      return windows.length ? tidyWindows(windows) : [[...channel.initial]]
+      const pairs: unknown[] = !Array.isArray(raw) ? [] : typeof raw[0] === 'number' ? [raw] : raw
+      const windows = pairs.slice(0, MAX_WINDOWS).flatMap((pair): ChannelWindow[] =>
+        Array.isArray(pair) ? [[clamp(pair[0], channel.initial[0]), clamp(pair[1], channel.initial[1])]] : []
+      )
+      return windows.length ? tidyWindows(windows, channel.period) : [[...channel.initial]]
     }),
   }
 }

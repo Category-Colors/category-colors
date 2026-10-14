@@ -515,10 +515,6 @@ body {
 }
 
 /* Dual-thumb range slider, visually matching .dialkit-slider */
-.range-slider-wrapper {
-  position: relative;
-}
-
 .range-slider {
   position: relative;
   height: var(--dial-row-height);
@@ -569,12 +565,9 @@ body {
   pointer-events: none;
 }
 
-.range-slider-value {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(calc(-50% + 0.5px));
-  display: inline-flex;
+/* The bound numbers, in the track or on the line under it */
+.range-slider-nums {
+  display: flex;
   align-items: baseline;
   gap: 3px;
   font-size: 13px;
@@ -584,18 +577,29 @@ body {
   color: var(--dial-text-label);
 }
 
+.range-slider-value {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(calc(-50% + 0.5px));
+}
+
 .range-slider-active .range-slider-value {
   color: var(--dial-text-focus);
 }
 
-.range-slider-num {
+.range-slider-num,
+.range-slider-add {
   appearance: none;
-  cursor: text;
   border: 0;
-  border-bottom: 1px solid transparent;
   background: transparent;
   color: inherit;
   font: inherit;
+}
+
+.range-slider-num {
+  cursor: text;
+  border-bottom: 1px solid transparent;
   padding-bottom: 1px;
   transition: border-color var(--dial-anim-fast);
 }
@@ -608,29 +612,13 @@ body {
 
 /* Several windows' bounds, under the track so they don't cover its bands */
 .range-slider-windows {
-  display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 3px;
   padding: 3px 10px 2px;
   font-size: 12px;
-  font-weight: 500;
-  font-family: 'Geist Variable', sans-serif;
-  font-variant-numeric: tabular-nums;
-  color: var(--dial-text-label);
-}
-
-.range-slider-windows .range-slider-dash:not(:first-child) {
-  margin-left: 1px;
 }
 
 /* Opens another window; shown with the handles */
 .range-slider-add {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--dial-text-label);
-  font: inherit;
   line-height: 1;
   padding: 0 0 0 4px;
   cursor: pointer;
@@ -2290,22 +2278,15 @@ body {
   overflow: auto;
 }
 
-.about-artwork {
-  position: relative;
-  min-height: 264px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--about-art-rule);
-  background: #17122f;
-}
-
 /* The painting is a little wider than the window; the crop keeps the eye */
-.about-artwork-image {
-  position: absolute;
-  inset: 0;
+.about-artwork {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: 264px;
   object-fit: cover;
   object-position: 40% 50%;
+  border-bottom: 1px solid var(--about-art-rule);
+  background: #17122f;
 }
 
 .about-colophon {
@@ -2443,7 +2424,7 @@ body {
   }
 
   .about-artwork {
-    min-height: 170px;
+    height: 170px;
   }
 
   .about-colophon {

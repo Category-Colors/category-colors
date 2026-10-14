@@ -9,7 +9,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { valueToCss } from '@/lib/color'
-import { spaceChannels, spaceRangeLabels } from '@/lib/color-spaces'
+import { spaceChannels } from '@/lib/color-spaces'
+import { decimalsForStep } from '@/components/dialkit/shortcut-utils'
 import { evaluatorLabel } from '@/lib/evaluators'
 import type { PaletteVersion } from '@/lib/palette'
 
@@ -18,9 +19,9 @@ export interface HistoryPopoverHandle {
   hide(): void
 }
 
-// Whole numbers for channels stepped by one (hue), two decimals otherwise
+// As the slider shows them: to the channel's step
 const fmtRange = (windows: [number, number][], step: number) =>
-  windows.map(([lo, hi]) => (step >= 1 ? `${Math.round(lo)}–${Math.round(hi)}` : `${lo.toFixed(2)}–${hi.toFixed(2)}`)).join(', ')
+  windows.map(([lo, hi]) => `${lo.toFixed(decimalsForStep(step))}–${hi.toFixed(decimalsForStep(step))}`).join(', ')
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -62,7 +63,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 // that produced it, in the report popover's visual language.
 function VersionDetail({ version }: { version: PaletteVersion }) {
   const { params } = version
-  const rangeLabels = spaceRangeLabels(params.colorSpace.mode)
+  const channels = spaceChannels(params.colorSpace.mode)
   // presets, imports, and from-scratch edits arrive without an annealing
   // run — their params are ambient panel state, not choices, so the whole
   // configuration report is withheld, not just cost/iterations
@@ -87,7 +88,7 @@ function VersionDetail({ version }: { version: PaletteVersion }) {
             <Group title="CONFIGURATION">
               <Row label="Space" value={params.colorSpace.mode} />
               {params.colorSpace.ranges.map((range, i) => (
-                <Row key={i} label={rangeLabels[i] ?? `Range ${i + 1}`} value={fmtRange(range, spaceChannels(params.colorSpace.mode)[i].step)} />
+                <Row key={i} label={`${channels[i].short} range`} value={fmtRange(range, channels[i].step)} />
               ))}
               <Row label="JND threshold" value={params.jnd} />
               <Row label="Order optimization" value={params.orderOptimization ? 'on' : 'off'} />
