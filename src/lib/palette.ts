@@ -214,13 +214,16 @@ export const presetParams = (p: (typeof PARAM_PRESETS)[number]): PaletteParams =
   }
 }
 
+// Windows a channel may carry; the slider stops adding at this many too
+export const MAX_WINDOWS = 20
+
 const IMPORT_LIMITS = {
   textLength: 1_000_000,
   initColors: 20,
   targets: 100,
   evaluators: 50,
   avoidColors: 100,
-  windows: 20,
+  windows: MAX_WINDOWS,
 } as const
 
 const boundedNumber = (
@@ -268,7 +271,10 @@ function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpa
         // only a pair written within the circle can mean the arc; one that
         // had to be clamped is just backwards
         const arc = channel.key === 'h' && lo > hi && lo === pair[0] && hi === pair[1]
-        return arc ? [[channel.min, hi], [lo, channel.max]] : [[lo, hi]]
+        if (!arc) return [[lo, hi]]
+        // [360, 0] is an arc of nothing, which can only mean everything
+        const halves: ChannelWindow[] = [[channel.min, hi], [lo, channel.max]].filter(([a, b]) => b > a) as ChannelWindow[]
+        return halves.length ? halves : [[channel.min, channel.max]]
       })
       return windows.length ? tidyWindows(windows) : [[...channel.initial]]
     }),

@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { valueToCss } from '@/lib/color'
-import { spaceRangeLabels } from '@/lib/color-spaces'
+import { spaceChannels, spaceRangeLabels } from '@/lib/color-spaces'
 import { evaluatorLabel } from '@/lib/evaluators'
 import type { PaletteVersion } from '@/lib/palette'
 
@@ -18,9 +18,9 @@ export interface HistoryPopoverHandle {
   hide(): void
 }
 
-const fmtWindow = ([lo, hi]: [number, number]) =>
-  hi > 2 ? `${Math.round(lo)}–${Math.round(hi)}` : `${lo.toFixed(2)}–${hi.toFixed(2)}`
-const fmtRange = (windows: [number, number][]) => windows.map(fmtWindow).join(', ')
+// Whole numbers for channels stepped by one (hue), two decimals otherwise
+const fmtRange = (windows: [number, number][], step: number) =>
+  windows.map(([lo, hi]) => (step >= 1 ? `${Math.round(lo)}–${Math.round(hi)}` : `${lo.toFixed(2)}–${hi.toFixed(2)}`)).join(', ')
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -87,7 +87,7 @@ function VersionDetail({ version }: { version: PaletteVersion }) {
             <Group title="CONFIGURATION">
               <Row label="Space" value={params.colorSpace.mode} />
               {params.colorSpace.ranges.map((range, i) => (
-                <Row key={i} label={rangeLabels[i] ?? `Range ${i + 1}`} value={fmtRange(range)} />
+                <Row key={i} label={rangeLabels[i] ?? `Range ${i + 1}`} value={fmtRange(range, spaceChannels(params.colorSpace.mode)[i].step)} />
               ))}
               <Row label="JND threshold" value={params.jnd} />
               <Row label="Order optimization" value={params.orderOptimization ? 'on' : 'off'} />
