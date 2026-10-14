@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { converter } from 'culori'
+import { clampChroma, converter } from 'culori'
 import type { Color } from 'culori'
 import { SpaceSelect } from '@/components/SpaceSelect'
 import {
@@ -63,8 +63,10 @@ const CHANNELS: Record<Exclude<Space, 'hex'>, ChannelDef[]> = {
 // well, so they keep HSV, the surface every picker uses for them.
 type PlaneSpace = 'hsl' | 'oklch' | 'oklab'
 interface Plane {
-  slider: string
+  slider: ChannelDef
   sliderBackground: string
+  // The plane position whose color marks the slider's handle
+  swatch: [x: number, y: number]
   // Where a value sits on the plane, both axes 0–1 with y upward
   toSquare(value: ColorValue): [x: number, y: number]
   // The value at a plane position, under a slider setting
@@ -80,43 +82,33 @@ interface Plane {
 const HUE_RAINBOW = 'linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00)'
 
 const channel = (space: Exclude<Space, 'hex'>, key: string) => CHANNELS[space].find((d) => d.key === key)!
-const fraction = (def: ChannelDef, n: number) => (n - def.min) / (def.max - def.min)
-const roundTo = (def: ChannelDef, n: number, round = Math.round) => {
+const roundTo = (def: ChannelDef, n: number) => {
   const p = 10 ** def.decimals
-  return round(Math.max(def.min, Math.min(def.max, n)) * p) / p
+  return Math.round(Math.max(def.min, Math.min(def.max, n)) * p) / p
 }
-// Chroma found at the gamut's edge rounds toward gray, so it stays inside
-const roundIn = (def: ChannelDef, n: number) => roundTo(def, n, Math.trunc)
+// A chroma-like channel at most `limit` from gray: rounded to nearest, then
+// stepped toward gray only when that lands past the limit. Nearest keeps a
+// handle from drifting over repeated slider moves; the step keeps edge picks
+// inside the gamut.
+const roundIn = (def: ChannelDef, n: number, limit: number) => {
+  const nearest = roundTo(def, n)
+  return Math.abs(nearest) <= Math.abs(limit) + 1e-9 ? nearest : roundTo(def, nearest - Math.sign(n) * 10 ** -def.decimals)
+}
 
 const toRgb = converter('rgb')
-const inGamut = (color: Color) => {
-  const { r, g, b } = toRgb(color)
-  return [r, g, b].every((c) => c >= -0.002 && c <= 1.002)
-}
 
-// The most chroma sRGB holds at a lightness and hue (OKLCH), found by
-// bisection under a ceiling no sRGB color reaches; the plane's x axis runs
-// from gray to this edge.
-const CHROMA_CEILING = 0.4
-function maxChroma(l: number, h: number): number {
-  let lo = 0
-  let hi = CHROMA_CEILING
-  for (let i = 0; i < 14; i++) {
-    const mid = (lo + hi) / 2
-    if (inGamut({ mode: 'oklch', l, c: mid, h })) lo = mid
-    else hi = mid
-  }
-  return lo
-}
+// The most chroma sRGB holds at a lightness and hue (OKLCH): culori's clamp
+// bisects down from a ceiling no sRGB color reaches. The plane's x axis
+// runs from gray to this edge.
+const maxChroma = (l: number, h: number) => clampChroma({ mode: 'oklch', l, c: 0.4, h }, 'oklch').c
 
 // OKLAB's a/b plane at a lightness is a blob, which the elliptical grid
 // mapping (Fong) turns into a square: polar position scaled by the gamut
 // edge in that direction becomes a disc, and the disc becomes the square.
-const RT2 = Math.SQRT2
 const discToSquare = (u: number, v: number): [number, number] => {
   const sq = (n: number) => Math.sqrt(Math.max(0, n))
-  const x = (sq(2 + u * u - v * v + 2 * RT2 * u) - sq(2 + u * u - v * v - 2 * RT2 * u)) / 2
-  const y = (sq(2 - u * u + v * v + 2 * RT2 * v) - sq(2 - u * u + v * v - 2 * RT2 * v)) / 2
+  const x = (sq(2 + u * u - v * v + 2 * Math.SQRT2 * u) - sq(2 + u * u - v * v - 2 * Math.SQRT2 * u)) / 2
+  const y = (sq(2 - u * u + v * v + 2 * Math.SQRT2 * v) - sq(2 - u * u + v * v - 2 * Math.SQRT2 * v)) / 2
   return [(x + 1) / 2, (y + 1) / 2]
 }
 const squareToDisc = (x: number, y: number): [number, number] => {
@@ -128,16 +120,18 @@ const degrees = (rad: number) => ((rad * 180) / Math.PI + 360) % 360
 
 const PLANES: Record<PlaneSpace, Plane> = {
   hsl: {
-    slider: 'h',
+    slider: channel('hsl', 'h'),
     sliderBackground: HUE_RAINBOW,
-    toSquare: (value) => (value.space === 'hsl' ? [value.s / 100, value.l / 100] : [0, 0]),
-    fromSquare: (h, x, y) => ({ space: 'hsl', h, s: roundTo(channel('hsl', 's'), x * 100), l: roundTo(channel('hsl', 'l'), y * 100) }),
+    swatch: [1, 0.5],
+    toSquare: (value) => (value.space === 'hsl' ? [value.s / channel('hsl', 's').max, value.l / channel('hsl', 'l').max] : [0, 0]),
+    fromSquare: (h, x, y) => ({ space: 'hsl', h, s: roundTo(channel('hsl', 's'), x * channel('hsl', 's').max), l: roundTo(channel('hsl', 'l'), y * channel('hsl', 'l').max) }),
     withSlider: (value, h) => ({ ...value, h }) as ColorValue,
     painter: (h) => (x, y) => ({ mode: 'hsl', h, s: x, l: y }),
   },
   oklch: {
-    slider: 'h',
+    slider: channel('oklch', 'h'),
     sliderBackground: 'linear-gradient(to right in oklch longer hue, oklch(0.72 0.14 0), oklch(0.72 0.14 360))',
+    swatch: [0.6, 0.72],
     toSquare: (value) => {
       if (value.space !== 'oklch') return [0, 0]
       const max = maxChroma(value.l, value.h)
@@ -145,12 +139,14 @@ const PLANES: Record<PlaneSpace, Plane> = {
     },
     fromSquare: (h, x, y) => {
       const l = roundTo(channel('oklch', 'l'), y)
-      return { space: 'oklch', l, c: roundIn(channel('oklch', 'c'), x * maxChroma(l, h)), h }
+      const max = maxChroma(l, h)
+      return { space: 'oklch', l, c: roundIn(channel('oklch', 'c'), x * max, max), h }
     },
     withSlider: (value, h) => {
       if (value.space !== 'oklch') return value
       const [x] = PLANES.oklch.toSquare(value)
-      return { ...value, h, c: roundIn(channel('oklch', 'c'), x * maxChroma(value.l, h)) }
+      const max = maxChroma(value.l, h)
+      return { ...value, h, c: roundIn(channel('oklch', 'c'), x * max, max) }
     },
     painter: (h) => {
       const edge = new Map<number, number>()
@@ -162,8 +158,9 @@ const PLANES: Record<PlaneSpace, Plane> = {
     },
   },
   oklab: {
-    slider: 'l',
+    slider: channel('oklab', 'l'),
     sliderBackground: 'linear-gradient(to right, #000, #fff)',
+    swatch: [0.5, 0.5],
     toSquare: (value) => {
       if (value.space !== 'oklab') return [0, 0]
       const angle = Math.atan2(value.b, value.a)
@@ -175,7 +172,8 @@ const PLANES: Record<PlaneSpace, Plane> = {
       const [u, v] = squareToDisc(x, y)
       const angle = Math.atan2(v, u)
       const c = Math.hypot(u, v) * maxChroma(l, degrees(angle))
-      return { space: 'oklab', l, a: roundIn(channel('oklab', 'a'), c * Math.cos(angle)), b: roundIn(channel('oklab', 'b'), c * Math.sin(angle)) }
+      const [a, b] = [c * Math.cos(angle), c * Math.sin(angle)]
+      return { space: 'oklab', l, a: roundIn(channel('oklab', 'a'), a, a), b: roundIn(channel('oklab', 'b'), b, b) }
     },
     // a and b have to move with lightness to stay inside the gamut
     withSlider: (value, l) => PLANES.oklab.fromSquare(l, ...PLANES.oklab.toSquare(value)),
@@ -197,8 +195,8 @@ const isPlaneSpace = (space: Space): space is PlaneSpace => space in PLANES
 // Paints the plane at a slider setting, low resolution and stretched by CSS
 const PLANE_W = 140
 const PLANE_H = 70
-function paintPlane(canvas: HTMLCanvasElement, space: PlaneSpace, slider: number) {
-  const color = PLANES[space].painter(slider)
+function paintPlane(canvas: HTMLCanvasElement, plane: Plane, slider: number) {
+  const color = plane.painter(slider)
   const ctx = canvas.getContext('2d')!
   const image = ctx.createImageData(PLANE_W, PLANE_H)
   const data = image.data
@@ -264,16 +262,16 @@ export function ColorPicker({
   const space = value.space
   const plane = isPlaneSpace(space) ? PLANES[space] : null
   const channels = value as unknown as Record<string, number>
-  const sliderFraction = plane ? fraction(channel(space as PlaneSpace, plane.slider), channels[plane.slider]) : hsv[0] / 360
+  const sliderValue = plane ? channels[plane.slider.key] : hsv[0]
+  const sliderFraction = plane ? (sliderValue - plane.slider.min) / (plane.slider.max - plane.slider.min) : hsv[0] / 360
   const [xFraction, yFraction] = plane ? plane.toSquare(value) : [hsv[1], hsv[2]]
 
   // Before paint, so the plane never shows the slider's previous setting
   // under a handle already at the new one
   const planeRef = useRef<HTMLCanvasElement>(null)
-  const sliderValue = plane ? channels[plane.slider] : 0
   useLayoutEffect(() => {
-    if (isPlaneSpace(space) && planeRef.current) paintPlane(planeRef.current, space, sliderValue)
-  }, [space, sliderValue])
+    if (plane && planeRef.current) paintPlane(planeRef.current, plane, sliderValue)
+  }, [plane, sliderValue])
 
   // A pointer position on the surface, as fractions of its width and height
   const pointerFractions = (e: ReactPointerEvent<HTMLDivElement>): [number, number] | null => {
@@ -287,14 +285,14 @@ export function ColorPicker({
     const at = pointerFractions(e)
     if (!at) return
     if (!plane) return emitFromHsv([hsv[0], at[0], at[1]])
-    applyValue(plane.fromSquare(channels[plane.slider], at[0], at[1]))
+    applyValue(plane.fromSquare(sliderValue, at[0], at[1]))
   }
 
   const huePointer = (e: ReactPointerEvent<HTMLDivElement>) => {
     const at = pointerFractions(e)
     if (!at) return
     if (!plane) return emitFromHsv([at[0] * 360, hsv[1], hsv[2]])
-    const def = channel(space as PlaneSpace, plane.slider)
+    const def = plane.slider
     applyValue(plane.withSlider(value, roundTo(def, def.min + at[0] * (def.max - def.min))))
   }
 
@@ -304,9 +302,9 @@ export function ColorPicker({
       const m = /^#?([0-9a-f]{6})$/i.exec(draft.text.trim())
       if (m) applyValue(hexValue(`#${m[1].toUpperCase()}`))
     } else {
-      const def = CHANNELS[value.space].find((d) => d.key === draft.key)
+      const def = channel(value.space, draft.key)
       const n = Number(draft.text)
-      if (def && Number.isFinite(n)) applyValue({ ...value, [draft.key]: roundTo(def, n) } as ColorValue)
+      if (Number.isFinite(n)) applyValue({ ...value, [draft.key]: roundTo(def, n) } as ColorValue)
     }
     setDraft(null)
   }
@@ -332,7 +330,7 @@ export function ColorPicker({
     <div className="color-picker">
       <div
         className={plane ? 'picker-sv' : 'picker-sv picker-sv-hsv'}
-        style={{ '--picker-hue': `hsl(${hsv[0]}, 100%, 50%)` } as CSSProperties}
+        style={plane ? undefined : ({ '--picker-hue': `hsl(${hsv[0]}, 100%, 50%)` } as CSSProperties)}
         onPointerDown={svPointer}
         onPointerMove={svPointer}
       >
@@ -358,7 +356,7 @@ export function ColorPicker({
             left: `${sliderFraction * 100}%`,
             top: '50%',
             backgroundColor: plane
-              ? valueToCss(plane.fromSquare(channels[plane.slider], plane.slider === 'l' ? 0.5 : 0.6, plane.slider === 'l' ? 0.5 : 0.72))
+              ? valueToCss(plane.fromSquare(sliderValue, ...plane.swatch))
               : `hsl(${hsv[0]}, 100%, 50%)`,
           }}
         />
@@ -395,17 +393,8 @@ export function ColorPicker({
           {CHANNELS[value.space].map((def) => (
             <label key={def.key} className="picker-channel">
               <input
-                value={
-                  draft?.key === def.key
-                    ? draft.text
-                    : String((value as unknown as Record<string, number>)[def.key])
-                }
-                onFocus={() =>
-                  setDraft({
-                    key: def.key,
-                    text: String((value as unknown as Record<string, number>)[def.key]),
-                  })
-                }
+                value={draft?.key === def.key ? draft.text : String(channels[def.key])}
+                onFocus={() => setDraft({ key: def.key, text: String(channels[def.key]) })}
                 onChange={(e) => setDraft({ key: def.key, text: e.target.value })}
                 onBlur={commitDraft}
                 onKeyDown={inputKeyDown}
