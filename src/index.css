@@ -1312,8 +1312,6 @@ body {
   border-radius: 8px;
   cursor: crosshair;
   touch-action: none;
-  /* the frame before the plane's first paint */
-  background: var(--dial-surface);
 }
 
 /* HSV's saturation axis starts at white in either theme */
