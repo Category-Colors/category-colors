@@ -1312,9 +1312,23 @@ body {
   border-radius: 8px;
   cursor: crosshair;
   touch-action: none;
+  overflow: hidden;
+  /* shows through where the plane leaves the sRGB gamut */
+  background: var(--dial-surface);
+}
+
+/* HSV's saturation axis starts at white in either theme */
+.picker-sv-hsv {
   background:
     linear-gradient(to top, #000, transparent),
-    linear-gradient(to right, var(--theme-ink), var(--picker-hue));
+    linear-gradient(to right, #fff, var(--picker-hue));
+}
+
+.picker-plane {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .picker-handle {
@@ -1322,7 +1336,7 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--theme-ink);
+  border: 2px solid #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -1334,16 +1348,6 @@ body {
   border-radius: 999px;
   cursor: ew-resize;
   touch-action: none;
-  background: linear-gradient(
-    to right,
-    #f00,
-    #ff0 17%,
-    #0f0 33%,
-    #0ff 50%,
-    #00f 67%,
-    #f0f 83%,
-    #f00
-  );
 }
 
 .picker-io {
