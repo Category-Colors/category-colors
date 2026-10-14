@@ -71,11 +71,22 @@ try {
   assert.equal(imported.jnd, 5)
   assert.equal(imported.maxIterations, 100_000)
   assert.equal(imported.orderOptimization, false)
+  // Pairs as files before 3.3 wrote them, each clamped and put in order;
+  // on hue, a backwards pair is the arc through zero
   assert.deepEqual(imported.colorSpace.ranges, [
-    [0, 1],
-    [0.1, 0.4],
-    [0, 360],
+    [[0, 1]],
+    [[0.1, 0.4]],
+    [[0, 360]],
   ])
+  const windows = palette.parseParams(
+    JSON.stringify({
+      initColors: [], targets: [], evaluators: [],
+      colorSpace: { mode: 'oklch', ranges: [[[0.2, 0.4], [0.3, 0.6], [0.9, 0.9]], [0, 0.2], [300, 60]] },
+    })
+  )
+  assert.deepEqual(windows.colorSpace.ranges, [[[0.2, 0.6]], [[0, 0.2]], [[0, 60], [300, 360]]])
+  assert.deepEqual(palette.tidyWindows([[5, 5]]), [[5, 5]])
+  assert.deepEqual(palette.tidyWindows([[3, 1], [5, 5], [2, 4]]), [[1, 4]])
   assert.equal(imported.initColors.length, 1)
   assert.deepEqual(imported.initColors[0].value, { space: 'rgb', r: 255, g: 20, b: 0 })
   assert.equal(imported.targets.length, 1)

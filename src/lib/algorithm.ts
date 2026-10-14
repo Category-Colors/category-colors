@@ -51,7 +51,7 @@ export function buildConfig(params: PaletteParams): Config {
   config.maxIterations = params.maxIterations
   config.colorSpace = {
     mode: params.colorSpace.mode,
-    ranges: params.colorSpace.ranges.map((r) => [...r]),
+    ranges: params.colorSpace.ranges.map((windows) => windows.map((w) => [...w])),
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
   config.evalFunctions = params.evaluators.filter((spec) => spec.weight > 0).map(toEvalFunction)

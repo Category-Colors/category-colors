@@ -18,8 +18,9 @@ export interface HistoryPopoverHandle {
   hide(): void
 }
 
-const fmtRange = ([lo, hi]: [number, number]) =>
+const fmtWindow = ([lo, hi]: [number, number]) =>
   hi > 2 ? `${Math.round(lo)}–${Math.round(hi)}` : `${lo.toFixed(2)}–${hi.toFixed(2)}`
+const fmtRange = (windows: [number, number][]) => windows.map(fmtWindow).join(', ')
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
