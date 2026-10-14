@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
+import { converter } from 'culori'
+import type { Color } from 'culori'
 import { SpaceSelect } from '@/components/SpaceSelect'
 import {
   convertValue,
   hexValue,
   hsvToHex,
   hsvToValue,
+  valueToCss,
   valueToHsv,
   type ColorValue,
   type Hsv,
@@ -44,7 +47,7 @@ const CHANNELS: Record<Exclude<Space, 'hex'>, ChannelDef[]> = {
   ],
   oklch: [
     { key: 'l', label: 'L', min: 0, max: 1, decimals: 3 },
-    { key: 'c', label: 'C', min: 0, max: 0.5, decimals: 3 },
+    { key: 'c', label: 'C', min: 0, max: 0.4, decimals: 3 },
     { key: 'h', label: 'H', min: 0, max: 360, decimals: 1 },
   ],
   oklab: [
@@ -52,6 +55,77 @@ const CHANNELS: Record<Exclude<Space, 'hex'>, ChannelDef[]> = {
     { key: 'a', label: 'A', min: -0.4, max: 0.4, decimals: 3 },
     { key: 'b', label: 'B', min: -0.4, max: 0.4, decimals: 3 },
   ],
+}
+
+// The pick surface in the color's own space, so dragging moves the numbers in
+// the inputs below: a plane of two channels at the slider's third. hex and
+// rgb have no plane that reads well, so they keep HSV, the surface every
+// picker uses for them.
+type PlaneSpace = 'hsl' | 'oklch' | 'oklab'
+interface Plane {
+  slider: string
+  x: string
+  y: string
+  color: (slider: number, x: number, y: number) => Color
+  sliderBackground: string
+}
+
+const HUE_RAINBOW = 'linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00)'
+
+const PLANES: Record<PlaneSpace, Plane> = {
+  hsl: {
+    slider: 'h', x: 's', y: 'l',
+    color: (h, s, l) => ({ mode: 'hsl', h, s: s / 100, l: l / 100 }),
+    sliderBackground: HUE_RAINBOW,
+  },
+  oklch: {
+    slider: 'h', x: 'c', y: 'l',
+    color: (h, c, l) => ({ mode: 'oklch', l, c, h }),
+    sliderBackground: 'linear-gradient(in oklch longer hue, oklch(0.72 0.14 0), oklch(0.72 0.14 360))',
+  },
+  oklab: {
+    slider: 'l', x: 'a', y: 'b',
+    color: (l, a, b) => ({ mode: 'oklab', l, a, b }),
+    sliderBackground: 'linear-gradient(to right, #000, #fff)',
+  },
+}
+
+const isPlaneSpace = (space: Space): space is PlaneSpace => space in PLANES
+
+const channel = (space: Exclude<Space, 'hex'>, key: string) => CHANNELS[space].find((d) => d.key === key)!
+const fraction = (def: ChannelDef, n: number) => (n - def.min) / (def.max - def.min)
+const roundTo = (def: ChannelDef, n: number) => {
+  const p = 10 ** def.decimals
+  return Math.round(Math.max(def.min, Math.min(def.max, n)) * p) / p
+}
+
+// Paints the plane at a slider setting, low resolution and stretched by CSS.
+// Pixels outside sRGB are left clear: the plane shows the gamut's real shape
+// rather than a clamped color that lies about where the edge is.
+const toRgb = converter('rgb')
+const PLANE_W = 280
+const PLANE_H = 140
+function paintPlane(canvas: HTMLCanvasElement, space: PlaneSpace, slider: number) {
+  const plane = PLANES[space]
+  const xDef = channel(space, plane.x)
+  const yDef = channel(space, plane.y)
+  const ctx = canvas.getContext('2d')!
+  const image = ctx.createImageData(PLANE_W, PLANE_H)
+  const data = image.data
+  for (let row = 0; row < PLANE_H; row++) {
+    const y = yDef.max - ((row + 0.5) / PLANE_H) * (yDef.max - yDef.min)
+    for (let col = 0; col < PLANE_W; col++) {
+      const x = xDef.min + ((col + 0.5) / PLANE_W) * (xDef.max - xDef.min)
+      const { r, g, b } = toRgb(plane.color(slider, x, y))
+      const i = (row * PLANE_W + col) * 4
+      if ([r, g, b].some((c) => c < -0.002 || c > 1.002)) continue
+      data[i] = Math.round(clamp01(r) * 255)
+      data[i + 1] = Math.round(clamp01(g) * 255)
+      data[i + 2] = Math.round(clamp01(b) * 255)
+      data[i + 3] = 255
+    }
+  }
+  ctx.putImageData(image, 0, 0)
 }
 
 function PipetteIcon() {
@@ -97,20 +171,48 @@ export function ColorPicker({
     onChange(next)
   }
 
-  const svPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
+  // The surface's three numbers: HSV for hex and rgb, the space's own
+  // channels otherwise. Slider first, then the plane's x and y.
+  const space = value.space
+  const plane = isPlaneSpace(space) ? PLANES[space] : null
+  const channels = value as unknown as Record<string, number>
+  const sliderFraction = plane ? fraction(channel(space as PlaneSpace, plane.slider), channels[plane.slider]) : hsv[0] / 360
+  const xFraction = plane ? fraction(channel(space as PlaneSpace, plane.x), channels[plane.x]) : hsv[1]
+  const yFraction = plane ? fraction(channel(space as PlaneSpace, plane.y), channels[plane.y]) : hsv[2]
+
+  const planeRef = useRef<HTMLCanvasElement>(null)
+  const sliderValue = plane ? channels[plane.slider] : 0
+  useEffect(() => {
+    if (plane && planeRef.current) paintPlane(planeRef.current, space as PlaneSpace, sliderValue)
+  }, [plane, space, sliderValue])
+
+  // A pointer position on the surface, as fractions of its width and height
+  const pointerFractions = (e: ReactPointerEvent<HTMLDivElement>): [number, number] | null => {
     if (e.type === 'pointerdown') e.currentTarget.setPointerCapture(e.pointerId)
-    else if (e.buttons !== 1) return
+    else if (e.buttons !== 1) return null
     const rect = e.currentTarget.getBoundingClientRect()
-    const s = clamp01((e.clientX - rect.left) / rect.width)
-    const v = 1 - clamp01((e.clientY - rect.top) / rect.height)
-    emitFromHsv([hsv[0], s, v])
+    return [clamp01((e.clientX - rect.left) / rect.width), 1 - clamp01((e.clientY - rect.top) / rect.height)]
+  }
+
+  const svPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const at = pointerFractions(e)
+    if (!at) return
+    if (!plane) return emitFromHsv([hsv[0], at[0], at[1]])
+    const xDef = channel(space as PlaneSpace, plane.x)
+    const yDef = channel(space as PlaneSpace, plane.y)
+    applyValue({
+      ...value,
+      [plane.x]: roundTo(xDef, xDef.min + at[0] * (xDef.max - xDef.min)),
+      [plane.y]: roundTo(yDef, yDef.min + at[1] * (yDef.max - yDef.min)),
+    } as ColorValue)
   }
 
   const huePointer = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.type === 'pointerdown') e.currentTarget.setPointerCapture(e.pointerId)
-    else if (e.buttons !== 1) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    emitFromHsv([clamp01((e.clientX - rect.left) / rect.width) * 360, hsv[1], hsv[2]])
+    const at = pointerFractions(e)
+    if (!at) return
+    if (!plane) return emitFromHsv([at[0] * 360, hsv[1], hsv[2]])
+    const def = channel(space as PlaneSpace, plane.slider)
+    applyValue({ ...value, [plane.slider]: roundTo(def, def.min + at[0] * (def.max - def.min)) } as ColorValue)
   }
 
   const commitDraft = () => {
@@ -150,27 +252,35 @@ export function ColorPicker({
   return (
     <div className="color-picker">
       <div
-        className="picker-sv"
+        className={plane ? 'picker-sv' : 'picker-sv picker-sv-hsv'}
         style={{ '--picker-hue': `hsl(${hsv[0]}, 100%, 50%)` } as CSSProperties}
         onPointerDown={svPointer}
         onPointerMove={svPointer}
       >
+        {plane && <canvas ref={planeRef} className="picker-plane" width={PLANE_W} height={PLANE_H} />}
         <div
           className="picker-handle"
           style={{
-            left: `${hsv[1] * 100}%`,
-            top: `${(1 - hsv[2]) * 100}%`,
-            backgroundColor: hsvToHex(hsv),
+            left: `${xFraction * 100}%`,
+            top: `${(1 - yFraction) * 100}%`,
+            backgroundColor: plane ? valueToCss(value) : hsvToHex(hsv),
           }}
         />
       </div>
-      <div className="picker-hue" onPointerDown={huePointer} onPointerMove={huePointer}>
+      <div
+        className="picker-hue"
+        style={{ background: plane ? plane.sliderBackground : HUE_RAINBOW }}
+        onPointerDown={huePointer}
+        onPointerMove={huePointer}
+      >
         <div
           className="picker-handle"
           style={{
-            left: `${(hsv[0] / 360) * 100}%`,
+            left: `${sliderFraction * 100}%`,
             top: '50%',
-            backgroundColor: `hsl(${hsv[0]}, 100%, 50%)`,
+            backgroundColor: plane
+              ? valueToCss({ ...value, [plane.x]: plane.slider === 'l' ? 0 : 0.14, [plane.y]: plane.slider === 'l' ? 0 : 0.72 } as ColorValue)
+              : `hsl(${hsv[0]}, 100%, 50%)`,
           }}
         />
       </div>
