@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
 import { SPRING, FADE } from '@/components/dialkit'
-import { tidyWindows, type ChannelWindow } from '@/lib/palette'
+import { MAX_WINDOWS, tidyWindows, type ChannelWindow } from '@/lib/palette'
 
 const HANDLE_BUFFER = 8
 const LABEL_CSS_LEFT = 10
@@ -52,10 +52,17 @@ export function RangeSlider({
       inputRef.current.select()
     }
   }, [editing])
+  // The windows can change under an edit (a restore, a preset, a tool call);
+  // an edit of a window that's gone is dropped rather than committed
+  const editingLive = editing !== null && value[editing[0]] !== undefined
+  useEffect(() => {
+    if (editing !== null && !editingLive) setEditing(null)
+  }, [editing, editingLive])
 
   // The windows with one bound moved: it stays on its own side of its
   // partner and off the neighboring windows
   const withBound = ([w, end]: Bound, raw: number): ChannelWindow[] => {
+    if (!value[w]) return value
     const [lo, hi] = value[w]
     const floor = end === 0 ? (value[w - 1]?.[1] ?? min) : lo
     const ceiling = end === 1 ? (value[w + 1]?.[0] ?? max) : hi
@@ -84,8 +91,9 @@ export function RangeSlider({
     let distance = Infinity
     value.forEach((window, w) =>
       window.forEach((b, end) => {
-        // ties go to the later bound, so a click past a shut window reopens it
-        if (Math.abs(v - b) <= distance) [nearest, distance] = [[w, end as 0 | 1], Math.abs(v - b)]
+        // a tie is a shut window: the click's side says which bound reopens it
+        const d = Math.abs(v - b)
+        if (d < distance || (d === distance && (v < b ? end === 0 : end === 1))) [nearest, distance] = [[w, end as 0 | 1], d]
       })
     )
     bound.current = nearest
@@ -108,6 +116,7 @@ export function RangeSlider({
   // Another window: in the widest gap, taking its middle third; with no gap
   // worth the name, the widest window splits into its outer thirds instead
   const addWindow = () => {
+    if (value.length >= MAX_WINDOWS) return
     const round = (n: number) => +n.toFixed(decimals)
     const edges = [min, ...value.flat(), max]
     const gaps = Array.from({ length: edges.length / 2 }, (_, i): ChannelWindow => [edges[2 * i], edges[2 * i + 1]])
@@ -130,7 +139,7 @@ export function RangeSlider({
   }
 
   const commitInput = () => {
-    if (editing !== null) {
+    if (editingLive) {
       const parsed = Number(inputValue)
       if (Number.isFinite(parsed)) {
         const next = tidyWindows(withBound(editing, parsed))
@@ -247,7 +256,7 @@ export function RangeSlider({
           onPointerDown={stop}
         >
           {value.length === 1 && bounds}
-          <button
+          {value.length < MAX_WINDOWS && <button
             type="button"
             className="range-slider-add"
             aria-label={`Add a ${label.toLowerCase()} window`}
@@ -255,7 +264,7 @@ export function RangeSlider({
             onClick={addWindow}
           >
             +
-          </button>
+          </button>}
         </span>
       </div>
       {value.length > 1 && <div className="range-slider-windows">{bounds}</div>}

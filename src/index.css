@@ -643,6 +643,13 @@ body {
   opacity: 1;
 }
 
+/* No hover to reveal it on a touch screen, so it's simply there */
+@media (hover: none) {
+  .range-slider-add {
+    opacity: 1;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .range-slider-add:hover {
     color: var(--dial-text-focus);

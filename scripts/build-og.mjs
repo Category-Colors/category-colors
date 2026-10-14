@@ -1,4 +1,4 @@
-// Renders scripts/og-card.html to public/og.png (1200×630, the Open Graph
+// Renders scripts/og-card.html to public/og.jpg (1200×630, the Open Graph
 // size every card consumer crops to).
 //
 // Playwright isn't a dependency of this app — the card changes about as often
@@ -36,11 +36,12 @@ async function findChrome() {
   return `${CACHE}/${latest}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`
 }
 
-const out = fileURLToPath(new URL('../public/og.png', import.meta.url))
+const out = fileURLToPath(new URL('../public/og.jpg', import.meta.url))
 const browser = await chromium.launch({ executablePath: await findChrome() })
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } })
 await page.goto(`http://localhost:${process.env.PORT ?? 5173}/scripts/og-card.html`, { waitUntil: 'networkidle' })
 await page.evaluate(() => document.fonts.ready)
-await page.locator('.og').screenshot({ path: out })
+// JPEG: the painting is photographic, and PNG made it a megabyte
+await page.locator('.og').screenshot({ path: out, type: 'jpeg', quality: 88 })
 await browser.close()
 console.log(`wrote ${out}`)

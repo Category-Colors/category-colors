@@ -85,6 +85,9 @@ try {
     })
   )
   assert.deepEqual(windows.colorSpace.ranges, [[[0.2, 0.6]], [[0, 0.2]], [[0, 60], [300, 360]]])
+  // a backwards hue pair whose arc has no width means the whole circle
+  const whole = palette.parseParams(JSON.stringify({ initColors: [], targets: [], evaluators: [], colorSpace: { mode: 'okhsl', ranges: [[360, 0], [0, 1], [0, 1]] } }))
+  assert.deepEqual(whole.colorSpace.ranges[0], [[0, 360]])
   assert.deepEqual(palette.tidyWindows([[5, 5]]), [[5, 5]])
   assert.deepEqual(palette.tidyWindows([[3, 1], [5, 5], [2, 4]]), [[1, 4]])
   assert.equal(imported.initColors.length, 1)
