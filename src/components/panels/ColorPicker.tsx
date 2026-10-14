@@ -81,7 +81,7 @@ const PLANES: Record<PlaneSpace, Plane> = {
   oklch: {
     slider: 'h', x: 'c', y: 'l',
     color: (h, c, l) => ({ mode: 'oklch', l, c, h }),
-    sliderBackground: 'linear-gradient(in oklch longer hue, oklch(0.72 0.14 0), oklch(0.72 0.14 360))',
+    sliderBackground: 'linear-gradient(to right in oklch longer hue, oklch(0.72 0.14 0), oklch(0.72 0.14 360))',
   },
   oklab: {
     slider: 'l', x: 'a', y: 'b',
@@ -103,6 +103,33 @@ const roundTo = (def: ChannelDef, n: number) => {
 // Pixels outside sRGB are left clear: the plane shows the gamut's real shape
 // rather than a clamped color that lies about where the edge is.
 const toRgb = converter('rgb')
+const inGamut = (color: Color) => {
+  const { r, g, b } = toRgb(color)
+  return [r, g, b].every((c) => c >= -0.002 && c <= 1.002)
+}
+
+// A pick outside sRGB comes back to its edge along the chroma axis: OKLCH's
+// c shrinks, OKLAB's a and b shrink together, so hue and lightness hold.
+// HSL is sRGB already.
+function toGamut(value: ColorValue): ColorValue {
+  if (value.space !== 'oklch' && value.space !== 'oklab') return value
+  const at = (t: number): Color =>
+    value.space === 'oklch'
+      ? { mode: 'oklch', l: value.l, c: value.c * t, h: value.h }
+      : { mode: 'oklab', l: value.l, a: value.a * t, b: value.b * t }
+  if (inGamut(at(1))) return value
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2
+    if (inGamut(at(mid))) lo = mid
+    else hi = mid
+  }
+  return value.space === 'oklch'
+    ? { ...value, c: roundTo(channel('oklch', 'c'), value.c * lo) }
+    : { ...value, a: roundTo(channel('oklab', 'a'), value.a * lo), b: roundTo(channel('oklab', 'b'), value.b * lo) }
+}
+
 const PLANE_W = 280
 const PLANE_H = 140
 function paintPlane(canvas: HTMLCanvasElement, space: PlaneSpace, slider: number) {
@@ -200,11 +227,11 @@ export function ColorPicker({
     if (!plane) return emitFromHsv([hsv[0], at[0], at[1]])
     const xDef = channel(space as PlaneSpace, plane.x)
     const yDef = channel(space as PlaneSpace, plane.y)
-    applyValue({
+    applyValue(toGamut({
       ...value,
       [plane.x]: roundTo(xDef, xDef.min + at[0] * (xDef.max - xDef.min)),
       [plane.y]: roundTo(yDef, yDef.min + at[1] * (yDef.max - yDef.min)),
-    } as ColorValue)
+    } as ColorValue))
   }
 
   const huePointer = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -212,7 +239,7 @@ export function ColorPicker({
     if (!at) return
     if (!plane) return emitFromHsv([at[0] * 360, hsv[1], hsv[2]])
     const def = channel(space as PlaneSpace, plane.slider)
-    applyValue({ ...value, [plane.slider]: roundTo(def, def.min + at[0] * (def.max - def.min)) } as ColorValue)
+    applyValue(toGamut({ ...value, [plane.slider]: roundTo(def, def.min + at[0] * (def.max - def.min)) } as ColorValue))
   }
 
   const commitDraft = () => {
