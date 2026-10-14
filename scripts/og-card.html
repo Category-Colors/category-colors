@@ -26,7 +26,7 @@
       .og {
         position: relative;
         display: grid;
-        grid-template-rows: 452px 178px;
+        grid-template-rows: 500px 130px;
         width: 1200px;
         height: 630px;
         overflow: hidden;
@@ -58,7 +58,8 @@
       .og-colophon {
         display: flex;
         flex-direction: column;
-        padding: 26px 36px 20px;
+        justify-content: center;
+        padding: 0 36px;
         background:
           repeating-linear-gradient(0deg, transparent 0 22px, rgb(17 19 28 / 0.027) 23px),
           #f0eee8;
@@ -68,8 +69,7 @@
         display: grid;
         grid-template-columns: 1fr 2fr;
         gap: 36px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid rgb(17 19 28 / 0.28);
+        align-items: baseline;
       }
 
       .og-colophon-lead p {
@@ -96,22 +96,6 @@
         line-height: 1.35;
       }
 
-      .og-colophon-foot {
-        display: flex;
-        justify-content: space-between;
-        gap: 36px;
-        margin-top: auto;
-        padding-top: 16px;
-        color: rgb(17 19 28 / 0.62);
-        font-size: 15px;
-        font-variation-settings: 'wght' 620;
-        line-height: 1;
-        letter-spacing: 0.005em;
-      }
-
-      .og-colophon-foot p {
-        margin: 0;
-      }
     </style>
   </head>
   <body>
@@ -129,10 +113,6 @@
           <p class="og-description">
             A browser-based optimizer for categorical color palettes.
           </p>
-        </div>
-        <div class="og-colophon-foot">
-          <p>Simulated annealing · Perceptual color spaces · Color vision simulation</p>
-          <p>categorycolors.com</p>
         </div>
       </div>
     </div>
