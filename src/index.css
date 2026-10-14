@@ -517,12 +517,11 @@ body {
 /* Dual-thumb range slider, visually matching .dialkit-slider */
 .range-slider-wrapper {
   position: relative;
-  height: var(--dial-row-height);
 }
 
 .range-slider {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  height: var(--dial-row-height);
   cursor: ew-resize; /* scrubbed sideways, so it says so */
   user-select: none;
   overflow: hidden;
@@ -604,6 +603,49 @@ body {
 @media (hover: hover) and (pointer: fine) {
   .range-slider-num:hover {
     border-bottom-color: var(--dial-text-label);
+  }
+}
+
+/* Several windows' bounds, under the track so they don't cover its bands */
+.range-slider-windows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px;
+  padding: 3px 10px 2px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Geist Variable', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--dial-text-label);
+}
+
+.range-slider-windows .range-slider-dash:not(:first-child) {
+  margin-left: 1px;
+}
+
+/* Opens another window; shown with the handles */
+.range-slider-add {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--dial-text-label);
+  font: inherit;
+  line-height: 1;
+  padding: 0 0 0 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dial-anim-fast), color var(--dial-anim-fast);
+}
+
+.range-slider-active .range-slider-add,
+.range-slider-add:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .range-slider-add:hover {
+    color: var(--dial-text-focus);
   }
 }
 

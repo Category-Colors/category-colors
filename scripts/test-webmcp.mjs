@@ -104,7 +104,7 @@ export async function testWebMcp(server) {
   reset()
   await call('generate_palette', { style: 'pastel' })
   assert.equal(generated[0].colorCount, 6)
-  assert.deepEqual(generated[0].colorSpace.ranges[2], [0.78, 0.92])
+  assert.deepEqual(generated[0].colorSpace.ranges[2], [[0.78, 0.92]])
   assert.match((await call('generate_palette', { style: 'neon' })).error, /style must be one of/)
   // config takes the Configure panel's own file shape, over the style, with
   // the shortcuts on top; the result echoes what was used.
@@ -122,7 +122,7 @@ export async function testWebMcp(server) {
   assert.equal(generated[0].colorCount, 4)
   assert.equal(generated[0].jnd, 25)
   assert.equal(generated[0].colorSpace.mode, 'oklch')
-  assert.deepEqual(generated[0].colorSpace.ranges[0], [0.4, 0.7])
+  assert.deepEqual(generated[0].colorSpace.ranges[0], [[0.4, 0.7]])
   assert.deepEqual(generated[0].evaluators.map((e) => e.type), ['jnd', 'contrast', 'avoid'])
   assert.equal(generated[0].evaluators[1].background, '#FFFEFC')
   assert.equal(generated[0].evaluators[2].avoidColors[0].value.hex, '#DD0000')

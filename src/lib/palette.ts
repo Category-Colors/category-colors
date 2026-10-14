@@ -64,17 +64,36 @@ export interface TargetColor {
   value: ColorValue
 }
 
-// The annealer's working space and per-channel bounds. Channel order follows
+// A [min, max] a channel may take. Each channel has one or more, as hard
+// bounds: a color is never generated or moved outside every window.
+export type ChannelWindow = [number, number]
+
+// The annealer's working space and per-channel windows. Channel order follows
 // the mode (okhsl = h/s/l, oklch = l/c/h, …) — see color-spaces.ts.
 export interface ColorSpaceParams {
   mode: WorkingSpace
-  ranges: [number, number][]
+  ranges: ChannelWindow[][]
 }
 
 export const defaultColorSpace = (mode: WorkingSpace): ColorSpaceParams => ({
   mode,
-  ranges: spaceInitialRanges(mode),
+  ranges: spaceInitialRanges(mode).map((r) => [r]),
 })
+
+// Sorted, non-overlapping, non-empty windows from any list of them: touching
+// or overlapping windows merge, and ones with no width are dropped unless
+// nothing else is left.
+export function tidyWindows(windows: ChannelWindow[]): ChannelWindow[] {
+  const sorted = windows.map(([a, b]): ChannelWindow => (a <= b ? [a, b] : [b, a])).sort((a, b) => a[0] - b[0])
+  const merged: ChannelWindow[] = []
+  for (const w of sorted) {
+    const last = merged.at(-1)
+    if (last && w[0] <= last[1]) last[1] = Math.max(last[1], w[1])
+    else merged.push([...w])
+  }
+  const wide = merged.filter(([a, b]) => b > a)
+  return wide.length ? wide : merged.slice(0, 1)
+}
 
 export interface PaletteParams {
   colorCount: number
@@ -191,7 +210,7 @@ export const presetParams = (p: (typeof PARAM_PRESETS)[number]): PaletteParams =
   return {
     ...DEFAULT_PARAMS,
     colorCount: p.count,
-    colorSpace: { ...space, ranges: [space.ranges[0], p.s, p.l] },
+    colorSpace: { ...space, ranges: [space.ranges[0], [p.s], [p.l]] },
   }
 }
 
@@ -201,6 +220,7 @@ const IMPORT_LIMITS = {
   targets: 100,
   evaluators: 50,
   avoidColors: 100,
+  windows: 20,
 } as const
 
 const boundedNumber = (
@@ -222,7 +242,10 @@ const normalizedHex = (value: unknown, fallback: string) => {
 
 // A space is only honored when its mode is known and it carries one range per
 // channel of that mode; each bound is clamped to the channel's own limits so a
-// hand-edited file can't put the annealer outside the space.
+// hand-edited file can't put the annealer outside the space. A channel's entry
+// is a list of windows, or a single [min, max] as files before 3.3 wrote it.
+// On hue, a pair with min > max is the arc through zero, so [300, 60] becomes
+// [0, 60] and [300, 360].
 function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
   if (!isWorkingSpace(space?.mode)) return defaultColorSpace('okhsl')
   const channels = spaceChannels(space.mode)
@@ -232,14 +255,22 @@ function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpa
   return {
     mode: space.mode,
     ranges: channels.map((channel, i) => {
-      const raw = space.ranges![i]
+      const raw: unknown = space.ranges![i]
       const clamp = (v: unknown, fallback: number) =>
         typeof v === 'number' && Number.isFinite(v)
           ? Math.min(channel.max, Math.max(channel.min, v))
           : fallback
-      const lo = clamp(raw?.[0], channel.initial[0])
-      const hi = clamp(raw?.[1], channel.initial[1])
-      return lo <= hi ? [lo, hi] : [hi, lo]
+      const pairs: unknown[] = Array.isArray(raw) && raw.every((n) => typeof n === 'number') ? [raw] : Array.isArray(raw) ? raw : []
+      const windows = pairs.slice(0, IMPORT_LIMITS.windows).flatMap((pair): ChannelWindow[] => {
+        if (!Array.isArray(pair)) return []
+        const lo = clamp(pair[0], channel.initial[0])
+        const hi = clamp(pair[1], channel.initial[1])
+        // only a pair written within the circle can mean the arc; one that
+        // had to be clamped is just backwards
+        const arc = channel.key === 'h' && lo > hi && lo === pair[0] && hi === pair[1]
+        return arc ? [[channel.min, hi], [lo, channel.max]] : [[lo, hi]]
+      })
+      return windows.length ? tidyWindows(windows) : [[...channel.initial]]
     }),
   }
 }

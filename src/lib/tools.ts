@@ -116,6 +116,8 @@ const colorValue = {
   required: ['space'],
 }
 
+const WINDOW_SCHEMA = { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[min, max]' }
+
 // Everything the Configure panel can set, as JSON Schema: the file the panel
 // imports and exports, and what summarize() echoes back as `config`. Every
 // field is optional; parseParams fills and clamps the rest.
@@ -129,11 +131,15 @@ export const CONFIG_SCHEMA = {
     orderOptimization: { type: 'boolean', description: 'Reorder the result so adjacent colors differ most.' },
     colorSpace: {
       type: 'object',
-      description: 'The space the optimizer moves in, with a [min, max] range per channel in that space\'s channel order: ' +
-        WORKING_SPACES.map((s) => `${s.mode} (${spaceChannels(s.mode).map((c) => c.key).join(', ')})`).join('; ') + '.',
+      description: 'The space the optimizer moves in, with hard bounds per channel in that space\'s channel order: ' +
+        WORKING_SPACES.map((s) => `${s.mode} (${spaceChannels(s.mode).map((c) => c.key).join(', ')})`).join('; ') +
+        '. Each channel takes one [min, max] window or a list of them, such as [[0, 60], [180, 240]] to allow two hue bands; on hue, [300, 60] is the arc through zero.',
       properties: {
         mode: { type: 'string', enum: WORKING_SPACES.map((s) => s.mode) },
-        ranges: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 } },
+        ranges: {
+          type: 'array',
+          items: { anyOf: [WINDOW_SCHEMA, { type: 'array', items: WINDOW_SCHEMA, minItems: 1, maxItems: 20 }] },
+        },
       },
       required: ['mode', 'ranges'],
     },

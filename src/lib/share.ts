@@ -34,7 +34,7 @@ const LINK_BASE = {
     { ...evaluator, type: 'cvd', weight: 0.1, cvd: 'tritanomaly', cvdSeverity: 1 },
     { ...evaluator, type: 'cvd', weight: 0.05, cvd: 'grayscale' },
   ],
-  colorSpace: { mode: 'okhsl', ranges: [[0, 360], [0.2, 0.8], [0.3, 0.9]] },
+  colorSpace: { mode: 'okhsl', ranges: [[[0, 360]], [[0.2, 0.8]], [[0.3, 0.9]]] },
 } as Record<string, unknown>
 
 const MAX_COLORS = 256
