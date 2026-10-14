@@ -5,9 +5,9 @@ import type { GenerateRequest } from './generate'
 // as plain data (ColorValue objects survive structured clone). The request id
 // rides along so the caller can tell its own reply from a concurrent one.
 self.onmessage = (e: MessageEvent<GenerateRequest>) => {
-  const { requestId, ...params } = e.data
+  const { requestId, seed, ...params } = e.data
   try {
-    self.postMessage({ ok: true, requestId, result: generatePalette(params) })
+    self.postMessage({ ok: true, requestId, result: generatePalette(params, seed) })
   } catch (err) {
     self.postMessage({ ok: false, requestId, error: String(err) })
   }

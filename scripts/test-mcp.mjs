@@ -34,7 +34,11 @@ export async function testMcp(server) {
   assert.deepEqual((await result(modern('server/discover'))).supportedVersions.includes('2026-07-28'), true)
   const { tools } = await result(modern('tools/list'))
   assert.deepEqual(tools.map((t) => t.name).sort(), ['check_palette', 'export_palette', 'generate_palette', 'get_preset_palette'])
-  for (const t of tools) assert.equal(t.annotations.readOnlyHint, true, t.name)
+  for (const t of tools) {
+    assert.equal(t.annotations.readOnlyHint, true, t.name)
+    assert.equal(t.outputSchema.type, 'object', t.name)
+  }
+  assert.equal(tools.find((t) => t.name === 'generate_palette').inputSchema.properties.config.type, 'object')
 
   // Results come as structured content plus the same JSON as text
   let out = await tool('check_palette', { colors: ['#E69F00', '#56B4E9', 'red'], jnd: 30 })
@@ -58,6 +62,22 @@ export async function testMcp(server) {
   assert.equal(colors.length, 3)
   assert.ok(colors.some((c) => c.toUpperCase() === '#DB563C'), colors.join())
   assert.ok(colors.filter((c) => c.startsWith('oklch(')).length >= 2, colors.join())
+  assert.equal(out.structuredContent.config.colorCount, 3)
+  assert.equal(typeof out.structuredContent.cost, 'number')
+  assert.equal(out.structuredContent.runs, 1)
+  assert.ok(Number.isSafeInteger(out.structuredContent.seed))
+  // The same config and seed make the same palette; the seed comes back
+  const fast = { colorCount: 3, config: { maxIterations: 1000 }, seed: 7 }
+  const [a, b] = await Promise.all([tool('generate_palette', fast), tool('generate_palette', fast)])
+  assert.deepEqual(a.structuredContent.colors, b.structuredContent.colors)
+  assert.equal(a.structuredContent.seed, 7)
+  assert.notDeepEqual((await tool('generate_palette', { ...fast, seed: 8 })).structuredContent.colors, a.structuredContent.colors)
+  // The full config, with the shortcuts over it
+  out = await tool('generate_palette', { config: { colorCount: 5, jnd: 12, maxIterations: 1000, colorSpace: { mode: 'oklch', ranges: [[0.3, 0.5], [0.02, 0.1], [0, 360]] } }, colorCount: 2 })
+  assert.equal(out.structuredContent.colors.length, 2)
+  assert.equal(out.structuredContent.config.jnd, 12)
+  assert.equal(out.structuredContent.config.colorSpace.mode, 'oklch')
+  assert.equal(out.structuredContent.report.jndThreshold, 12)
 
   // A 2025-era client: initialize, then a sessionless call
   const init = await result(post({}, { method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }))
@@ -93,6 +113,19 @@ export async function testMcp(server) {
   assert.match(out.content[0].text, /Too many palettes/)
   assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })))).isError, undefined)
   assert.deepEqual(seen.filter((s) => s.startsWith('generate')), ['generate 3.3.3.3', 'generate 3.3.3.3'])
+  // runs: n spends one generation per run and keeps the cheapest; past the
+  // limit it returns what it has
+  seen.length = 0
+  const twice = limited(100)
+  twice.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 2)
+  out = JSON.parse((await (await call(from('4.4.4.4', generate({ colorCount: 2, runs: 3, config: { maxIterations: 1000 } })), twice)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  assert.equal(out.isError, undefined)
+  assert.equal(out.structuredContent.runs, 2)
+  assert.equal(seen.filter((s) => s === 'generate 4.4.4.4').length, 3)
+  // and the winning run's seed is the one reported
+  out = await tool('generate_palette', { colorCount: 2, runs: 2, seed: 100, config: { maxIterations: 1000 } })
+  assert.ok([100, 101].includes(out.structuredContent.seed))
+  assert.deepEqual((await tool('generate_palette', { colorCount: 2, seed: out.structuredContent.seed, config: { maxIterations: 1000 } })).structuredContent.colors, out.structuredContent.colors)
 
   // Production has the limits bound, a CPU cap, and the limits Worker declares
   // what the endpoint asks for

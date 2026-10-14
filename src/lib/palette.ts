@@ -98,6 +98,9 @@ export interface PaletteVersion {
   cost: number
   iterations: number
   costHistory: CostSample[]
+  // The optimizer's seed: the same params and seed make this palette again.
+  // Kept on the version, not the params, so the panel never repeats a run.
+  seed?: number
   createdAt: number
 }
 

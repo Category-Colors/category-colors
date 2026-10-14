@@ -100,7 +100,7 @@ export default function App() {
   // With `override`, the run uses those params and the panel adopts them
   // (the empty state's recipes, WebMCP's generate_palette); otherwise it uses
   // whatever the panel holds. Resolves null if a run is already going.
-  const runGeneration = (override?: PaletteParams): Promise<PaletteVersion | null> => {
+  const runGeneration = (override?: PaletteParams, seed?: number): Promise<PaletteVersion | null> => {
     // State updates are asynchronous, so two clicks in the same frame can both
     // observe busy=false. The ref closes that small window and keeps the UI's
     // single-run contract honest.
@@ -110,7 +110,7 @@ export default function App() {
     if (override) setParams(override)
     const snapshot = structuredClone(override ?? paramsRef.current)
     // annealing runs in a web worker, so the UI stays live throughout
-    return generatePaletteAsync(snapshot)
+    return generatePaletteAsync(snapshot, seed)
       .then((result) => {
         const version: PaletteVersion = {
           id: nextId.current++,
