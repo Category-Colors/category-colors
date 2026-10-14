@@ -5,10 +5,12 @@ export interface GenerateResult {
   cost: number
   iterations: number
   costHistory: CostSample[]
+  seed: number
 }
 
 export interface GenerateRequest extends PaletteParams {
   requestId: number
+  seed?: number
 }
 
 type WorkerReply =
@@ -61,12 +63,12 @@ const getWorker = () => {
   return next
 }
 
-export function generatePaletteAsync(params: PaletteParams): Promise<GenerateResult> {
+export function generatePaletteAsync(params: PaletteParams, seed?: number): Promise<GenerateResult> {
   return new Promise((resolve, reject) => {
     const requestId = nextRequestId++
     pending.set(requestId, { resolve, reject })
     try {
-      getWorker().postMessage({ ...params, requestId } satisfies GenerateRequest)
+      getWorker().postMessage({ ...params, requestId, seed } satisfies GenerateRequest)
     } catch (error) {
       pending.delete(requestId)
       reject(error instanceof Error ? error : new Error(String(error)))

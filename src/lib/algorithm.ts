@@ -58,9 +58,12 @@ export function buildConfig(params: PaletteParams): Config {
   return config
 }
 
-export function generatePalette(params: PaletteParams) {
+// Every run is seeded, so a palette can be made again: the seed drawn here is
+// returned with the result for the caller to keep.
+export function generatePalette(params: PaletteParams, seed = Math.floor(Math.random() * 2 ** 31)) {
   const config = buildConfig(params)
   config.recordHistory = true
+  config.seed = seed
 
   const initialState = prepareInitialState(
     {
@@ -87,5 +90,6 @@ export function generatePalette(params: PaletteParams) {
     cost: finalState.cost,
     iterations: finalState.iterations,
     costHistory: finalState.costHistory ?? [],
+    seed,
   }
 }

@@ -10,9 +10,9 @@ export async function testWebMcp(server) {
   const generated = []
   const api = {
     getState: () => state,
-    async generate(params) {
+    async generate(params, seed) {
       generated.push(params)
-      const version = { id: 7, params, colors: ['#e69f00', '#56b4e9', '#009e73'], cost: 0.1, iterations: 100, costHistory: [[0, 1], [100, 0.1]], createdAt: 1 }
+      const version = { id: 7, params, colors: ['#e69f00', '#56b4e9', '#009e73'], cost: 0.1, iterations: 100, costHistory: [[0, 1], [100, 0.1]], seed: seed ?? 123, createdAt: 1 }
       state = { ...state, current: version }
       return version
     },
@@ -74,6 +74,17 @@ export async function testWebMcp(server) {
   assert.ok(result.report.tests[0].issueCount >= 1)
   assert.deepEqual(result.report.tests[0].closePairs[0].positions, [1, 2])
   assert.equal(state.current, before)
+  // and scores the palette: the closest pair per condition and overall
+  assert.equal(result.report.tests[0].minDeltaE, result.report.tests[0].closePairs[0].deltaE)
+  assert.ok(result.report.tests.every((t) => t.minDeltaE >= result.report.minDeltaE))
+  assert.equal(result.config.jnd, 20)
+  // a jnd of its own, echoed back, without touching the panel
+  result = await call('check_palette', { colors: ['#ff0000', '#0000ff'], jnd: 35 })
+  assert.equal(result.report.jndThreshold, 35)
+  assert.equal(result.config.jnd, 35)
+  assert.equal(state.params.jnd, 20)
+  assert.equal((await call('check_palette', { jnd: 35 })).report.jndThreshold, 35)
+  assert.equal((await call('check_palette')).report.jndThreshold, 20)
 
   // export_palette uses the app's own formatter.
   result = await call('export_palette', { format: 'css', colors: ['#112233'] })
@@ -95,6 +106,35 @@ export async function testWebMcp(server) {
   assert.equal(generated[0].colorCount, 6)
   assert.deepEqual(generated[0].colorSpace.ranges[2], [0.78, 0.92])
   assert.match((await call('generate_palette', { style: 'neon' })).error, /style must be one of/)
+  // config takes the Configure panel's own file shape, over the style, with
+  // the shortcuts on top; the result echoes what was used.
+  reset()
+  result = await call('generate_palette', {
+    style: 'pastel',
+    colorCount: 4,
+    config: {
+      jnd: 25,
+      colorSpace: { mode: 'oklch', ranges: [[0.4, 0.7], [0.05, 0.2], [0, 360]] },
+      evaluators: [{ type: 'jnd', weight: 1 }, { type: 'contrast', weight: 0.5, background: '#fffefc', ratio: 3 }, { type: 'avoid', avoidColors: [{ value: { space: 'hex', hex: '#d00' } }] }],
+      targets: [{ value: { space: 'oklch', l: 0.6, c: 0.15, h: 40 } }],
+    },
+  })
+  assert.equal(generated[0].colorCount, 4)
+  assert.equal(generated[0].jnd, 25)
+  assert.equal(generated[0].colorSpace.mode, 'oklch')
+  assert.deepEqual(generated[0].colorSpace.ranges[0], [0.4, 0.7])
+  assert.deepEqual(generated[0].evaluators.map((e) => e.type), ['jnd', 'contrast', 'avoid'])
+  assert.equal(generated[0].evaluators[1].background, '#FFFEFC')
+  assert.equal(generated[0].evaluators[2].avoidColors[0].value.hex, '#DD0000')
+  assert.equal(generated[0].targets.length, 1)
+  assert.equal(result.config, generated[0])
+  assert.equal(result.cost, 0.1)
+  assert.match((await call('generate_palette', { config: [] })).error, /config must be an object/)
+  // the seed goes to the run and comes back on the result
+  assert.equal(result.seed, 123)
+  assert.equal((await call('generate_palette', { seed: 42 })).seed, 42)
+  assert.match((await call('generate_palette', { seed: 1.5 })).error, /seed must be/)
+  assert.equal((await call('set_palette', { colors: ['red', 'blue'] })).seed, undefined)
   state.busy = true
   assert.match((await call('generate_palette', {})).error, /already being generated/)
 

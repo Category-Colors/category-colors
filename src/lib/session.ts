@@ -27,7 +27,7 @@ export function parseSession(text: string): Session | null {
       if (!config || !Number.isFinite(v.cost) || !Number.isSafeInteger(v.iterations) || v.iterations < 0 || !Number.isFinite(v.createdAt)) return null
       if (!Array.isArray(v.costHistory) || v.costHistory.length > 512 || !v.costHistory.every((p: unknown) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))) return null
       ids.add(v.id)
-      versions.push({ id: v.id, colors: v.colors, params: config, cost: v.cost, iterations: v.iterations, createdAt: v.createdAt, costHistory: v.costHistory, edited: v.edited === true })
+      versions.push({ id: v.id, colors: v.colors, params: config, cost: v.cost, iterations: v.iterations, createdAt: v.createdAt, costHistory: v.costHistory, edited: v.edited === true, ...(Number.isSafeInteger(v.seed) ? { seed: v.seed } : {}) })
     }
     return { params, versions, currentId: ids.has(raw.currentId) ? raw.currentId : versions.at(-1)?.id ?? null }
   } catch {

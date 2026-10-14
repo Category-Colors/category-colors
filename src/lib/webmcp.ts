@@ -1,7 +1,7 @@
 import { formatPalette, EXPORT_FORMATS } from './exporters'
 import type { PaletteParams, PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
-import { GENERATE_INPUT, PRESET_NAMES, colorList, describe, generateParams, readColors, report, scratch, swatch } from './tools'
+import { GENERATE_INPUT, PRESET_NAMES, colorList, describe, generateParams, readColors, readSeed, report, scratch, swatch } from './tools'
 
 // WebMCP (https://webmachinelearning.github.io/webmcp/): the page registers
 // tools on document.modelContext, and an agent in the browser calls them
@@ -32,7 +32,7 @@ export interface WebMcpApi {
   getState(): { params: PaletteParams; current: PaletteVersion | null; busy: boolean }
   // Resolves null when a run is already in progress; rejects with an
   // AbortError when the run is cancelled.
-  generate(params: PaletteParams): Promise<PaletteVersion | null>
+  generate(params: PaletteParams, seed?: number): Promise<PaletteVersion | null>
   cancel(): void
   addPalette(colors: string[]): PaletteVersion
 }
@@ -62,7 +62,7 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       name: 'generate_palette',
       title: 'Generate palette',
       description:
-        'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Uses the settings in the app\'s Configure panel unless a style is given. Takes a few seconds. The result becomes the current palette and is added to history.',
+        'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Starts from the settings in the app\'s Configure panel; a style replaces them, and `config` (the full configuration, in the shape the panel imports) overrides field by field. The result echoes the settings used as `config` and the random `seed`, which with the same config reproduces it. Takes a few seconds. The result becomes the current palette and is added to history.',
       inputSchema: {
         type: 'object',
         properties: GENERATE_INPUT,
@@ -71,10 +71,11 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
         const { params, busy } = api().getState()
         if (busy) throw new Error('A palette is already being generated. Wait for it to finish, then call again.')
         const next = generateParams(input, params)
+        const seed = readSeed(input.seed)
         const onAbort = () => api().cancel()
         options?.signal?.addEventListener('abort', onAbort, { once: true })
         try {
-          const version = await api().generate(next)
+          const version = await api().generate(next, seed)
           if (!version) throw new Error('A palette is already being generated. Wait for it to finish, then call again.')
           return describe(version)
         } catch (err) {
@@ -119,16 +120,17 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       name: 'check_palette',
       title: 'Check palette',
       description:
-        'Checks whether every pair of colors stays distinguishable under normal vision and simulated color vision deficiencies, using the app\'s current threshold. Checks the given colors, or the current palette when none are given. Does not change anything.',
+        'Checks whether every pair of colors stays distinguishable under normal vision and simulated color vision deficiencies. Uses the given jnd threshold, or the app\'s current one, and echoes the settings used as `config`. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Checks the given colors, or the current palette when none are given. Does not change anything.',
       inputSchema: {
         type: 'object',
-        properties: { colors: colorList('Colors to check. Omit to check the current palette.', 2) },
+        properties: { colors: colorList('Colors to check. Omit to check the current palette.', 2), jnd: GENERATE_INPUT.jnd },
       },
       annotations: { readOnlyHint: true },
       async execute(input) {
-        if (input.colors === undefined) return describe(current())
+        const params = generateParams({ jnd: input.jnd }, api().getState().params)
+        if (input.colors === undefined) return describe(input.jnd === undefined ? current() : { ...current(), params })
         const colors = readColors(input.colors, 2)
-        return { colors: colors.map(swatch), report: report(scratch(colors, api().getState().params)) }
+        return { colors: colors.map(swatch), report: report(scratch(colors, params)), config: params }
       },
     },
     {
