@@ -1,7 +1,7 @@
 import { convertValue, parseCssColor, valueToCss } from './color'
 import { WORKING_SPACES, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
-import { PARAM_PRESETS, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
+import { MAX_WINDOWS, PARAM_PRESETS, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
 import { buildJndReport, testTitles } from './report'
 import { linkFor } from './share'
@@ -138,7 +138,7 @@ export const CONFIG_SCHEMA = {
         mode: { type: 'string', enum: WORKING_SPACES.map((s) => s.mode) },
         ranges: {
           type: 'array',
-          items: { anyOf: [WINDOW_SCHEMA, { type: 'array', items: WINDOW_SCHEMA, minItems: 1, maxItems: 20 }] },
+          items: { anyOf: [WINDOW_SCHEMA, { type: 'array', items: WINDOW_SCHEMA, minItems: 1, maxItems: MAX_WINDOWS }] },
         },
       },
       required: ['mode', 'ranges'],

@@ -28,6 +28,8 @@ export interface SpaceChannel {
   step: number
   /** the range a fresh run starts with */
   initial: [number, number]
+  /** set on a cyclic channel: the value at which it comes back to min */
+  period?: number
 }
 
 export interface WorkingSpaceDef {
@@ -45,6 +47,7 @@ const HUE: SpaceChannel = {
   max: 360,
   step: 1,
   initial: [0, 360],
+  period: 360,
 }
 
 export const WORKING_SPACES: WorkingSpaceDef[] = [
@@ -117,9 +120,6 @@ export const isWorkingSpace = (v: unknown): v is WorkingSpace =>
 export const spaceDef = (mode: WorkingSpace): WorkingSpaceDef => BY_MODE.get(mode)!
 
 export const spaceChannels = (mode: WorkingSpace) => spaceDef(mode).channels
-
-export const spaceRangeLabels = (mode: WorkingSpace) =>
-  spaceChannels(mode).map((c) => `${c.short} range`)
 
 export const spaceInitialRanges = (mode: WorkingSpace): [number, number][] =>
   spaceChannels(mode).map((c) => [...c.initial] as [number, number])
