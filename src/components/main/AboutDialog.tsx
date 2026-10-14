@@ -75,20 +75,7 @@ function ThanksTo() {
 function SplashArtwork() {
   return (
     <div className="about-artwork" aria-hidden="true">
-      <div className="about-artwork-field">
-        <img className="about-artwork-image" src={artwork} alt="" />
-      </div>
-      <div className="about-title-panel">
-        <span className="about-mini-mark">
-          <span />
-        </span>
-        <div className="about-title-lockup">
-          <p>Category</p>
-          <p>colors</p>
-        </div>
-        <p className="about-version">Version 1.1</p>
-        <p className="about-title-note">Perceptual palette system</p>
-      </div>
+      <img className="about-artwork-image" src={artwork} alt="" />
     </div>
   )
 }
@@ -144,7 +131,10 @@ function AboutSplash({ onClose }: { onClose: () => void }) {
 
           <div className="about-colophon">
             <div className="about-colophon-lead">
-              <p id="about-title">Category colors</p>
+              <div>
+                <p id="about-title">Category colors</p>
+                <p className="about-version">Version 1.1</p>
+              </div>
               <p id="about-description">
                 A browser-based optimizer for categorical color palettes.
               </p>
