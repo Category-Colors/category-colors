@@ -83,6 +83,13 @@ export async function testAgents(server) {
   }
   const routes = JSON.parse(await read('public/_routes.json'))
   assert.ok(routes.include.includes('/*') && routes.exclude.includes('/assets/*'))
+  // Every static file the page points at must bypass the Function, which
+  // only knows the routes it serves (the card went 404 once as og.png → og.jpg)
+  const indexHtml = await read('index.html')
+  for (const file of ['og.jpg', 'favicon.svg', 'llms.txt', 'robots.txt', 'sitemap.xml']) {
+    assert.ok(routes.exclude.includes(`/${file}`), `${file} must be excluded in _routes.json`)
+  }
+  assert.ok(indexHtml.includes('https://categorycolors.com/og.jpg'))
 
   // The homepage's raw HTML: one H1, sequential headings, enough text to
   // describe the app, and JSON-LD that parses.
