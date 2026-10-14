@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import { windowMotion } from '@/components/dialkit'
 import { useWindowEscape, useWindowFocusReturn } from '@/lib/use-window-escape'
 import { XIcon } from '@/components/panels/icons'
+import artwork from '@/assets/about-art.webp'
 
 // The people whose research, palettes, tools and libraries this app is built
 // out of — the acknowledgements from the essay, plus DialKit, whose controls
@@ -75,18 +76,7 @@ function SplashArtwork() {
   return (
     <div className="about-artwork" aria-hidden="true">
       <div className="about-artwork-field">
-        <span className="about-sun" />
-        <span className="about-beam about-beam-a" />
-        <span className="about-beam about-beam-b" />
-        <span className="about-beam about-beam-c" />
-        <span className="about-orbit about-orbit-outer" />
-        <span className="about-orbit about-orbit-middle" />
-        <span className="about-orbit about-orbit-inner" />
-        <span className="about-pupil" />
-        <span className="about-satellite about-satellite-a" />
-        <span className="about-satellite about-satellite-b" />
-        <span className="about-satellite about-satellite-c" />
-        <span className="about-artwork-index">01—08</span>
+        <img className="about-artwork-image" src={artwork} alt="" />
       </div>
       <div className="about-title-panel">
         <span className="about-mini-mark">
