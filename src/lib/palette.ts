@@ -66,12 +66,17 @@ export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) => isPausable(
 export const MAX_WINDOWS = 20
 
 // Seeds state.colors: fixedColor pins the value through annealing,
-// fixedOrder pins the position through order optimization.
+// fixedOrder pins the position through order optimization, and
+// lockedChannels holds the named channels of the working space (such as 'h')
+// at the seed's value while the rest move. Names, not the package's channel
+// indexes, so a lock survives a change of space that keeps the channel and
+// drops out of one that doesn't.
 export interface InitColor {
   id: number
   value: ColorValue
   fixedColor: boolean
   fixedOrder: boolean
+  lockedChannels: string[]
 }
 
 // Feeds config.similarityTarget; only the similarity evaluator reads it.
@@ -249,7 +254,7 @@ export function newEvaluatorSpec(
 
 export function newInitColor(value: ColorValue = hexValue('#888888')): InitColor {
   nextId += 1
-  return { id: nextId, value, fixedColor: false, fixedOrder: false }
+  return { id: nextId, value, fixedColor: false, fixedOrder: false, lockedChannels: [] }
 }
 
 export function newTargetColor(value: ColorValue = hexValue('#888888')): TargetColor {
@@ -426,7 +431,14 @@ export function parseParams(text: string): PaletteParams | null {
         .flatMap((c) => {
           const value = normalizeColorValue(c?.value)
           return value
-            ? [{ ...newInitColor(value), fixedColor: !!c.fixedColor, fixedOrder: !!c.fixedOrder }]
+            ? [{
+                ...newInitColor(value),
+                fixedColor: !!c.fixedColor,
+                fixedOrder: !!c.fixedOrder,
+                lockedChannels: Array.isArray(c.lockedChannels)
+                  ? [...new Set(c.lockedChannels.filter((k): k is string => typeof k === 'string' && k.length <= 8))].slice(0, 4)
+                  : [],
+              }]
             : []
         }),
       targets: raw.targets

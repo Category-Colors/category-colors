@@ -228,6 +228,11 @@ export function ParametersPanel({
                 onFixedOrderChange={(fixedOrder) =>
                   set('initColors', replaceAt(params.initColors, i, { ...color, fixedOrder }))
                 }
+                channels={spaceChannels(params.colorSpace.mode)}
+                lockedChannels={color.lockedChannels}
+                onLockedChannelsChange={(lockedChannels) =>
+                  set('initColors', replaceAt(params.initColors, i, { ...color, lockedChannels }))
+                }
                 onRemove={() => set('initColors', removeAt(params.initColors, i))}
               />
             )}

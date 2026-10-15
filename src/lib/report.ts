@@ -84,9 +84,10 @@ function colorsToFree(version: Pick<PaletteVersion, 'params' | 'colors'>, pinned
 // moved before the run starts. Seeds the person fixed stay fixed; they come
 // back from a run exactly as written, so they're found by value. With nothing
 // failing, everything is fixed and a fix has nothing to do.
-export function refineParams(version: Pick<PaletteVersion, 'params' | 'colors'>): PaletteParams {
+// `keep` names more positions (0-based) to hold, such as fix_palette's pinned.
+export function refineParams(version: Pick<PaletteVersion, 'params' | 'colors'>, keep: number[] = []): PaletteParams {
   const pinnedCss = new Set(version.params.initColors.filter((c) => c.fixedColor).map((c) => valueToCss(c.value)))
-  const pinned = new Set(version.colors.flatMap((css, i) => (pinnedCss.has(css) ? [i] : [])))
+  const pinned = new Set([...keep, ...version.colors.flatMap((css, i) => (pinnedCss.has(css) ? [i] : []))])
   const free = colorsToFree(version, pinned)
   return {
     ...fittedTo(structuredClone(version.params), version.colors),

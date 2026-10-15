@@ -23,6 +23,9 @@ export function ColorRow({
   onFixedColorChange,
   fixedOrder,
   onFixedOrderChange,
+  channels,
+  lockedChannels,
+  onLockedChannelsChange,
   defaultPickerOpen = false,
 }: {
   value: ColorValue
@@ -36,6 +39,11 @@ export function ColorRow({
   onFixedColorChange?: (fixed: boolean) => void
   fixedOrder?: boolean
   onFixedOrderChange?: (fixed: boolean) => void
+  /** The working space's channels, one lock toggle each; hidden while the
+      value is fixed, which holds every channel anyway */
+  channels?: { key: string; label: string; short: string }[]
+  lockedChannels?: string[]
+  onLockedChannelsChange?: (keys: string[]) => void
   defaultPickerOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultPickerOpen)
@@ -95,6 +103,27 @@ export function ColorRow({
         />
       </div>
       <div className="color-row-actions">
+        {onLockedChannelsChange &&
+          !fixedColor &&
+          channels?.map((channel) => {
+            const locked = !!lockedChannels?.includes(channel.key)
+            return (
+              <button
+                key={channel.key}
+                className="color-row-icon color-row-channel"
+                data-active={String(locked)}
+                aria-label={`${locked ? 'Unlock' : 'Lock'} ${channel.label.toLowerCase()}`}
+                title={`${locked ? 'Unlock' : 'Lock'} ${channel.label.toLowerCase()}`}
+                onClick={() =>
+                  onLockedChannelsChange(
+                    locked ? lockedChannels!.filter((k) => k !== channel.key) : [...(lockedChannels ?? []), channel.key]
+                  )
+                }
+              >
+                {channel.short}
+              </button>
+            )
+          })}
         {onFixedColorChange && (
           <button
             className="color-row-icon"

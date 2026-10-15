@@ -11,6 +11,7 @@ import {
 // keeps it on a subpath of its own the way it does saliency's.
 import names from 'category-colors/evaluators/names'
 import { oklchCss, toCulori, valueToCss } from '@/lib/color'
+import { spaceChannels } from './color-spaces'
 import { evaluateFix, scheduleFor, toSeed, type FixOptions } from './fix'
 import { BEHAVIORS, cvdSeverityFor, ordersColors, pausesWhenRepairing } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
@@ -94,6 +95,7 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
   const config = buildConfig(params)
   config.recordHistory = true
   config.seed = seed
+  const channelKeys = spaceChannels(params.colorSpace.mode).map((c) => c.key)
 
   const initialState = prepareInitialState(
     {
@@ -101,6 +103,7 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
         color: toCulori(c.value),
         fixedColor: c.fixedColor,
         fixedOrder: c.fixedOrder,
+        lockedChannels: c.lockedChannels.map((key) => channelKeys.indexOf(key)).filter((i) => i >= 0),
       })),
     },
     config
