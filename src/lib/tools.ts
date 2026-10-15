@@ -3,7 +3,7 @@ import { WORKING_SPACES, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
 import { MAX_WINDOWS, PARAM_PRESETS, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
-import { buildJndReport, testTitles } from './report'
+import { buildJndReport, refineParams, testTitles } from './report'
 import { linkFor } from './share'
 
 // What the browser's WebMCP tools (webmcp.ts) and the remote MCP server
@@ -129,6 +129,8 @@ export const CONFIG_SCHEMA = {
     jnd: { type: 'number', minimum: 5, maximum: 40, description: 'CIEDE2000 distance below which two colors count as confusable.' },
     maxIterations: { type: 'integer', minimum: 1000, maximum: 100000, description: 'Annealing steps. 60000 converges; fewer is faster but worse.' },
     orderOptimization: { type: 'boolean', description: 'Reorder the result so adjacent colors differ most.' },
+    fixStrength: { type: 'number', minimum: 0, maximum: 1, description: 'behavior fix only, default 0.35: 1 clears the most failing pairs, 0 keeps colors closest to their seeds.' },
+    behavior: { type: 'string', enum: ['optimize', 'fix', 'evaluate'], description: 'optimize (default) makes the best palette the evaluators describe. evaluate runs nothing: the seeds (initColors) become the palette as they are, to read their report. fix repairs the seeds (initColors) instead: only pairs failing the JND and CVD evaluators count, energy and range pause (unless fixEnabled), and colors stay near their seeds. Pin positions with fixedOrder, and fix the seeds that already pass with fixedColor.' },
     colorSpace: {
       type: 'object',
       description: 'The space the optimizer moves in, with hard bounds per channel in that space\'s channel order: ' +
@@ -169,6 +171,7 @@ export const CONFIG_SCHEMA = {
           checkAdjacent: { type: 'boolean', description: 'contrast only: hold the ratio between neighbors instead.' },
           avoidColors: { type: 'array', description: 'avoid only.', items: { type: 'object', properties: { value: colorValue }, required: ['value'] } },
           avoidRadius: { type: 'number', minimum: 0.05, maximum: 0.5, description: 'avoid only: how far to stay from each avoided color.' },
+          fixEnabled: { type: 'boolean', description: 'energy and range only: keep running under behavior fix, where they otherwise pause.' },
         },
         required: ['type'],
       },
@@ -197,6 +200,38 @@ export const GENERATE_INPUT = {
     maximum: 2 ** 31 - 1,
     description: 'Runs are random. The same config and seed reproduce a palette exactly; every result reports the seed it used. Omit for a fresh draw.',
   },
+}
+
+// fix_palette's description, shared by both servers, which each add a sentence
+export const FIX_DESCRIPTION =
+  'Repairs the pairs of colors that fall below the JND threshold (under normal vision and simulated color vision deficiencies) with small changes, rather than making a new palette: each color keeps its position, the fewest colors that touch every failing pair move, and the rest stay exactly as they are. Never returns more issues than it started with, and reports `issuesBefore`; call again on the result to keep going.'
+
+// fix_palette's input beside the colors
+export const FIX_INPUT = {
+  strength: {
+    type: 'number',
+    minimum: 0,
+    maximum: 1,
+    description: 'How far the fix may move colors, default 0.35. 1 clears the most failing pairs; 0 keeps colors closest to where they were and leaves more pairs failing.',
+  },
+  jnd: {
+    type: 'number',
+    minimum: 5,
+    maximum: 40,
+    description: 'The CIEDE2000 distance a pair must reach to pass; the default is 20.',
+  },
+}
+
+// The app's Refine: the colors as seeds held at their positions, the fewest
+// that touch every failing pair free to move and the rest fixed, under
+// behavior fix. A fix never returns more issues than it was given.
+export function fixParams(input: Record<string, unknown>, colors: string[], base: PaletteParams): PaletteParams {
+  const strength = input.strength
+  if (strength !== undefined && (typeof strength !== 'number' || !(strength >= 0 && strength <= 1))) {
+    throw new Error('strength must be a number from 0 to 1.')
+  }
+  const params = refineParams({ params: generateParams({ jnd: input.jnd }, base), colors })
+  return strength === undefined ? params : { ...params, fixStrength: strength }
 }
 
 // generate_palette's seed, or undefined for a fresh one

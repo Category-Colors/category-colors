@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createDefaultConfig, palettes } from 'category-colors'
-import { formatHex } from 'culori'
+import { differenceCiede2000, formatHex } from 'culori'
 import { createServer } from 'vite'
 import { testLaunch } from './test-launch.mjs'
 import { testWebMcp } from './test-webmcp.mjs'
@@ -280,6 +280,73 @@ try {
     assert.equal(result.colors.length, 2)
     assert.ok(result.colors.every((value) => color.parseCssColor(value)))
     assert.ok(Number.isFinite(result.cost))
+  }
+
+  // Refine: a version's colors become pinned seeds, the ones outside the
+  // failing pairs' cover are fixed, and fix behavior clears pairs without
+  // touching what was fixed
+  {
+    const report = await server.ssrLoadModule('/src/lib/report.ts')
+    const okabeIto = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
+    const version = { id: 1, params: structuredClone(palette.DEFAULT_PARAMS), colors: okabeIto, cost: 0, iterations: 0, costHistory: [], createdAt: 0 }
+    const refine = report.refineParams(version)
+    assert.equal(refine.behavior, 'fix')
+    assert.ok(refine.initColors.every((c) => c.fixedOrder))
+    const free = refine.initColors.filter((c) => !c.fixedColor).length
+    assert.ok(free > 0 && free < okabeIto.length, `cover frees ${free} of ${okabeIto.length}`)
+    const result = generatePalette(refine, 1)
+    refine.initColors.forEach((c, i) => {
+      if (c.fixedColor) assert.equal(result.colors[i], okabeIto[i], `fixed seed ${i} moved`)
+    })
+    const issues = (colors) => report.buildJndReport({ ...version, params: refine, colors }).totalIssues
+    assert.ok(issues(result.colors) < issues(okabeIto) / 2, `${issues(okabeIto)} issues -> ${issues(result.colors)}`)
+    // a seed the person fixed stays fixed even when it sits in a failing pair
+    // (found by value, as runs return fixed seeds exactly as written)
+    const freed = refine.initColors.findIndex((c) => !c.fixedColor)
+    const pin = { ...palette.newInitColor(color.parseCssColor(okabeIto[freed])), fixedColor: true }
+    const pinnedColors = okabeIto.map((h, i) => (i === freed ? color.valueToCss(pin.value) : h))
+    const pinnedRefine = report.refineParams({ params: { ...version.params, initColors: [pin] }, colors: pinnedColors })
+    assert.equal(pinnedRefine.initColors[freed].fixedColor, true)
+    assert.ok(pinnedRefine.initColors.some((c) => !c.fixedColor))
+    // with nothing failing, every seed is fixed: a fix has nothing to move
+    const passing = report.refineParams({ params: { ...version.params, jnd: 5 }, colors: okabeIto })
+    assert.ok(passing.initColors.every((c) => c.fixedColor))
+    // the space stretches to hold the palette, so preparing the run leaves
+    // every seed where it was (under the defaults the grey moved 12 ΔE)
+    const { prepareInitialState } = await server.ssrLoadModule('category-colors')
+    const { toCulori } = await server.ssrLoadModule('/src/lib/color.ts')
+    const prepared = prepareInitialState({ colors: refine.initColors.map((c) => ({ color: toCulori(c.value) })) }, buildConfig(refine))
+    assert.deepEqual(prepared.colors.map((c) => formatHex(c)), okabeIto.map((h) => h.toLowerCase()))
+    assert.equal(palette.parseParams(JSON.stringify(refine)).behavior, 'fix')
+    assert.equal(palette.parseParams(JSON.stringify({ ...refine, fixStrength: 4 })).fixStrength, 1)
+    // Strength runs the schedule from all of it down to 45%
+    const { scheduleFor } = await server.ssrLoadModule('/src/lib/fix.ts')
+    assert.equal(scheduleFor(1), 1)
+    assert.ok(Math.abs(scheduleFor(0) - 0.45) < 1e-9)
+    // and the weakest strength moves the freed colors far less than the full one
+    const ciede = differenceCiede2000()
+    const travel = (strength) =>
+      generatePalette({ ...refine, fixStrength: strength }, 1).colors.reduce((sum, c, i) => sum + ciede(c, okabeIto[i]), 0)
+    assert.ok(travel(0) < travel(1) * 0.7, `travel at strength 0 (${travel(0)}) vs 1 (${travel(1)})`)
+    assert.equal(palette.parseParams(JSON.stringify({ ...refine, behavior: 'nonsense' })).behavior, 'optimize')
+    assert.equal(palette.parseParams(JSON.stringify({ ...refine, behavior: 'evaluate' })).behavior, 'evaluate')
+  }
+
+  // colorSpaceContaining stretches the nearest edge, around the circle on hue
+  {
+    const space = { mode: 'okhsl', ranges: [[[100, 200]], [[0.2, 0.8]], [[0.3, 0.9]]] }
+    // 350 is 110° back from 100 through zero, nearer than 150° on from 200
+    const wide = palette.colorSpaceContaining(space, ['oklch(0.6 0.15 350)', '#ffffff'])
+    const hue = wide.ranges[0].map(([a, b]) => [Math.round(a), Math.round(b)])
+    assert.deepEqual(hue, [[0, 200], [350, 360]])
+    assert.deepEqual(palette.colorSpaceContaining(space, ['oklch(0.6 0.15 30)']).ranges[0].map(([a, b]) => [Math.round(a), b]), [[30, 200]])
+    assert.equal(wide.ranges[2].at(-1)[1], 1) // white lifts the lightness ceiling
+    assert.deepEqual(palette.colorSpaceContaining(space, ['#808080']).ranges[0], [[100, 200]]) // grey: no hue
+    // a preset brings the defaults, at its own size, not the panel's settings
+    const preset = palette.paletteParams(['#E69F00', '#999999', '#56B4E9'])
+    assert.equal(preset.colorCount, 3)
+    assert.equal(preset.behavior, 'optimize')
+    assert.deepEqual(preset.evaluators.map((e) => e.type), palette.DEFAULT_PARAMS.evaluators.map((e) => e.type))
   }
 
   console.log('Core regression checks passed.')

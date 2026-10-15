@@ -74,12 +74,14 @@ export function MobileBar({
   open,
   onOpen,
   onGenerate,
+  action,
   onCancel,
 }: {
   busy: boolean
   open: MobileSheet | null
   onOpen: (sheet: MobileSheet) => void
   onGenerate: () => void
+  action: string
   onCancel: () => void
 }) {
   const busyLabel = useBusyLabel(busy)
@@ -124,7 +126,7 @@ export function MobileBar({
         type="button"
         className="mobile-bar-generate"
         disabled={busy}
-        aria-label="Generate a palette"
+        aria-label={action === 'Generate' ? 'Generate a palette' : action}
         onClick={() => onGenerate()}
       >
         {busy ? <span className="button-spinner" /> : <PlayIcon />}

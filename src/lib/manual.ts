@@ -49,7 +49,7 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Iterations',
-        where: 'Configuration › Optimizer',
+        where: 'Configuration, above the button',
         body: 'A ceiling on annealing steps, 1,000 to 100,000, default 20,000. It is a limit rather than a target — the run stops at whichever comes first, this or the temperature reaching its cutoff. More iterations buy a longer search at a proportionally longer wait, with sharp diminishing returns.',
       },
       {
@@ -59,8 +59,8 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Order optimization',
-        where: 'Configuration › Optimizer',
-        body: 'A pass after annealing that reorders the finished colors so that consecutive ones are as evenly spaced as possible. It matters when something assigns colors by position — the first two series in a chart should not be near-neighbors. Up to 10 colors every order is tried; past that it settles for repeated pairwise swaps. Colors marked Fix order stay put.',
+        where: 'Configuration, above the button',
+        body: 'A pass after annealing that reorders the finished colors so that consecutive ones are as evenly spaced as possible. It matters when something assigns colors by position — the first two series in a chart should not be near-neighbors. Up to 10 colors every order is tried; past that it settles for repeated pairwise swaps. Colors marked Fix order stay put, and under Fix issues the pass doesn’t run at all.',
       },
     ],
   },
@@ -145,6 +145,16 @@ export const MANUAL: ManualSection[] = [
         term: 'Name difference',
         body: 'Penalizes colors people would call by the same word. Every color carries a vector of how often survey participants reached for each of 153 terms — Heer and Stone (2012) — and the cost is the mean overlap between every pair, so two blues score badly however far apart ΔE puts them. Saliency asks whether a color has a name; this asks whether two colors share one.',
       },
+      {
+        term: 'Behavior',
+        where: 'Configuration, above the button',
+        body: 'What the run is for, and what the button says. Generate & optimize, the default, makes the best palette the evaluators describe. Evaluate runs nothing: the seeds join history exactly as they are, all of them whatever the color count, so the report and stats can score them; Iterations and Optimize order hide, since there is no run. Fix issues repairs the seeds instead: the JND and CVD evaluators count only the pairs that fail, each as much as any other and by how far it falls short; Energy and Range pause, since a palette that already passes has nothing to spread (the pause on their rows switches them back on); the other evaluators apply as usual; order optimization is off; and every color is held near its seed, so a fix that moves less wins over one that moves more. Seeds that are fixed stay put. When a fix finishes, its colors become the seeds, set up the way Refine does, so pressing again works on what’s left. Refine switches to it for you.',
+      },
+      {
+        term: 'Strength',
+        where: 'Configuration, under Behavior (Fix issues only)',
+        body: 'How far Fix issues trusts the seeds, 0 to 1, default 0.35. It sets how hot the run starts: at 1 it runs the whole cooling schedule, taking big steps early, clearing the most failing pairs and letting the colors it frees travel as far as that takes; toward 0 it starts cooler, with smaller steps that keep colors close to where they started, and leaves more pairs failing. Lower settings also finish sooner.',
+      },
     ],
   },
   {
@@ -160,7 +170,7 @@ export const MANUAL: ManualSection[] = [
       {
         term: 'Channel range',
         where: 'Configuration › Color space',
-        body: 'A floor and ceiling on one channel, and the main way to give a palette a character. Narrow lightness for a palette that reads evenly on a chart; narrow saturation to keep it muted; leave hue wide open. Colors are only ever generated inside these bounds. A channel can have more than one window: the + beside the numbers opens another in the widest gap, dragging a window shut removes it, and every window is a hard bound, so two hue windows mean two hue families and nothing in between.',
+        body: 'A floor and ceiling on one channel, and the main way to give a palette a character. Narrow lightness for a palette that reads evenly on a chart; narrow saturation to keep it muted; leave hue wide open. Colors are only ever generated inside these bounds. A channel can have more than one window: the + beside the numbers opens another in the widest gap, and the channel then lists a compact slider per window under its name; its × or dragging it shut removes it, and every window is a hard bound, so two hue windows mean two hue families and nothing in between.',
       },
       {
         term: 'RGB',
@@ -231,7 +241,7 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'JND threshold',
-        where: 'Configuration › Optimizer',
+        where: 'Configuration, above the button',
         body: 'The line itself, 5 to 40, default 20. It sets both what the JND and CVD evaluators penalize and what the report calls a failure, so raising it makes the report stricter and the search harder in one move. Above roughly 25 a large palette becomes impossible to satisfy and every pair fails.',
       },
       {
@@ -334,18 +344,23 @@ export const MANUAL: ManualSection[] = [
         body: 'Every version this session, oldest first. Clicking one restores it — both its colors and the whole configuration it was generated under, so the parameters panel goes back with it. History lives in the tab and is gone on reload; export anything worth keeping.',
       },
       {
-        term: 'Initialize',
-        where: 'Configuration › Initialize',
+        term: 'Refine',
+        where: 'Output › History',
+        body: 'The wand on a history row: repair that palette rather than replace it. Its colors become the seeds, each pinned to its position so categories keep their colors. The fewest colors that between them touch every failing pair are left free and the rest are fixed, and Behavior switches to Fix issues. Press Fix issues to run it. Unfix a seed first to let it move too.',
+      },
+      {
+        term: 'Initial colors',
+        where: 'Configuration › Initial colors',
         body: 'Colors the run starts from instead of random ones. Fewer seeds than the palette needs and the rest are filled in at random; more and the extras are dropped. Unless a seed is fixed, the run is free to move it.',
       },
       {
         term: 'Fix color',
-        where: 'Configuration › Initialize',
+        where: 'Configuration › Initial colors',
         body: 'Pins a seed to its exact value: the run may never move it, and works the rest of the palette around it. The setting for a brand color that has to appear untouched.',
       },
       {
         term: 'Fix order',
-        where: 'Configuration › Initialize',
+        where: 'Configuration › Initial colors',
         body: 'Pins a color to its position in the list, leaving order optimization to rearrange everything else around it. Independent of Fix color — a color can be free to change and still required to stay first.',
       },
       {
@@ -354,7 +369,7 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Established palette',
-        body: 'The named palettes offered as a starting point — Okabe–Ito, Tableau 10, Observable 10, the ColorBrewer sets, Adobe Spectrum, IBM Carbon. Loading one replaces the palette wholesale. Run the report on one to see the trade-offs its authors made.',
+        body: 'The named palettes offered as a starting point — Okabe–Ito, Tableau 10, Observable 10, the ColorBrewer sets, Adobe Spectrum, IBM Carbon. Loading one from the history panel replaces the palette wholesale; Load a preset in the Configuration panel’s ⋯ menu makes one the seeds instead, setting the color count to match and widening the color space to hold it. Run the report on one to see the trade-offs its authors made.',
       },
       {
         term: 'Extract from image',

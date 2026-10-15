@@ -1096,6 +1096,33 @@
   opacity: 1;
 }
 
+/* A described option: the label with one quieter line under it. The check
+   lines up with the label, not the middle of the pair. */
+.dialkit-select-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* one line, always: a narrow panel clips it rather than growing the row */
+.dialkit-select-option-description {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--dial-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dialkit-select-dropdown:has([data-selected="true"]) .dialkit-select-option:has(.dialkit-select-option-text) {
+  align-items: flex-start;
+}
+
+.dialkit-select-dropdown:has([data-selected="true"]) .dialkit-select-option:has(.dialkit-select-option-text)::before {
+  margin-top: 4px;
+}
+
 /* Every row running its own fade makes a pointer sweeping the menu feel
    chased by the highlight. The first hover still fades in; once the pointer
    reaches a second row the menu is marked warm and tracks it instantly. */

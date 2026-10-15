@@ -1,7 +1,7 @@
 import { formatPalette, EXPORT_FORMATS } from './exporters'
 import type { PaletteParams, PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
-import { GENERATE_INPUT, PRESET_NAMES, colorList, describe, generateParams, readColors, readSeed, report, scratch, swatch } from './tools'
+import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, describe, fixParams, generateParams, readColors, readSeed, report, scratch, swatch } from './tools'
 
 // WebMCP (https://webmachinelearning.github.io/webmcp/): the page registers
 // tools on document.modelContext, and an agent in the browser calls them
@@ -35,6 +35,7 @@ export interface WebMcpApi {
   generate(params: PaletteParams, seed?: number): Promise<PaletteVersion | null>
   cancel(): void
   addPalette(colors: string[]): PaletteVersion
+  addPreset(colors: string[]): PaletteVersion
 }
 
 
@@ -43,6 +44,24 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
     const { current } = api().getState()
     if (!current) throw new Error('There is no palette yet. Call generate_palette or load_preset_palette first.')
     return current
+  }
+
+  // A run through the app, as the button makes one: cancelled with the
+  // agent's signal, and refused while another is going
+  const busy = 'A palette is already being generated. Wait for it to finish, then call again.'
+  const run = async (params: PaletteParams, seed: number | undefined, signal: AbortSignal | undefined, verb: string) => {
+    const onAbort = () => api().cancel()
+    signal?.addEventListener('abort', onAbort, { once: true })
+    try {
+      const version = await api().generate(params, seed)
+      if (!version) throw new Error(busy)
+      return version
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') throw new Error(`${verb} was cancelled.`)
+      throw err
+    } finally {
+      signal?.removeEventListener('abort', onAbort)
+    }
   }
 
   const tools: ModelContextTool[] = [
@@ -68,22 +87,26 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
         properties: GENERATE_INPUT,
       },
       async execute(input, options) {
-        const { params, busy } = api().getState()
-        if (busy) throw new Error('A palette is already being generated. Wait for it to finish, then call again.')
-        const next = generateParams(input, params)
-        const seed = readSeed(input.seed)
-        const onAbort = () => api().cancel()
-        options?.signal?.addEventListener('abort', onAbort, { once: true })
-        try {
-          const version = await api().generate(next, seed)
-          if (!version) throw new Error('A palette is already being generated. Wait for it to finish, then call again.')
-          return describe(version)
-        } catch (err) {
-          if ((err as Error)?.name === 'AbortError') throw new Error('Generation was cancelled.')
-          throw err
-        } finally {
-          options?.signal?.removeEventListener('abort', onAbort)
-        }
+        const state = api().getState()
+        if (state.busy) throw new Error(busy)
+        return describe(await run(generateParams(input, state.params), readSeed(input.seed), options?.signal, 'Generation'))
+      },
+    },
+    {
+      name: 'fix_palette',
+      title: 'Fix palette',
+      description: `${FIX_DESCRIPTION} Fixes the given colors, or the current palette when none are given. The result becomes the current palette and is added to history.`,
+      inputSchema: {
+        type: 'object',
+        properties: { colors: colorList('Colors to fix, in order. Omit to fix the current palette.', 2), ...FIX_INPUT, seed: GENERATE_INPUT.seed },
+      },
+      async execute(input, options) {
+        const state = api().getState()
+        if (state.busy) throw new Error(busy)
+        const source = input.colors === undefined ? current() : { params: state.params, colors: readColors(input.colors, 2) }
+        const params = fixParams(input, source.colors, source.params)
+        const issuesBefore = report(scratch(source.colors, params))?.totalIssues ?? 0
+        return { issuesBefore, ...(await describe(await run(params, readSeed(input.seed), options?.signal, 'Fixing'))) }
       },
     },
     {
@@ -99,7 +122,7 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       async execute(input) {
         const preset = PRESET_PALETTES.find((p) => p.name === input.name)
         if (!preset) throw new Error(`name must be one of ${PRESET_NAMES.join(', ')}.`)
-        return describe(api().addPalette([...preset.colors]))
+        return describe(api().addPreset([...preset.colors]))
       },
     },
     {

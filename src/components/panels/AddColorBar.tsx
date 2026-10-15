@@ -16,9 +16,9 @@ interface Extracted {
 const MAX_IMAGE_BYTES = 25_000_000
 
 // Add-row for color lists: plain add, add-from-image (popover with a drop
-// zone that extracts a palette from a picture), and a presets menu that
-// swaps the whole list. `ghost` renders the same three actions as small
-// text buttons for use inside an empty-state slot.
+// zone that extracts a palette from a picture), and, given `onReplace`, a
+// presets menu that swaps the whole list. `ghost` renders the same actions as
+// small text buttons for use inside an empty-state slot.
 export function AddColorBar({
   label = 'Add color',
   ghost = false,
@@ -30,7 +30,7 @@ export function AddColorBar({
   ghost?: boolean
   onAdd: () => void
   onAddMany: (hexes: string[]) => void
-  onReplace: (hexes: string[]) => void
+  onReplace?: (hexes: string[]) => void
 }) {
   const barRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -169,15 +169,17 @@ export function AddColorBar({
             <PhotoIcon />
             From image
           </button>
-          <button
-            ref={presetsRef}
-            className="ghost-button"
-            data-open={String(menuOpen)}
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <SwatchesIcon />
-            Presets…
-          </button>
+          {onReplace && (
+            <button
+              ref={presetsRef}
+              className="ghost-button"
+              data-open={String(menuOpen)}
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <SwatchesIcon />
+              Presets…
+            </button>
+          )}
         </>
       ) : (
         <>
@@ -192,15 +194,17 @@ export function AddColorBar({
           >
             <PhotoIcon />
           </button>
-          <button
-            ref={presetsRef}
-            className="dialkit-button square-button"
-            data-open={String(menuOpen)}
-            aria-label="Swap in a preset…"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <SwatchesIcon />
-          </button>
+          {onReplace && (
+            <button
+              ref={presetsRef}
+              className="dialkit-button square-button"
+              data-open={String(menuOpen)}
+              aria-label="Swap in a preset…"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <SwatchesIcon />
+            </button>
+          )}
         </>
       )}
       <input
@@ -236,7 +240,7 @@ export function AddColorBar({
                     data-selected="false"
                     onClick={() => {
                       setMenuOpen(false)
-                      onReplace(preset.colors)
+                      onReplace?.(preset.colors)
                     }}
                   >
                     <span>{preset.name}</span>

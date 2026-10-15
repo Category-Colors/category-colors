@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 // held in plain variables so each assertion can see exactly what a tool did.
 export async function testWebMcp(server) {
   const { webMcpTools, registerWebMcpTools } = await server.ssrLoadModule('/src/lib/webmcp.ts')
-  const { DEFAULT_PARAMS } = await server.ssrLoadModule('/src/lib/palette.ts')
+  const { DEFAULT_PARAMS, paletteParams } = await server.ssrLoadModule('/src/lib/palette.ts')
 
   let state
   const generated = []
@@ -22,6 +22,12 @@ export async function testWebMcp(server) {
       state = { ...state, current: version }
       return version
     },
+    // the app's addPreset: the same, under the preset's own settings
+    addPreset(colors) {
+      const version = { id: 9, params: paletteParams(colors), colors, cost: 0, iterations: 0, costHistory: [], createdAt: 1 }
+      state = { ...state, current: version }
+      return version
+    },
   }
   const reset = () => { state = { params: structuredClone(DEFAULT_PARAMS), current: null, busy: false }; generated.length = 0 }
   const tools = Object.fromEntries(webMcpTools(() => api).map((tool) => [tool.name, tool]))
@@ -29,7 +35,7 @@ export async function testWebMcp(server) {
 
   // Every tool satisfies the draft's required members, with names unique and
   // schemas that are plain JSON objects.
-  assert.deepEqual(Object.keys(tools).sort(), ['check_palette', 'export_palette', 'generate_palette', 'get_current_palette', 'load_preset_palette', 'set_palette'])
+  assert.deepEqual(Object.keys(tools).sort(), ['check_palette', 'export_palette', 'fix_palette', 'generate_palette', 'get_current_palette', 'load_preset_palette', 'set_palette'])
   for (const tool of Object.values(tools)) {
     assert.ok(tool.description.length > 40, `${tool.name} needs a description an agent can act on`)
     assert.equal(tool.inputSchema.type, 'object')
@@ -90,6 +96,18 @@ export async function testWebMcp(server) {
   result = await call('export_palette', { format: 'css', colors: ['#112233'] })
   assert.match(result.text, /--palette-1: #112233/)
   assert.match((await call('export_palette', { format: 'svg' })).error, /format must be one of/)
+
+  // fix_palette runs the app's Refine on the current palette: positions
+  // pinned, the colors outside the failing pairs' cover fixed, behavior fix
+  await call('load_preset_palette', { name: 'Okabe–Ito' })
+  result = await call('fix_palette', { strength: 0.8 })
+  const fix = generated.at(-1)
+  assert.equal(fix.behavior, 'fix')
+  assert.equal(fix.fixStrength, 0.8)
+  assert.ok(fix.initColors.every((c) => c.fixedOrder))
+  assert.ok(fix.initColors.some((c) => c.fixedColor) && fix.initColors.some((c) => !c.fixedColor))
+  assert.ok(result.issuesBefore > 0)
+  assert.match((await call('fix_palette', { strength: 2 })).error, /strength must be/)
 
   // generate_palette builds on the panel's params, clamps through
   // parseParams, pins fixed colors, and grows the count to fit them.
@@ -162,7 +180,7 @@ export async function testWebMcp(server) {
   const registration = new AbortController()
   globalThis.document = { modelContext: { registerTool: async (tool, options) => { registered.push([tool.name, options.signal]) } } }
   registerWebMcpTools(() => api, registration.signal)
-  assert.equal(registered.length, 6)
+  assert.equal(registered.length, 7)
   assert.ok(registered.every(([, signal]) => signal === registration.signal))
   delete globalThis.document
 

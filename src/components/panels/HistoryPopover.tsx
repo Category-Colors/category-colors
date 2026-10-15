@@ -92,6 +92,7 @@ function VersionDetail({ version }: { version: PaletteVersion }) {
               ))}
               <Row label="JND threshold" value={params.jnd} />
               <Row label="Order optimization" value={params.orderOptimization ? 'on' : 'off'} />
+              <Row label="Behavior" value={params.behavior === 'fix' ? `fix issues, strength ${params.fixStrength.toFixed(2)}` : params.behavior} />
               <ChipsRow label="Seeds" hexes={params.initColors.map((c) => valueToCss(c.value))} />
               <ChipsRow label="Targets" hexes={params.targets.map((t) => valueToCss(t.value))} />
             </Group>

@@ -61,7 +61,7 @@ export async function testAgents(server) {
   assert.match(llms, /^# Category Colors\n\n> \S/)
   assert.match(llms, /\n## When to use this\n/)
   assert.match(llms, /\n## Docs\n\n- \[[^\]]+\]\(https:\/\/[^)]+\)/)
-  for (const tool of ['generate_palette', 'load_preset_palette', 'set_palette', 'check_palette', 'export_palette', 'get_current_palette']) {
+  for (const tool of ['generate_palette', 'fix_palette', 'load_preset_palette', 'set_palette', 'check_palette', 'export_palette', 'get_current_palette']) {
     assert.ok(llms.includes(`\`${tool}\``), `llms.txt should name ${tool}`)
   }
   assert.ok(llms.includes('https://categorycolors.com/mcp'), 'llms.txt should point to the MCP server')

@@ -53,6 +53,25 @@ export function PinIcon() {
   )
 }
 
+// After Lucide's wand: refine a palette rather than start over
+export function WandIcon() {
+  return (
+    <Icon>
+      <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h.01M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5" />
+    </Icon>
+  )
+}
+
+// After Lucide's pause: an evaluator held out of a Fix issues run
+// Filled, and inset like StopIcon for the same reason
+export function PauseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 6.5h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM14 6.5h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" />
+    </svg>
+  )
+}
+
 export function PlusIcon() {
   return (
     <Icon>

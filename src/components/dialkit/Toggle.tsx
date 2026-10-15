@@ -8,12 +8,14 @@ interface ToggleProps {
   onChange: (checked: boolean) => void;
   shortcut?: ShortcutConfig;
   shortcutActive?: boolean;
+  disabled?: boolean;
 }
 
-export function Toggle({ label, checked, onChange, shortcut, shortcutActive }: ToggleProps) {
+export function Toggle({ label, checked, onChange, shortcut, shortcutActive, disabled }: ToggleProps) {
   return (
     <div
       className="dialkit-labeled-control dialkit-toggle-row"
+      data-disabled={disabled ? 'true' : undefined}
       // The label and the gap beside it are part of the target, the way a
       // <label> extends a checkbox's. A click that landed on a segment is
       // that segment's to answer — flipping as well would undo it.
@@ -21,7 +23,7 @@ export function Toggle({ label, checked, onChange, shortcut, shortcutActive }: T
       // accessible control, and wrapping them would nest one interactive
       // element inside another and add a second tab stop for the same thing.
       onClick={(e) => {
-        if ((e.target as HTMLElement).closest('.dialkit-segmented')) return;
+        if (disabled || (e.target as HTMLElement).closest('.dialkit-segmented')) return;
         onChange(!checked);
       }}
     >
@@ -40,6 +42,7 @@ export function Toggle({ label, checked, onChange, shortcut, shortcutActive }: T
         ]}
         value={checked ? 'on' : 'off'}
         onChange={(val) => onChange(val === 'on')}
+        disabled={disabled}
       />
     </div>
   );

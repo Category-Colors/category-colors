@@ -7,7 +7,7 @@ import { newTargetColor, type CvdType, type EvaluatorSpec, type TargetColor } fr
 import { AddColorBar } from './AddColorBar'
 import { ColorRow } from './ColorRow'
 import { ListEmptyState, ListRow } from './ReorderList'
-import { XIcon } from './icons'
+import { PauseIcon, XIcon } from './icons'
 
 // Editable color list (similarity targets, avoid colors) whose rows show and
 // hide like folder content. While empty, an empty-state slot with ghost add
@@ -86,10 +86,15 @@ export function EvaluatorEditor({
   targets,
   onTargetsChange,
   defaultOpen = false,
+  mutable = false,
+  paused = false,
 }: {
   spec: EvaluatorSpec
   onChange: (spec: EvaluatorSpec) => void
   onRemove: () => void
+  // Fix issues pauses the spreading terms; a mutable row can be switched back on
+  mutable?: boolean
+  paused?: boolean
   // Shared target list, edited inside similarity evaluators (the algorithm
   // has a single global similarityTarget)
   targets?: TargetColor[]
@@ -100,16 +105,30 @@ export function EvaluatorEditor({
     onChange({ ...spec, [key]: value })
 
   return (
+    <div className="evaluator" data-paused={String(paused)}>
     <Folder
       title={specTitle(spec)}
       defaultOpen={defaultOpen}
       // the × removes the evaluator, not anything inside it, so it stays
-      // reachable from the collapsed row
+      // reachable from the collapsed row; so does the pause, for the same reason
       keepActionsWhenClosed
       actions={
-        <button className="color-row-icon" aria-label="Remove" onClick={onRemove}>
-          <XIcon />
-        </button>
+        <>
+          {mutable && (
+            // highlighted while paused, like the lock and pin on seed rows
+            <button
+              className="color-row-icon"
+              data-active={String(paused)}
+              aria-label={paused ? `Resume ${evaluatorLabel(spec)} while fixing` : `Pause ${evaluatorLabel(spec)} while fixing`}
+              onClick={() => set('fixEnabled', paused)}
+            >
+              <PauseIcon />
+            </button>
+          )}
+          <button className="color-row-icon" aria-label="Remove" onClick={onRemove}>
+            <XIcon />
+          </button>
+        </>
       }
     >
       <p className="panel-hint">{TYPE_HINTS[spec.type]}</p>
@@ -192,5 +211,6 @@ export function EvaluatorEditor({
         </>
       )}
     </Folder>
+    </div>
   )
 }
