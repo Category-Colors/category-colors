@@ -3,7 +3,7 @@ import { generatePalette } from '../src/lib/algorithm'
 import { EXPORT_FORMATS, formatPalette } from '../src/lib/exporters'
 import { DEFAULT_PARAMS } from '../src/lib/palette'
 import { PRESET_PALETTES } from '../src/lib/presets'
-import { GENERATE_INPUT, PRESET_NAMES, colorList, generateParams, readColors, readSeed, scratch, summarize } from '../src/lib/tools'
+import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, fixParams, generateParams, readColors, readSeed, report, scratch, summarize } from '../src/lib/tools'
 
 // The remote MCP server (docs/mcp-server-plan.md): the WebMCP tools without
 // the page, so every call stands alone and takes its colors as input. It
@@ -106,7 +106,7 @@ function server(allowGeneration: () => Promise<boolean>) {
   }))
   mcp.registerTool('check_palette', {
     title: 'Check palette',
-    description: 'Checks whether every pair of colors stays distinguishable under normal vision and simulated protanomaly, deuteranomaly, tritanomaly and grayscale, flagging pairs whose CIEDE2000 distance falls below the threshold. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Returns the report, the settings used, and a link that opens the palette in the Category Colors app.',
+    description: 'Checks whether every pair of colors stays distinguishable under normal vision and simulated protanomaly, deuteranomaly and tritanomaly, flagging pairs whose CIEDE2000 distance falls below the threshold. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Returns the report, the settings used, and a link that opens the palette in the Category Colors app.',
     inputSchema: object({
       colors: colorList('The palette to check, in order.', 2),
       jnd: GENERATE_INPUT.jnd,
@@ -116,6 +116,19 @@ function server(allowGeneration: () => Promise<boolean>) {
   }, tool(async (input) => {
     const params = generateParams({ jnd: input.jnd }, DEFAULT_PARAMS)
     return summarize(scratch(readColors(input.colors, 2), params))
+  }))
+  mcp.registerTool('fix_palette', {
+    title: 'Fix palette',
+    description: `${FIX_DESCRIPTION} Returns the fixed palette with the report, the settings used, the seed, and a link that opens it in the Category Colors app. Counts toward the generation rate limit.`,
+    inputSchema: object({ colors: colorList('The palette to fix, in order.', 2), ...FIX_INPUT, seed: GENERATE_INPUT.seed }, ['colors']),
+    outputSchema: paletteOutput({ issuesBefore: { type: 'integer', description: 'Failing pairs before the fix, counted like report.totalIssues.' } }),
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  }, tool(async (input) => {
+    const colors = readColors(input.colors, 2)
+    const params = fixParams(input, colors, DEFAULT_PARAMS)
+    if (!(await allowGeneration())) throw new Error('Too many palettes generated in the last minute. Wait a minute and try again.')
+    const issuesBefore = report(scratch(colors, params))?.totalIssues ?? 0
+    return { issuesBefore, ...(await summarize({ id: 1, params, ...generatePalette(params, readSeed(input.seed)), createdAt: Date.now() })) }
   }))
   mcp.registerTool('get_preset_palette', {
     title: 'Get preset palette',

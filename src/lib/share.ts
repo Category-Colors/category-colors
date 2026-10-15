@@ -16,13 +16,22 @@ import { parseParams, type PaletteParams } from './palette'
 // LINK_BASE is the defaults as of 2026-10-12, copied rather than imported from
 // DEFAULT_PARAMS. A link leaves out whatever matched the base, so if the base
 // moved, old links would silently pick up the new values. When the app's
-// defaults change, links only get longer. Never edit this.
-const evaluator = { cvd: 'deuteranomaly', cvdSeverity: 0.5, background: '#ffffff', ratio: 3, checkAdjacent: false, avoidRadius: 0.15, avoidColors: [] }
+// defaults change, links only get longer. Don't edit this.
+//
+// The one exception, 2026-10-15: grayscale left the default evaluators, and was
+// taken out of the base too so that a fresh visit's address stays bare. Older
+// links that kept the default evaluators open without that 0.05 grayscale term;
+// their colors are unaffected. `behavior`, `fixStrength` and the evaluators'
+// `fixEnabled` joined the base the same day; no older link carries them, so
+// they can only ever read as their defaults.
+const evaluator = { cvd: 'deuteranomaly', cvdSeverity: 0.5, background: '#ffffff', ratio: 3, checkAdjacent: false, avoidRadius: 0.15, avoidColors: [], fixEnabled: false }
 const LINK_BASE = {
   colorCount: 8,
   jnd: 20,
   maxIterations: 60000,
   orderOptimization: true,
+  behavior: 'optimize',
+  fixStrength: 0.35,
   initColors: [],
   targets: [],
   evaluators: [
@@ -32,7 +41,6 @@ const LINK_BASE = {
     { ...evaluator, type: 'cvd', weight: 0.1, cvd: 'protanomaly', cvdSeverity: 1 },
     { ...evaluator, type: 'cvd', weight: 0.1, cvd: 'deuteranomaly', cvdSeverity: 1 },
     { ...evaluator, type: 'cvd', weight: 0.1, cvd: 'tritanomaly', cvdSeverity: 1 },
-    { ...evaluator, type: 'cvd', weight: 0.05, cvd: 'grayscale' },
   ],
   colorSpace: { mode: 'okhsl', ranges: [[[0, 360]], [[0.2, 0.8]], [[0.3, 0.9]]] },
 } as Record<string, unknown>

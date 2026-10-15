@@ -5,7 +5,9 @@ import { SPRING, popoverMotion } from './motion';
 import { useAnchoredPortal, useDismiss, useWarmHover } from './use-dropdown';
 import { ICON_CHEVRON } from './icons';
 
-type SelectOption = string | { value: string; label: string };
+// `description` is one line under the label in the open list only; the
+// trigger shows just the label once the option is chosen
+type SelectOption = string | { value: string; label: string; description?: string };
 
 interface SelectControlProps {
   label: string;
@@ -19,7 +21,7 @@ function toTitleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function normalizeOptions(options: SelectOption[]): { value: string; label: string }[] {
+function normalizeOptions(options: SelectOption[]): { value: string; label: string; description?: string }[] {
   return options.map((opt) =>
     typeof opt === 'string' ? { value: opt, label: toTitleCase(opt) } : opt
   );
@@ -33,8 +35,9 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
   const selectedOption = normalized.find((o) => o.value === value);
 
   const { portalTarget, pos } = useAnchoredPortal(isOpen, triggerRef, {
-    // Estimate dropdown height: 8px padding + 32px per option
-    dropdownHeight: 8 + normalized.length * 32,
+    // Estimate dropdown height: 8px padding + 32px per option, 16px more
+    // for each description line
+    dropdownHeight: 8 + normalized.reduce((h, o) => h + (o.description ? 48 : 32), 0),
   });
   useDismiss(isOpen, useCallback(() => setIsOpen(false), []), [triggerRef, dropdownRef]);
   const warmRef = useWarmHover(dropdownRef);
@@ -99,7 +102,14 @@ export function SelectControl({ label, value, options, onChange, disabled }: Sel
                     setIsOpen(false);
                   }}
                 >
-                  {option.label}
+                  {option.description ? (
+                    <span className="dialkit-select-option-text">
+                      {option.label}
+                      <span className="dialkit-select-option-description">{option.description}</span>
+                    </span>
+                  ) : (
+                    option.label
+                  )}
                 </button>
               ))}
             </motion.div>

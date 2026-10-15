@@ -2,11 +2,16 @@ import { useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Slider, Toggle, Folder, SelectControl } from '@/components/dialkit'
 import {
+  BEHAVIOR_ACTIONS,
+  fittedTo,
   DEFAULT_PARAMS,
   defaultColorSpace,
   newEvaluatorSpec,
   newInitColor,
   parseParams,
+  isPaused,
+  SPREADING_TYPES,
+  type Behavior,
   type CvdType,
   type EvaluatorType,
   type PaletteParams,
@@ -16,6 +21,7 @@ import { hexValue } from '@/lib/color'
 import { SPACE_OPTIONS, spaceChannels, spaceDef } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
+import { PRESET_PALETTES } from '@/lib/presets'
 import { AddEvaluatorMenu } from './AddEvaluatorMenu'
 import { ColorRow } from './ColorRow'
 import { EvaluatorEditor } from './EvaluatorEditor'
@@ -29,9 +35,15 @@ import { countOf, useSections } from './sections'
 import { useBusyLabel } from '@/lib/use-busy-label'
 import { ListEmptyState, ListRow, ReorderList } from './ReorderList'
 
-const SECTIONS = ['space', 'init', 'evals', 'optimizer'] as const
+const SECTIONS = ['space', 'init', 'evals'] as const
 
 const MAX_CONFIG_BYTES = 1_000_000
+
+const BEHAVIOR_OPTIONS = [
+  { value: 'optimize', label: 'Generate & optimize', description: 'Builds a new palette from scratch' },
+  { value: 'fix', label: 'Fix issues', description: 'Repairs failing pairs with small changes' },
+  { value: 'evaluate', label: 'Evaluate', description: 'Evaluates the initialized colors' },
+]
 
 const replaceAt = <T,>(list: T[], index: number, item: T) =>
   list.map((entry, i) => (i === index ? item : entry))
@@ -63,15 +75,25 @@ export function ParametersPanel({
   const sections = useSections(SECTIONS)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const fixing = params.behavior === 'fix'
+  const evaluating = params.behavior === 'evaluate'
+
   const set = <K extends keyof PaletteParams>(key: K, value: PaletteParams[K]) =>
     onParamsChange({ ...params, [key]: value })
 
   const addEvaluator = (type: EvaluatorType, cvd?: CvdType) =>
     set('evaluators', [...params.evaluators, newEvaluatorSpec(type, cvd && { cvd })])
 
-  // a preset swaps the whole list rather than editing it; the counter tells
-  // ReorderList to retire the old rows at once instead of crossfading them
+  // A preset loads from the header menu rather than Initial colors, since it sets
+  // the color count to match and stretches the color space to hold it; seeds
+  // alone could load more or fewer colors than the run makes. It swaps the
+  // whole list, so the counter tells ReorderList to retire the old rows at
+  // once instead of crossfading them.
   const [initGen, setInitGen] = useState(0)
+  const loadPreset = (colors: string[]) => {
+    setInitGen((g) => g + 1)
+    onParamsChange({ ...fittedTo(params, colors), initColors: colors.map((h) => newInitColor(hexValue(h))) })
+  }
   const initAddBar = (ghost?: boolean) => (
     <AddColorBar
       ghost={ghost}
@@ -79,10 +101,6 @@ export function ParametersPanel({
       onAddMany={(hexes) =>
         set('initColors', [...params.initColors, ...hexes.map((h) => newInitColor(hexValue(h)))])
       }
-      onReplace={(hexes) => {
-        setInitGen((g) => g + 1)
-        set('initColors', hexes.map((h) => newInitColor(hexValue(h))))
-      }}
     />
   )
 
@@ -111,6 +129,10 @@ export function ParametersPanel({
           <>
             <PanelMenu
               items={[
+                {
+                  label: 'Load a preset',
+                  items: PRESET_PALETTES.map((p) => ({ label: p.name, swatches: p.colors, onClick: () => loadPreset(p.colors) })),
+                },
                 { label: 'Reset all', onClick: () => onParamsChange(DEFAULT_PARAMS) },
                 {
                   label: 'Export configuration',
@@ -176,7 +198,7 @@ export function ParametersPanel({
           ))}
         </Folder>
         <Folder
-          title="Initialize"
+          title="Initial colors"
           open={sections.open.init}
           onOpenChange={sections.setSection('init')}
           summary={countOf(params.initColors.length, 'color')}
@@ -250,6 +272,8 @@ export function ParametersPanel({
                 <ListRow key={spec.id}>
                   <EvaluatorEditor
                     spec={spec}
+                    mutable={fixing && SPREADING_TYPES.includes(spec.type)}
+                    paused={isPaused(spec, params.behavior)}
                     onChange={(next) => set('evaluators', replaceAt(params.evaluators, i, next))}
                     onRemove={() => set('evaluators', removeAt(params.evaluators, i))}
                     targets={params.targets}
@@ -267,12 +291,24 @@ export function ParametersPanel({
             )}
           </AnimatePresence>
         </Folder>
-        <Folder
-          title="Optimizer"
-          open={sections.open.optimizer}
-          onOpenChange={sections.setSection('optimizer')}
-          summary={`${params.maxIterations.toLocaleString()} iterations`}
-        >
+        {/* Run settings, unfoldered: they decide what the button below does */}
+        <div className="panel-run-settings">
+          <SelectControl
+            label="Behavior"
+            value={params.behavior}
+            options={BEHAVIOR_OPTIONS}
+            onChange={(v) => set('behavior', v as Behavior)}
+          />
+          {fixing && (
+            <Slider
+              label="Strength"
+              value={params.fixStrength}
+              onChange={(v) => set('fixStrength', v)}
+              min={0}
+              max={1}
+              step={0.05}
+            />
+          )}
           <Slider
             label="JND threshold"
             value={params.jnd}
@@ -281,20 +317,28 @@ export function ParametersPanel({
             max={40}
             step={1}
           />
-          <Slider
-            label="Iterations"
-            value={params.maxIterations}
-            onChange={(v) => set('maxIterations', v)}
-            min={1000}
-            max={100000}
-            step={1000}
-          />
-          <Toggle
-            label="Optimize order"
-            checked={params.orderOptimization}
-            onChange={(v) => set('orderOptimization', v)}
-          />
-        </Folder>
+          {/* Evaluate runs nothing, so it has no run length or order pass */}
+          {!evaluating && (
+            <>
+              <Slider
+                label="Iterations"
+                value={params.maxIterations}
+                onChange={(v) => set('maxIterations', v)}
+                min={1000}
+                max={100000}
+                step={1000}
+              />
+              {/* Fixing keeps every color in place, so ordering is off while it
+                  runs; the stored setting comes back with Generate & optimize */}
+              <Toggle
+                label="Optimize order"
+                checked={params.orderOptimization && !fixing}
+                onChange={(v) => set('orderOptimization', v)}
+                disabled={fixing}
+              />
+            </>
+          )}
+        </div>
       </Folder>
       <div className="panel-footer">
         <div className="dialkit-button-group">
@@ -310,7 +354,7 @@ export function ParametersPanel({
             onClick={() => onGenerate()}
           >
             {busy && <span className="button-spinner" />}
-            {busy ? busyLabel : 'Generate'}
+            {busy ? busyLabel : BEHAVIOR_ACTIONS[params.behavior]}
           </button>
           {busy && (
             <button

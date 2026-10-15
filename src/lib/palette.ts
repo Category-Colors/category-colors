@@ -1,3 +1,4 @@
+import { converter, parse } from 'culori'
 import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
 import { isWorkingSpace, spaceChannels, spaceInitialRanges, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
@@ -47,7 +48,16 @@ export interface EvaluatorSpec {
   checkAdjacent: boolean
   avoidColors: TargetColor[]
   avoidRadius: number
+  // Energy and Range only: run them under Fix issues too (they pause there by
+  // default — see SPREADING_TYPES)
+  fixEnabled: boolean
 }
+
+// The terms that only spread colors apart. A palette being fixed has nothing
+// to spread, and on a finished one they are what made colors wander.
+export const SPREADING_TYPES: EvaluatorType[] = ['energy', 'range']
+export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) =>
+  behavior === 'fix' && SPREADING_TYPES.includes(spec.type) && !spec.fixEnabled
 
 // Windows a channel may carry; the importer keeps this many and the slider
 // stops adding at it
@@ -103,11 +113,66 @@ export function tidyWindows(windows: ChannelWindow[], period?: number): ChannelW
   return wide.length ? wide : merged.slice(0, 1)
 }
 
+export type Behavior = 'optimize' | 'fix' | 'evaluate'
+
+// What the run button says under each behavior
+export const BEHAVIOR_ACTIONS: Record<Behavior, string> = {
+  optimize: 'Generate',
+  fix: 'Fix issues',
+  evaluate: 'Evaluate',
+}
+
+// The same windows, each stretched just far enough to take in every one of
+// these colors. The package snaps a seed outside every window to the nearest
+// edge before the run starts, so a finished palette loaded under narrower
+// settings would be redrawn before anything was fixed (Okabe–Ito's grey moved
+// 12 ΔE that way). A value is reached from whichever window edge is nearest,
+// around the circle on a cyclic channel; a grey has no hue and asks nothing of
+// that channel.
+export function colorSpaceContaining(space: ColorSpaceParams, colors: string[]): ColorSpaceParams {
+  const toMode = converter(space.mode)
+  const points = colors.map((css) => toMode(parse(css)) as Record<string, number | undefined> | undefined)
+  return {
+    mode: space.mode,
+    ranges: spaceChannels(space.mode).map((channel, i) => {
+      const windows = space.ranges[i].map((w): ChannelWindow => [...w])
+      const gap = (from: number, to: number) => {
+        const d = to - from
+        return channel.period ? ((d % channel.period) + channel.period) % channel.period : Math.abs(d)
+      }
+      for (const point of points) {
+        const v = point?.[channel.key]
+        if (v === undefined || Number.isNaN(v)) continue
+        const value = Math.min(channel.max, Math.max(channel.min, v))
+        const inside = tidyWindows(windows, channel.period).some(([a, b]) => value >= a && value <= b)
+        if (inside) continue
+        // nearest edge: forward past a window's end, or back before its start
+        let best = { gap: Infinity, index: 0, end: 1 as 0 | 1 }
+        windows.forEach(([a, b], index) => {
+          const after = channel.period ? gap(b, value) : value > b ? value - b : Infinity
+          const before = channel.period ? gap(value, a) : value < a ? a - value : Infinity
+          if (after < best.gap) best = { gap: after, index, end: 1 }
+          if (before < best.gap) best = { gap: before, index, end: 0 }
+        })
+        windows[best.index][best.end] = value
+      }
+      return tidyWindows(windows, channel.period)
+    }),
+  }
+}
+
 export interface PaletteParams {
   colorCount: number
   jnd: number
   maxIterations: number
   orderOptimization: boolean
+  // 'optimize' makes the best palette the evaluators describe. 'fix' repairs
+  // the seeds instead: JND and CVD rows score only failing pairs, the spreading
+  // terms pause, and colors are held near their seeds (see fix.ts).
+  behavior: Behavior
+  // Fix issues only: 1 clears the most failing pairs, 0 keeps colors closest
+  // to their seeds (see scheduleFor in fix.ts)
+  fixStrength: number
   initColors: InitColor[]
   targets: TargetColor[]
   evaluators: EvaluatorSpec[]
@@ -139,6 +204,7 @@ const SPEC_DEFAULTS = {
   ratio: 3,
   checkAdjacent: false,
   avoidRadius: 0.15,
+  fixEnabled: false,
 }
 
 let nextId = 0
@@ -171,9 +237,13 @@ export function newTargetColor(value: ColorValue = hexValue('#888888')): TargetC
 // the library's default exactly despite naming only the anomaly variants.
 //
 // The CVD weights look far too low next to an unimpaired `jnd` of 1 until you
-// measure them — the terms saturate early. Carrying them higher buys almost
-// nothing, because the binding constraint is grayscale, not a deficiency.
-// Lower the `jnd` weight to trade ordinary separation back for CVD headroom.
+// measure them — the terms saturate early. Lower the `jnd` weight to trade
+// ordinary separation back for CVD headroom.
+//
+// Grayscale is left out, as in the library's since 3.5.0: lightness alone spans
+// about 100 ΔE, so past five or six colors no palette passes it at a JND of 20,
+// and a term that can't be met only drags the rest of the run after it. It is
+// one click away in the evaluator menu for palettes that really will be printed.
 const DEFAULT_EVALUATORS: EvaluatorSpec[] = [
   newEvaluatorSpec('energy', { weight: 0.15 }),
   newEvaluatorSpec('range', { weight: 0.15 }),
@@ -181,9 +251,6 @@ const DEFAULT_EVALUATORS: EvaluatorSpec[] = [
   newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'protanomaly', cvdSeverity: 1 }),
   newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'deuteranomaly', cvdSeverity: 1 }),
   newEvaluatorSpec('cvd', { weight: 0.1, cvd: 'tritanomaly', cvdSeverity: 1 }),
-  // No cvdSeverity: grayscale reads its severity through cvdSeverityFor, which
-  // pins it to 1 regardless of what is stored here.
-  newEvaluatorSpec('cvd', { weight: 0.05, cvd: 'grayscale' }),
 ]
 
 export const DEFAULT_PARAMS: PaletteParams = {
@@ -198,6 +265,8 @@ export const DEFAULT_PARAMS: PaletteParams = {
   // convergence for roughly 6s more on the first generate rather than 3x.
   maxIterations: 60000,
   orderOptimization: true,
+  behavior: 'optimize',
+  fixStrength: 0.35,
   initColors: [],
   targets: [],
   evaluators: DEFAULT_EVALUATORS,
@@ -222,6 +291,19 @@ export const presetParams = (p: (typeof PARAM_PRESETS)[number]): PaletteParams =
   }
 }
 
+
+// Params sized to a finished palette, in a space that already holds every one
+// of its colors, so none moves before a run starts
+export const fittedTo = (params: PaletteParams, colors: string[]): PaletteParams => ({
+  ...params,
+  colorCount: colors.length,
+  colorSpace: colorSpaceContaining(params.colorSpace, colors),
+})
+
+// Settings a finished palette (a preset) comes in with: the defaults, fitted
+// to it. Not the panel's settings, which belong to whatever the person was
+// making before.
+export const paletteParams = (colors: string[]): PaletteParams => fittedTo(structuredClone(DEFAULT_PARAMS), colors)
 
 const IMPORT_LIMITS = {
   textLength: 1_000_000,
@@ -301,6 +383,7 @@ export function parseParams(text: string): PaletteParams | null {
       ratio: boundedNumber(e.ratio, SPEC_DEFAULTS.ratio, 1, 7),
       checkAdjacent: e.checkAdjacent === true,
       avoidRadius: boundedNumber(e.avoidRadius, SPEC_DEFAULTS.avoidRadius, 0.05, 0.5),
+      fixEnabled: e.fixEnabled === true,
     })
     const space = raw.colorSpace
     return {
@@ -310,6 +393,8 @@ export function parseParams(text: string): PaletteParams | null {
         boundedNumber(raw.maxIterations, d.maxIterations, 1_000, 100_000)
       ),
       orderOptimization: raw.orderOptimization !== false,
+      behavior: raw.behavior === 'fix' || raw.behavior === 'evaluate' ? raw.behavior : 'optimize',
+      fixStrength: boundedNumber(raw.fixStrength, d.fixStrength, 0, 1),
       initColors: raw.initColors
         .slice(0, IMPORT_LIMITS.initColors)
         .flatMap((c) => {

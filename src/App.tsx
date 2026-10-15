@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { MotionConfig, motion, useMotionValue, useTransform } from 'motion/react'
 import type { MotionStyle } from 'motion/react'
 import {
+  BEHAVIOR_ACTIONS,
+  paletteParams,
   type PaletteParams,
   type PaletteVersion,
 } from '@/lib/palette'
@@ -18,6 +20,7 @@ import { DOCKED, useIsPhone } from '@/lib/use-media'
 import { loadSession, saveSession } from '@/lib/session'
 import { registerWebMcpTools, type WebMcpApi } from '@/lib/webmcp'
 import { linkFor, readLink } from '@/lib/share'
+import { refineParams } from '@/lib/report'
 
 // Below this the panels float over the canvas instead of the canvas
 // reserving a column for them (index.css). Floating panels would cover what
@@ -120,6 +123,12 @@ export default function App() {
         }
         setVersions((prev) => [...prev, version])
         setCurrentId(version.id)
+        // A fix's output seeds the next fix, so pressing again picks up what's
+        // left. Only while the panel is still on Fix issues; its other
+        // settings, changed during the run or not, are kept.
+        if (snapshot.behavior === 'fix' && paramsRef.current.behavior === 'fix') {
+          setParams(refineParams({ ...version, params: paramsRef.current }))
+        }
         return version
       })
       .finally(() => {
@@ -173,6 +182,13 @@ export default function App() {
     setCurrentId(version.id)
   }
 
+  // Loads a version's output as the next run's starting colors, with the ones
+  // that pass held still (see refineParams)
+  const refine = (version: PaletteVersion) => {
+    setParams(refineParams(version))
+    setCurrentId(version.id)
+  }
+
   // Hand edits from the Output panel rewrite the current version's colors;
   // preview, report, and stats all derive from them and follow along. With
   // no current version (cleared history), the first edit starts one.
@@ -196,6 +212,10 @@ export default function App() {
     setVersions(next)
     if (id === currentId) setCurrentId(next.length ? next[next.length - 1].id : null)
   }
+
+  // A preset arrives with its own settings (paletteParams), so refining it
+  // doesn't depend on whatever the panel happened to hold
+  const addPreset = (colors: string[]) => addPalette(colors, paletteParams(colors))
 
   // Wholesale palette loads (presets, imports) become their own history
   // entries; empty costHistory marks that the optimizer never ran
@@ -253,6 +273,7 @@ export default function App() {
     generate: runGeneration,
     cancel: cancelPaletteGeneration,
     addPalette,
+    addPreset,
   }
   useEffect(() => {
     const registration = new AbortController()
@@ -280,7 +301,7 @@ export default function App() {
       />
       <main className="app-main">
         {storageWarning && <p role="status" className="rounded-lg bg-panel p-3 text-[13px] text-ink">{storageWarning}</p>}
-        <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPalette} onReload={() => {
+        <MainTabs version={current} busy={busy} onGenerate={generate} onPreset={addPreset} onReload={() => {
           if (saveSession(sessionRef.current)) window.location.reload()
           else setWarnings((previous) => ({ ...previous, reload: RELOAD_PAUSED }))
         }} />
@@ -290,8 +311,10 @@ export default function App() {
         versions={versions}
         currentId={currentId}
         onRestore={restore}
+        onRefine={refine}
         onColorsChange={updateColors}
         onPaletteReplace={addPalette}
+        onPreset={addPreset}
         onDeleteVersion={deleteVersion}
         onClearVersions={clearVersions}
         open={outputOpen}
@@ -306,6 +329,7 @@ export default function App() {
           onOpen={setSheet}
           onGenerate={generate}
           onCancel={cancelPaletteGeneration}
+          action={BEHAVIOR_ACTIONS[params.behavior]}
         />
       )}
       <TooltipLayer />

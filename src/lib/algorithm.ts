@@ -11,8 +11,10 @@ import {
 // keeps it on a subpath of its own the way it does saliency's.
 import names from 'category-colors/evaluators/names'
 import { oklchCss, toCulori, valueToCss } from '@/lib/color'
-import { cvdSeverityFor } from './palette'
+import { evaluateFix, scheduleFor, toSeed, type FixOptions } from './fix'
+import { cvdSeverityFor, isPaused } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
+import { buildJndReport } from './report'
 
 // The bridge between the app's serializable params and the category-colors
 // algorithm. Kept apart from palette.ts so importing the parameter types and
@@ -41,6 +43,22 @@ function toEvalFunction(spec: EvaluatorSpec): EvalFunction {
   return entry
 }
 
+// Fix mode (see fix.ts): the JND and CVD rows collapse into one fix term that
+// checks the same conditions, the spreading terms pause unless switched back
+// on, and the rest apply as usual. Without a JND row normal vision goes
+// unchecked, as in optimize.
+
+function fixEvalFunctions(active: EvaluatorSpec[], params: PaletteParams): EvalFunction[] {
+  const options: FixOptions = {
+    seeds: params.initColors.map((c) => toSeed(toCulori(c.value))),
+    conditions: active.flatMap((spec) =>
+      spec.type === 'jnd' ? [null] : spec.type === 'cvd' ? [{ type: spec.cvd, severity: cvdSeverityFor(spec) }] : []
+    ),
+  }
+  const rest = active.filter((spec) => spec.type !== 'jnd' && spec.type !== 'cvd' && !isPaused(spec, 'fix'))
+  return [{ function: evaluateFix, weight: 1, ...options }, ...rest.map(toEvalFunction)]
+}
+
 // The algorithm config a set of params describes; shared by generation (in
 // the worker) and the stats breakdown (on the main thread).
 export function buildConfig(params: PaletteParams): Config {
@@ -54,13 +72,22 @@ export function buildConfig(params: PaletteParams): Config {
     ranges: params.colorSpace.ranges.map((windows) => windows.map((w) => [...w])),
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
-  config.evalFunctions = params.evaluators.filter((spec) => spec.weight > 0).map(toEvalFunction)
+  const active = params.evaluators.filter((spec) => spec.weight > 0)
+  config.evalFunctions = params.behavior === 'fix' ? fixEvalFunctions(active, params) : active.map(toEvalFunction)
   return config
 }
+
+// A result for colors no run produced: no cost, no curve
+const unrun = (colors: string[], seed: number) => ({ colors, cost: 0, iterations: 0, costHistory: [], seed })
 
 // Every run is seeded, so a palette can be made again: the seed drawn here is
 // returned with the result for the caller to keep.
 export function generatePalette(params: PaletteParams, seed = Math.floor(Math.random() * 2 ** 31)) {
+  // Evaluate runs nothing: the seeds come back as written, for the report to score
+  if (params.behavior === 'evaluate') {
+    if (params.initColors.length < 2) throw new Error('Add at least two initial colors to evaluate them.')
+    return unrun(params.initColors.map((c) => valueToCss(c.value)), seed)
+  }
   const config = buildConfig(params)
   config.recordHistory = true
   config.seed = seed
@@ -75,18 +102,37 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
     },
     config
   )
-  const run = params.orderOptimization ? runWithOrderOptimization : runSimulatedAnnealing
+  // A fix starts partway down the schedule (see scheduleFor). Only the
+  // temperature drops: initialTemperature stays the full one, since the step
+  // size is scaled against it, so steps start partway down too.
+  if (params.behavior === 'fix') {
+    const { cutoff } = config
+    initialState.temperature = cutoff * (initialState.temperature / cutoff) ** scheduleFor(params.fixStrength)
+  }
+  // Fixing keeps every color where it was; reordering would undo that
+  const run = params.orderOptimization && params.behavior !== 'fix' ? runWithOrderOptimization : runSimulatedAnnealing
   const finalState = run(initialState, config)
 
   // Fixed colors come back as the person wrote them; the rest as OKLCH
   const fixed = new Map(
     params.initColors.filter((c) => c.fixedColor).map((c) => [oklchCss(toCulori(c.value)), valueToCss(c.value)])
   )
+  const colors = finalState.colors.map((color) => {
+    const css = oklchCss(color)
+    return fixed.get(css) ?? css
+  })
+  // A fix never hands back more issues than it was given. The objective can
+  // trade one deep shortfall for two shallow ones, and fitting the seeds to
+  // the color space or rounding them to OKLCH can tip a pair that just passed.
+  // Then the seeds come back as if nothing ran, without the discarded run's
+  // cost and curve. Only when they're a whole palette to fall back to.
+  if (params.behavior === 'fix' && params.initColors.length === colors.length) {
+    const seeds = params.initColors.map((c) => valueToCss(c.value))
+    const issues = (palette: string[]) => buildJndReport({ params, colors: palette })?.totalIssues ?? 0
+    if (issues(colors) > issues(seeds)) return unrun(seeds, seed)
+  }
   return {
-    colors: finalState.colors.map((color) => {
-      const css = oklchCss(color)
-      return fixed.get(css) ?? css
-    }),
+    colors,
     cost: finalState.cost,
     iterations: finalState.iterations,
     costHistory: finalState.costHistory ?? [],

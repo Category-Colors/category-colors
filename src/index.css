@@ -428,6 +428,18 @@ body {
   width: max-content;
 }
 
+/* a row that opens a child menu */
+.panel-menu-parent {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* holds its hover highlight while its flyout is open */
+.panel-menu-parent[data-open='true'] {
+  background: var(--dial-surface-hover);
+}
+
 /* Docked DialKit-style panels. The dock keeps its full width while the
    panel inside morphs down to 42px, so the dock itself must not intercept
    clicks — otherwise it invisibly blocks the nav once the main area
@@ -565,7 +577,7 @@ body {
   pointer-events: none;
 }
 
-/* The bound numbers, in the track or on the line under it */
+/* The bound numbers, in the track or beside a window's row */
 .range-slider-nums {
   display: flex;
   align-items: baseline;
@@ -610,11 +622,46 @@ body {
   }
 }
 
-/* Several windows' bounds, under the track so they don't cover its bands */
-.range-slider-windows {
-  flex-wrap: wrap;
-  padding: 3px 10px 2px;
-  font-size: 12px;
+/* Several windows: the label as a header over a compact row per window,
+   track left and numbers right, so each window takes a little over half the
+   height of a full dial */
+.range-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.range-slider-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* flush left, like the folder titles, so it reads as the rows' heading */
+  padding-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dial-text-label);
+}
+
+.range-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-slider-compact {
+  flex: 1;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.range-slider-compact .range-slider-handle {
+  height: 12px;
+}
+
+/* wide enough for the longest "lo–hi" so every row's track ends at one edge */
+.range-slider-row-value {
+  min-width: 8ch;
+  justify-content: flex-end;
 }
 
 /* Opens another window; shown with the handles */
@@ -863,6 +910,26 @@ body {
   border-top: none;
   margin-top: 0;
   padding-top: 0;
+}
+
+/* An evaluator Fix issues won't run: its name and contents fade, its pause
+   and × stay at full strength since they're how to bring it back or drop it */
+.evaluator[data-paused='true'] .dialkit-folder-title,
+.evaluator[data-paused='true'] .dialkit-folder-content {
+  opacity: 0.4;
+}
+
+/* Run settings sit unfoldered below the last section, whose bottom rule
+   already separates them */
+.panel-run-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dialkit-toggle-row[data-disabled] .dialkit-labeled-control-label {
+  opacity: 0.4;
 }
 
 /* Open evaluator rows keep the hover treatment as an active state: title

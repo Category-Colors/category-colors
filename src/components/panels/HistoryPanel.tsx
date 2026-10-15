@@ -23,7 +23,7 @@ import { ScrollOverlay } from '@/components/ScrollOverlay'
 import { AddColorBar } from './AddColorBar'
 import { ColorRow } from './ColorRow'
 import { HistoryPopover, type HistoryPopoverHandle } from './HistoryPopover'
-import { CheckIcon, CopyIcon, LinkIcon, TrashIcon, XIcon } from './icons'
+import { CheckIcon, CopyIcon, LinkIcon, TrashIcon, WandIcon, XIcon } from './icons'
 import { PanelShell } from './PanelShell'
 import type { MotionValue } from 'motion/react'
 import { PanelMenu } from './PanelMenu'
@@ -58,11 +58,13 @@ function VersionRow({
   version,
   active,
   onRestore,
+  onRefine,
   onDelete,
 }: {
   version: PaletteVersion
   active: boolean
   onRestore: () => void
+  onRefine: () => void
   onDelete: () => void
 }) {
   return (
@@ -83,6 +85,9 @@ function VersionRow({
         </span>
       </button>
       <div className="color-row-actions">
+        <button className="color-row-icon" aria-label={`Refine palette ${version.id}`} onClick={onRefine}>
+          <WandIcon />
+        </button>
         <button className="color-row-icon" aria-label={`Remove palette ${version.id}`} onClick={onDelete}>
           <XIcon />
         </button>
@@ -95,8 +100,10 @@ export function HistoryPanel({
   versions,
   currentId,
   onRestore,
+  onRefine,
   onColorsChange,
   onPaletteReplace,
+  onPreset,
   onDeleteVersion,
   onClearVersions,
   open,
@@ -107,8 +114,10 @@ export function HistoryPanel({
   versions: PaletteVersion[]
   currentId: number | null
   onRestore: (version: PaletteVersion) => void
+  onRefine: (version: PaletteVersion) => void
   onColorsChange: (colors: string[]) => void
   onPaletteReplace: (colors: string[]) => void
+  onPreset: (colors: string[]) => void
   onDeleteVersion: (id: number) => void
   onClearVersions: () => void
   open: boolean
@@ -183,7 +192,7 @@ export function HistoryPanel({
     commit(items.map((item) => ({ ...item, value: convertValue(item.value, space as Space) })))
   }
 
-  // same three-way add bar as the config panel's Initialize section
+  // same three-way add bar as the config panel's Initial colors section
   const paletteAddBar = (ghost?: boolean) => (
     <AddColorBar
       ghost={ghost}
@@ -191,7 +200,7 @@ export function HistoryPanel({
       onAddMany={(hexes) =>
         commit([...items, ...hexes.map((hex) => ({ id: nextItemId++, value: hexValue(hex) }))])
       }
-      onReplace={onPaletteReplace} // presets are a new palette, not an edit
+      onReplace={onPreset} // presets are a new palette, not an edit, with settings of their own
     />
   )
 
@@ -359,6 +368,7 @@ export function HistoryPanel({
                   version={v}
                   active={v.id === currentId}
                   onRestore={() => onRestore(v)}
+                  onRefine={() => onRefine(v)}
                   onDelete={() => {
                     popover.current?.hide() // its anchor row is going away
                     onDeleteVersion(v.id)

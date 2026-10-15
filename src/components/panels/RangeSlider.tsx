@@ -1,19 +1,22 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { SPRING, FADE } from '@/components/dialkit'
 import { decimalsForStep, roundValue } from '@/components/dialkit/shortcut-utils'
 import { MAX_WINDOWS, tidyWindows, type ChannelWindow } from '@/lib/palette'
+import { PlusIcon, XIcon } from './icons'
 
 const HANDLE_BUFFER = 8
 const LABEL_CSS_LEFT = 10
 const VALUE_CSS_RIGHT = 10
 
 // Range slider matching the DialKit Slider look and behavior: label left,
-// "lo–hi" values right, a filled band per window, hashmarks and handles that
-// appear on hover (handles dodge the text). Dragging grabs the nearest bound
-// of any window; clicking a number edits it. The + button opens another
-// window in the widest gap, and dragging a window shut removes it.
+// "lo–hi" values right, a filled band, hashmarks and handles that appear on
+// hover (handles dodge the text). With several windows the label becomes a
+// group header over a compact row per window: its own track left, its numbers
+// right. Dragging grabs the nearest bound on that track; clicking a number
+// edits it. The + button opens another window in the widest gap; a row's ×,
+// or dragging a window shut, removes it.
 //
 // Bounds are addressed by their index in the flattened windows: bound i is
 // window i >> 1, lower (0) or upper (1) end i & 1.
@@ -40,13 +43,17 @@ export function RangeSlider({
   // the parent only ever gets the tidy version, so it never holds a shut or
   // overlapping window and nothing downstream has to cope with one.
   const [drag, setDrag] = useState<ChannelWindow[] | null>(null)
-  const [hovered, setHovered] = useState(false)
+  // Which track is hovered or dragged: -1 the single dial, w a window's row
+  const [hovered, setHovered] = useState<number | null>(null)
+  const [dragTrack, setDragTrack] = useState<number | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
   const [inputValue, setInputValue] = useState('')
   const bound = useRef(0)
+  const rect = useRef<DOMRect | null>(null)
 
   const shown = drag ?? value
-  const isActive = drag !== null || hovered
+  const flat = shown.flat()
+  const activeTrack = dragTrack ?? hovered
   const fmt = (v: number) => v.toFixed(decimalsForStep(step))
   const pct = (v: number) => ((v - min) / (max - min)) * 100
 
@@ -74,8 +81,8 @@ export function RangeSlider({
   }
 
   const valueAt = (clientX: number) => {
-    const rect = trackRef.current!.getBoundingClientRect()
-    const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const { left, width } = rect.current!
+    const p = Math.max(0, Math.min(1, (clientX - left) / width))
     return roundValue(min + p * (max - min), step)
   }
 
@@ -86,17 +93,22 @@ export function RangeSlider({
     onChange(tidyWindows(next))
   }
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  // A press grabs the nearest of the track's bounds: any of them on the single
+  // dial, its own window's two on a window's row
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>, key: number, indices: number[]) => {
     if (editing !== null) return
     e.currentTarget.setPointerCapture(e.pointerId)
+    rect.current = e.currentTarget.getBoundingClientRect()
     const v = valueAt(e.clientX)
+    const flat = value.flat()
     let distance = Infinity
-    value.flat().forEach((b, i) => {
+    for (const i of indices) {
       // a tie is a shut window: the click's side says which bound reopens it
-      const d = Math.abs(v - b)
-      if (d < distance || (d === distance && (v < b ? !(i & 1) : i & 1))) [bound.current, distance] = [i, d]
-    })
+      const d = Math.abs(v - flat[i])
+      if (d < distance || (d === distance && (v < flat[i] ? !(i & 1) : i & 1))) [bound.current, distance] = [i, d]
+    }
     setDrag(value)
+    setDragTrack(key)
     apply(value, v)
   }
 
@@ -105,7 +117,10 @@ export function RangeSlider({
     apply(drag, valueAt(e.clientX))
   }
 
-  const endDrag = () => setDrag(null)
+  const endDrag = () => {
+    setDrag(null)
+    setDragTrack(null)
+  }
 
   // Another window: in the widest gap, taking its middle third; with no gap
   // worth the name, the widest window splits into its outer thirds instead
@@ -163,103 +178,143 @@ export function RangeSlider({
         )
       : Array.from({ length: 9 }, (_, i) => (i + 1) * 10)
 
-  // Every bound as an editable number, "lo–hi" per window, windows separated
-  // by commas. One window sits in the track; several go on a line below it,
-  // where they don't cover the bands.
-  const bounds = shown.flat().map((v, i) => (
-    <Fragment key={i}>
-      {i & 1 ? <span className="range-slider-dash">–</span> : i > 0 && <span className="range-slider-dash">,</span>}
-      {editing === i ? (
-        <input
-          ref={inputRef}
-          type="text"
-          className="range-slider-input"
-          style={{ width: `${Math.max(inputValue.length, 2) + 0.5}ch`, textAlign: i & 1 ? 'left' : 'right' }}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitInput()
-            else if (e.key === 'Escape') setEditing(null)
-          }}
-          onBlur={commitInput}
-          onClick={stop}
-        />
-      ) : (
-        <button
-          type="button"
-          className="range-slider-num"
-          aria-label={`Edit ${i & 1 ? 'upper' : 'lower'} ${label.toLowerCase()} bound${shown.length > 1 ? ` of window ${(i >> 1) + 1}` : ''}`}
-          onClick={() => startEdit(i)}
-        >
-          {fmt(v)}
-        </button>
-      )}
-    </Fragment>
-  ))
+  // The given bounds as editable numbers, "lo–hi"
+  const bounds = (indices: number[]) =>
+    indices.map((i) => (
+      <Fragment key={i}>
+        {i & 1 ? <span className="range-slider-dash">–</span> : null}
+        {editing === i ? (
+          <input
+            ref={inputRef}
+            type="text"
+            className="range-slider-input"
+            style={{ width: `${Math.max(inputValue.length, 2) + 0.5}ch`, textAlign: i & 1 ? 'left' : 'right' }}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitInput()
+              else if (e.key === 'Escape') setEditing(null)
+            }}
+            onBlur={commitInput}
+            onClick={stop}
+          />
+        ) : (
+          <button
+            type="button"
+            className="range-slider-num"
+            aria-label={`Edit ${i & 1 ? 'upper' : 'lower'} ${label.toLowerCase()} bound${shown.length > 1 ? ` of window ${(i >> 1) + 1}` : ''}`}
+            onClick={() => startEdit(i)}
+          >
+            {fmt(flat[i])}
+          </button>
+        )}
+      </Fragment>
+    ))
 
-  return (
-    <div>
+  const addButton = value.length < MAX_WINDOWS && (
+    <button
+      type="button"
+      className="range-slider-add"
+      aria-label={`Add a ${label.toLowerCase()} window`}
+      title="Add a window"
+      onClick={addWindow}
+    >
+      +
+    </button>
+  )
+
+  // A track: the whole channel, with a band per window it draws. `dodge`
+  // gives the handle thresholds for text laid over the track, if any.
+  const track = (key: number, windows: number[], children: ReactNode, dodge?: [number, number]) => {
+    const isActive = activeTrack === key
+    const indices = windows.flatMap((w) => [2 * w, 2 * w + 1])
+    return (
       <div
-        ref={trackRef}
-        className={`range-slider ${isActive ? 'range-slider-active' : ''}`}
-        onPointerDown={onPointerDown}
+        ref={key === -1 ? trackRef : undefined}
+        className={`range-slider ${key === -1 ? '' : 'range-slider-compact'} ${isActive ? 'range-slider-active' : ''}`}
+        onPointerDown={(e) => onPointerDown(e, key, indices)}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={() => setHovered(key)}
+        onMouseLeave={() => setHovered((h) => (h === key ? null : h))}
         role="group"
-        aria-label={label}
+        aria-label={key === -1 ? label : `${label} window ${key + 1}`}
       >
         <div className="dialkit-slider-hashmarks">
           {marks.map((p) => (
             <div key={p} className="dialkit-slider-hashmark" style={{ left: `${p}%` }} />
           ))}
         </div>
-        {shown.map(([lo, hi], w) => (
-          <div key={w} className="range-slider-fill" style={{ left: `${pct(lo)}%`, width: `${pct(hi) - pct(lo)}%` }} />
-        ))}
-        {shown.flat().map((v, i) => {
-          const p = pct(v)
-          const dodge = p < leftThreshold || p > rightThreshold
+        {windows.map((w) => {
+          const [lo, hi] = shown[w]
+          return <div key={w} className="range-slider-fill" style={{ left: `${pct(lo)}%`, width: `${pct(hi) - pct(lo)}%` }} />
+        })}
+        {indices.map((i) => {
+          const p = pct(flat[i])
+          const ducked = !!dodge && (p < dodge[0] || p > dodge[1])
           return (
             <motion.div
               key={i}
               className="range-slider-handle"
               style={{ left: `clamp(5px, ${p}%, calc(100% - 5px))`, x: '-50%', y: '-50%' }}
               animate={{
-                opacity: !isActive ? 0 : dodge ? 0.1 : drag ? 0.9 : 0.5,
+                opacity: !isActive ? 0 : ducked ? 0.1 : drag ? 0.9 : 0.5,
                 scaleX: isActive ? 1 : 0.25,
-                scaleY: isActive && dodge ? 0.75 : 1,
+                scaleY: isActive && ducked ? 0.75 : 1,
               }}
               transition={{ scaleX: SPRING.glyph, scaleY: SPRING.glyph, opacity: FADE }}
             />
           )
         })}
+        {children}
+      </div>
+    )
+  }
+
+  // One window is the full dial, label and numbers laid over the track.
+  // Several are a group under the label, a compact row per window with its
+  // track on the left and its numbers on the right.
+  if (shown.length === 1) {
+    return track(
+      -1,
+      [0],
+      <>
         <span ref={labelRef} className="range-slider-label">
           {label}
         </span>
-        <span
-          ref={valueRef}
-          className="range-slider-value range-slider-nums"
-          onMouseDown={stop}
-          onPointerDown={stop}
-        >
-          {shown.length === 1 && bounds}
-          {value.length < MAX_WINDOWS && (
-            <button
-              type="button"
-              className="range-slider-add"
-              aria-label={`Add a ${label.toLowerCase()} window`}
-              title="Add a window"
-              onClick={addWindow}
-            >
-              +
-            </button>
-          )}
+        <span ref={valueRef} className="range-slider-value range-slider-nums" onMouseDown={stop} onPointerDown={stop}>
+          {bounds([0, 1])}
+          {addButton}
         </span>
+      </>,
+      [leftThreshold, rightThreshold]
+    )
+  }
+  return (
+    <div className="range-slider-group" role="group" aria-label={label}>
+      <div className="range-slider-group-header">
+        <span>{label}</span>
+        {/* the same icon button as the rows' ×, so it sits right above them */}
+        {value.length < MAX_WINDOWS && (
+          <button className="color-row-icon" aria-label={`Add a ${label.toLowerCase()} window`} onClick={addWindow}>
+            <PlusIcon />
+          </button>
+        )}
       </div>
-      {shown.length > 1 && <div className="range-slider-windows range-slider-nums">{bounds}</div>}
+      {shown.map((_, w) => (
+        <div key={w} className="range-slider-row">
+          {track(w, [w], null)}
+          <span className="range-slider-nums range-slider-row-value">{bounds([2 * w, 2 * w + 1])}</span>
+          <button
+            className="color-row-icon"
+            aria-label={`Remove ${label.toLowerCase()} window ${w + 1}`}
+            onClick={() => onChange(value.filter((_, j) => j !== w))}
+          >
+            <XIcon />
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

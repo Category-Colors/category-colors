@@ -183,8 +183,6 @@ function PairPopover({
   const OPEN_DWELL = 120
   const MOVE_DWELL = 100
 
-  const bridgeRef = useRef<HTMLDivElement>(null)
-
   const hideNow = () => {
     const s = state.current
     const pop = popRef.current
@@ -194,8 +192,6 @@ function PairPopover({
     s.anchorEl = null
     pop.style.transform = `${s.pos} scale(0.94)` // shrink toward the anchor
     pop.style.opacity = '0'
-    // while hidden the box must not block hover on the cells beneath it
-    pop.style.pointerEvents = 'none'
   }
   const scheduleHide = () => {
     const s = state.current
@@ -213,8 +209,8 @@ function PairPopover({
     const s = state.current
     const aim = (el: Element) => {
       const rect = el.getBoundingClientRect()
-      // the anchor cell keeps its highlight while the pointer visits the
-      // popover, when CSS :hover no longer applies
+      // the anchor cell keeps its highlight while the popover describes it,
+      // through the dwell after the pointer has moved on
       s.anchorEl?.removeAttribute('data-active')
       s.anchorEl = el
       el.setAttribute('data-active', '')
@@ -231,12 +227,6 @@ function PairPopover({
         // the open/close animations)
         pop.style.transformOrigin = above ? '50% 100%' : '50% 0%'
       }
-      const bridge = bridgeRef.current
-      if (bridge) {
-        // the hover bridge spans the gap on whichever side faces the cell
-        bridge.style.top = above ? '100%' : 'auto'
-        bridge.style.bottom = above ? 'auto' : '100%'
-      }
       return pos
     }
     const openAt = (nextKey: string, el: Element) => {
@@ -250,7 +240,6 @@ function PairPopover({
       pop.style.opacity = '1'
       void pop.offsetWidth
       pop.style.transitionProperty = ''
-      pop.style.pointerEvents = 'auto'
       s.visible = true
       if (nextKey !== s.key) {
         s.key = nextKey
@@ -279,8 +268,8 @@ function PairPopover({
     }
   }, [])
 
-  // a fixed popover left behind by scrolling would hover over the wrong
-  // cells now that it's interactive — drop it immediately
+  // a fixed popover left behind by scrolling would sit over the wrong
+  // cells — drop it immediately
   useEffect(() => {
     const popoverState = state.current
     const onScroll = () => {
@@ -301,13 +290,13 @@ function PairPopover({
     <div
       ref={popRef}
       aria-hidden="true"
-      onPointerEnter={cancelHide}
-      onPointerLeave={scheduleHide}
       className="report-content popover-surface fixed top-0 left-0 z-50 w-56 will-change-transform"
       style={
         {
           ...popoverInk(tokens),
           opacity: 0,
+          // never a hover target, even when open: the pointer goes straight
+          // through to the cells it covers
           pointerEvents: 'none',
           transform: 'translate3d(0, 0, 0) scale(0.94)',
           transitionProperty: 'transform, opacity',
@@ -316,9 +305,6 @@ function PairPopover({
         } as CSSProperties
       }
     >
-      {/* invisible strip spanning the cell↔popover gap so the pointer can
-          travel to the content without dropping hover */}
-      <div ref={bridgeRef} className="absolute inset-x-0 h-2.5" />
       <div className="grid">
         {view.slots.map((slotKey, idx) => {
           // slots stay mounted even while empty so the opacity flip always

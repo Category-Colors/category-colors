@@ -33,7 +33,7 @@ export async function testMcp(server) {
 
   assert.deepEqual((await result(modern('server/discover'))).supportedVersions.includes('2026-07-28'), true)
   const { tools } = await result(modern('tools/list'))
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['check_palette', 'export_palette', 'generate_palette', 'get_preset_palette'])
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['check_palette', 'export_palette', 'fix_palette', 'generate_palette', 'get_preset_palette'])
   for (const t of tools) {
     assert.equal(t.annotations.readOnlyHint, true, t.name)
     assert.equal(t.outputSchema.type, 'object', t.name)
@@ -78,6 +78,16 @@ export async function testMcp(server) {
   assert.equal(out.structuredContent.config.jnd, 12)
   assert.equal(out.structuredContent.config.colorSpace.mode, 'oklch')
   assert.equal(out.structuredContent.report.jndThreshold, 12)
+  // evaluate runs nothing: the initColors come back as given
+  out = await tool('generate_palette', { config: { behavior: 'evaluate', initColors: [{ value: { space: 'hex', hex: '#E69F00' } }, { value: { space: 'hex', hex: '#56B4E9' } }] } })
+  assert.deepEqual(out.structuredContent.colors.map((c) => c.hex), ['#E69F00', '#56B4E9'])
+  assert.equal(out.structuredContent.cost, undefined)
+  // fix_palette repairs without adding issues, and says how many it started with
+  const okabe = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999']
+  out = await tool('fix_palette', { colors: okabe, seed: 1 })
+  assert.equal(out.structuredContent.config.behavior, 'fix')
+  assert.ok(out.structuredContent.report.totalIssues < out.structuredContent.issuesBefore, JSON.stringify(out.structuredContent.report.totalIssues))
+  assert.equal((await tool('fix_palette', { colors: okabe, strength: -1 })).isError, true)
 
   // A 2025-era client: initialize, then a sessionless call
   const init = await result(post({}, { method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }))
