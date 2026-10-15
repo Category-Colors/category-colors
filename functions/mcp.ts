@@ -12,8 +12,8 @@ import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, fi
 //
 // Open to anyone, without auth. Rate limits keep that affordable: they live in
 // workers/limits, counting requests and generations per client IP and
-// generations from everyone (a generation costs 2–4 s of CPU in production,
-// which only Workers Paid allows). Local runs without that Worker go unlimited. To take
+// generations from everyone (in production a generation costs about 1 s of
+// CPU and a fix 3-6 s, which only Workers Paid allows). Local runs without that Worker go unlimited. To take
 // the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
 // and deploy.
 
@@ -23,8 +23,8 @@ interface Context { request: Request; env: Env }
 
 // Browsers may only call from the site itself; CLI and desktop clients send no Origin
 const ALLOWED_ORIGINS = ['categorycolors.com', 'localhost', '127.0.0.1']
-// A generation costs 2–4 s of CPU and the per-client limit is 5 a minute
-const MAX_RUNS = 3
+// Five of the heaviest generations fit the 30 s CPU cap in wrangler.jsonc
+const MAX_RUNS = 5
 
 const ok = (result: object) => ({ content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result as Record<string, unknown> })
 const object = (properties: object, required: string[] = []) =>
@@ -82,7 +82,7 @@ function server(allowGeneration: () => Promise<boolean>) {
   const mcp = new McpServer({ name: 'category-colors', title: 'Category Colors', version: '1.0.0' }, { maxToolInputElements: 200 })
   mcp.registerTool('generate_palette', {
     title: 'Generate palette',
-    description: 'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Takes the full configuration as `config` (the shape the app\'s Configure panel imports), or the shortcuts, over the defaults; echoes the settings used as `config` and the random `seed`, which with the same config reproduces the result. Returns each color as CSS, hex and OKLCH, an accessibility report, and a link that opens the palette in the Category Colors app. Takes a second or two per run.',
+    description: 'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Takes the full configuration as `config` (the shape the app\'s Configure panel imports), or the shortcuts, over the defaults; echoes the settings used as `config` and the random `seed`, which with the same config reproduces the result. Returns each color as CSS, hex and OKLCH, an accessibility report, and a link that opens the palette in the Category Colors app. Takes about a second per run.',
     inputSchema: object({
       ...GENERATE_INPUT,
       runs: { type: 'integer', minimum: 1, maximum: MAX_RUNS, description: `Run up to ${MAX_RUNS} times (seed, seed+1, …) and return the lowest-cost palette with its seed. Each run counts toward the rate limit.` },

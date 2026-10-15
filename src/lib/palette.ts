@@ -286,13 +286,9 @@ const DEFAULT_EVALUATORS: EvaluatorSpec[] = [
 export const DEFAULT_PARAMS: PaletteParams = {
   colorCount: 8,
   jnd: 20,
-  // 20000 was enough for the older five-term objective, which converged well
-  // inside it. This one does not: measured at eight colors, cutting it off at
-  // 20000 costs about eight points of ordinary separation (23.2 -> 15.8 mean
-  // minimum deltaE) and leaves the worst case at 4.0 instead of 7.7. The extra
-  // iterations are nearly free in wall clock — cooling hits `cutoff` first, so
-  // a run ends on temperature around 40-60k either way, and 60000 buys full
-  // convergence for roughly 6s more on the first generate rather than 3x.
+  // A cap, not a target. Since category-colors 3.4.0 a run cools to its
+  // cutoff in about 11-13k steps, so 60000 never binds; it stays so saved
+  // settings and share links (whose base records it) keep their meaning.
   maxIterations: 60000,
   orderOptimization: true,
   behavior: 'optimize',

@@ -127,7 +127,7 @@ export const CONFIG_SCHEMA = {
   properties: {
     colorCount: GENERATE_INPUT_COUNT,
     jnd: { type: 'number', minimum: 5, maximum: 40, description: 'CIEDE2000 distance below which two colors count as confusable.' },
-    maxIterations: { type: 'integer', minimum: 1000, maximum: 100000, description: 'Annealing steps. 60000 converges; fewer is faster but worse.' },
+    maxIterations: { type: 'integer', minimum: 1000, maximum: 100000, description: 'A cap on annealing steps. A run ends on its own when it has cooled, after about 11-13k steps, so only a cap below that shortens it (and worsens it).' },
     orderOptimization: { type: 'boolean', description: 'Reorder the result so adjacent colors differ most.' },
     fixStrength: { type: 'number', minimum: 0, maximum: 1, description: 'behavior fix only, default 0.35: 1 clears the most failing pairs, 0 keeps colors closest to their seeds.' },
     behavior: { type: 'string', enum: BEHAVIOR_NAMES, description: 'optimize (default) makes the best palette the evaluators describe. evaluate runs nothing: the seeds (initColors) become the palette as they are, to read their report. fix repairs the seeds (initColors) instead: only pairs failing the JND and CVD evaluators count, energy and range pause (unless fixEnabled), and colors stay near their seeds. Pin positions with fixedOrder, and fix the seeds that already pass with fixedColor.' },

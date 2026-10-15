@@ -308,26 +308,20 @@ export function ParametersPanel({
             max={40}
             step={1}
           />
-          {/* a behavior that runs nothing has no run length or order pass */}
+          {/* No Iterations control: a run ends when it has cooled, about 11-13k
+              steps, well under any cap worth setting, and cooling it slower
+              (6x the steps) moved no palette's closest pair or issue count.
+              maxIterations stays in params as a cap for saved settings and
+              agents. A behavior that runs nothing has no order pass either. */}
           {rules.runs && (
-            <>
-              <Slider
-                label="Iterations"
-                value={params.maxIterations}
-                onChange={(v) => set('maxIterations', v)}
-                min={1000}
-                max={100000}
-                step={1000}
-              />
-              {/* Fixing keeps every color in place, so ordering is off while it
-                  runs; the stored setting comes back with Generate & optimize */}
-              <Toggle
-                label="Optimize order"
-                checked={ordersColors(params)}
-                onChange={(v) => set('orderOptimization', v)}
-                disabled={rules.repairs}
-              />
-            </>
+            // Fixing keeps every color in place, so ordering is off while it
+            // runs; the stored setting comes back with Generate & optimize
+            <Toggle
+              label="Optimize order"
+              checked={ordersColors(params)}
+              onChange={(v) => set('orderOptimization', v)}
+              disabled={rules.repairs}
+            />
           )}
         </div>
       </Folder>

@@ -6,9 +6,11 @@ import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 const POLICY = {
   // Every /mcp request, per client IP
   request: (ip) => [['request', 60, ip]],
-  // Palette generations (2–13 s of CPU each), per client IP and from everyone;
-  // the second caps the CPU bill
-  generate: (ip) => [['generate', 5, ip], ['generate', 10, 'all']],
+  // Palette generations, per client IP and from everyone; the second caps the
+  // CPU bill. Measured in production on 2026-10-15: about 1 s of CPU for a
+  // generation, 3 s for a fix, 6 s for the worst fix (20 crowded colors at
+  // Strength 1), so 60 a minute is at most 6 CPU-minutes a minute.
+  generate: (ip) => [['generate', 20, ip], ['generate', 60, 'all']],
 }
 
 export default class Limits extends WorkerEntrypoint {

@@ -41,7 +41,7 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Cooling rate',
-        body: 'The factor temperature is multiplied by every iteration — 0.999. Cooling is geometric, so the run usually reaches its stopping temperature well before the iteration cap; raising Iterations past that point changes nothing.',
+        body: 'The factor temperature is multiplied by every iteration — 0.999. Cooling is geometric, so the run reaches its stopping temperature after about 11,000 to 13,000 steps, and that is what ends it.',
       },
       {
         term: 'Neighbor',
@@ -49,13 +49,12 @@ export const MANUAL: ManualSection[] = [
       },
       {
         term: 'Iterations',
-        where: 'Configuration, above the button',
-        body: 'A ceiling on annealing steps, 1,000 to 100,000, default 20,000. It is a limit rather than a target — the run stops at whichever comes first, this or the temperature reaching its cutoff. More iterations buy a longer search at a proportionally longer wait, with sharp diminishing returns.',
+        body: 'How many steps a run takes: about 11,000 to 13,000, until the temperature reaches its cutoff. There is no control for it. Cooling more slowly, with six times the steps, lowered cost a little but left the closest pair and the issue count where they were. Saved settings and agents can still set maxIterations, a cap the run stops at if it gets there first.',
       },
       {
         term: 'Loss curve',
         where: 'Report › Statistics',
-        body: 'Cost plotted against iteration, sampled about 250 times across the run, with the start, high, low and end points marked. Expect a steep early fall and a long flat tail. A curve still dropping at the right edge means the run was cut off with progress left in it — raise Iterations.',
+        body: 'Cost plotted against iteration, sampled about 250 times across the run, with the start, high, low and end points marked. Expect a steep early fall and a long flat tail.',
       },
       {
         term: 'Order optimization',
@@ -148,7 +147,7 @@ export const MANUAL: ManualSection[] = [
       {
         term: 'Behavior',
         where: 'Configuration, above the button',
-        body: 'What the run is for, and what the button says. Generate & optimize, the default, makes the best palette the evaluators describe. Evaluate runs nothing: the seeds join history exactly as they are, all of them whatever the color count, so the report and stats can score them; Iterations and Optimize order hide, since there is no run. Fix issues repairs the seeds instead: the JND and CVD evaluators count only the pairs that fail, each as much as any other and by how far it falls short; Energy and Range pause, since a palette that already passes has nothing to spread (the pause on their rows switches them back on); the other evaluators apply as usual; order optimization is off; and every color is held near its seed, so a fix that moves less wins over one that moves more. Seeds that are fixed stay put. When a fix finishes, its colors become the seeds, set up the way Refine does, so pressing again works on what’s left. Refine switches to it for you.',
+        body: 'What the run is for, and what the button says. Generate & optimize, the default, makes the best palette the evaluators describe. Evaluate runs nothing: the seeds join history exactly as they are, all of them whatever the color count, so the report and stats can score them; Optimize order hides, since there is no run. Fix issues repairs the seeds instead: the JND and CVD evaluators count only the pairs that fail, each as much as any other and by how far it falls short; Energy and Range pause, since a palette that already passes has nothing to spread (the pause on their rows switches them back on); the other evaluators apply as usual; order optimization is off; and every color is held near its seed, so a fix that moves less wins over one that moves more. Seeds that are fixed stay put. When a fix finishes, its colors become the seeds, set up the way Refine does, so pressing again works on what’s left. Refine switches to it for you.',
       },
       {
         term: 'Strength',
