@@ -435,11 +435,6 @@ body {
   gap: 16px;
 }
 
-/* the same width as the add bar's presets menu, which it also shows */
-.panel-menu-flyout {
-  width: 216px;
-}
-
 /* holds its hover highlight while its flyout is open */
 .panel-menu-parent[data-open='true'] {
   background: var(--dial-surface-hover);

@@ -92,7 +92,8 @@ function VersionDetail({ version }: { version: PaletteVersion }) {
               ))}
               <Row label="JND threshold" value={params.jnd} />
               <Row label="Order optimization" value={params.orderOptimization ? 'on' : 'off'} />
-              <Row label="Behavior" value={`${BEHAVIORS[params.behavior].label}${BEHAVIORS[params.behavior].repairs ? `, strength ${params.fixStrength.toFixed(2)}` : ''}`} />
+              <Row label="Behavior" value={BEHAVIORS[params.behavior].label} />
+              {BEHAVIORS[params.behavior].repairs && <Row label="Strength" value={params.fixStrength.toFixed(2)} />}
               <ChipsRow label="Seeds" hexes={params.initColors.map((c) => valueToCss(c.value))} />
               <ChipsRow label="Targets" hexes={params.targets.map((t) => valueToCss(t.value))} />
             </Group>

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Slider, Toggle, Folder, SelectControl } from '@/components/dialkit'
 import {
-  BEHAVIOR_NAMES,
   BEHAVIORS,
   fittedTo,
   DEFAULT_PARAMS,
@@ -39,7 +38,7 @@ const SECTIONS = ['space', 'init', 'evals'] as const
 
 const MAX_CONFIG_BYTES = 1_000_000
 
-const BEHAVIOR_OPTIONS = BEHAVIOR_NAMES.map((value) => ({ value, label: BEHAVIORS[value].label, description: BEHAVIORS[value].description }))
+const BEHAVIOR_OPTIONS = Object.entries(BEHAVIORS).map(([value, b]) => ({ value, label: b.label, description: b.description }))
 
 const replaceAt = <T,>(list: T[], index: number, item: T) =>
   list.map((entry, i) => (i === index ? item : entry))
@@ -186,7 +185,7 @@ export function ParametersPanel({
               min={channel.min}
               max={channel.max}
               step={channel.step}
-              wraps={channel.period !== undefined}
+              period={channel.period}
             />
           ))}
         </Folder>

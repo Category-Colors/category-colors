@@ -55,10 +55,10 @@ export interface EvaluatorSpec {
 
 // The terms that only spread colors apart. A palette being fixed has nothing
 // to spread, and on a finished one they are what made colors wander.
-export const SPREADING_TYPES: EvaluatorType[] = ['energy', 'range']
-// Whether a row can be paused under this behavior, and whether it is
-export const isPausable = (spec: EvaluatorSpec, behavior: Behavior) =>
-  BEHAVIORS[behavior].repairs && SPREADING_TYPES.includes(spec.type)
+const SPREADING_TYPES: EvaluatorType[] = ['energy', 'range']
+// Whether a row pauses when a behavior repairs, unless switched back on
+export const pausesWhenRepairing = (spec: EvaluatorSpec) => SPREADING_TYPES.includes(spec.type)
+export const isPausable = (spec: EvaluatorSpec, behavior: Behavior) => BEHAVIORS[behavior].repairs && pausesWhenRepairing(spec)
 export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) => isPausable(spec, behavior) && !spec.fixEnabled
 
 // Windows a channel may carry; the importer keeps this many and the slider
@@ -150,10 +150,9 @@ export const BEHAVIORS = {
 export type Behavior = keyof typeof BEHAVIORS
 export const BEHAVIOR_NAMES = Object.keys(BEHAVIORS) as Behavior[]
 
-// Whether the order pass runs: asked for, and the behavior both runs and lets
+// Whether a run reorders its result: asked for, and the behavior lets
 // positions change
-export const ordersColors = (params: PaletteParams) =>
-  params.orderOptimization && BEHAVIORS[params.behavior].runs && !BEHAVIORS[params.behavior].repairs
+export const ordersColors = (params: PaletteParams) => params.orderOptimization && !BEHAVIORS[params.behavior].repairs
 
 // The same windows, each stretched just far enough to take in every one of
 // these colors. The package snaps a seed outside every window to the nearest

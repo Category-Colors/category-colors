@@ -6,7 +6,7 @@ import { useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 import { getDialKitPortalRoot } from '@/components/dialkit/dropdown-position'
 import { EllipsisIcon } from './icons'
 
-// .panel-menu-flyout's width
+// .preset-menu's width, which the flyout borrows
 const FLYOUT_WIDTH = 216
 
 interface Action {
@@ -18,15 +18,16 @@ interface Action {
 // (or on click, for touch); a click on any of them closes the whole menu. The
 // flyout is portaled to the panel's dock, which sits outside the panel's
 // clipping, so it can hang past the panel's edge.
-export type MenuItem = Action | { label: string; flyout: ReactNode }
+type FlyoutItem = { label: string; flyout: ReactNode }
+export type MenuItem = Action | FlyoutItem
 
 // "…" overflow menu with DialKit dropdown chrome, anchored to its trigger.
 export function PanelMenu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false)
-  // the open child menu, and where it goes in its portal root
+  // the open child menu by label, read from the current items so its rows
+  // see current props, and where it goes in its portal root
   const [child, setChild] = useState<{
     label: string
-    flyout: ReactNode
     root: HTMLElement
     pos: { top: number; left: number; maxHeight: number }
   } | null>(null)
@@ -87,7 +88,7 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
                 const top = Math.min(row.top - 5, window.innerHeight - 8 - maxHeight)
                 const left = Math.min(menu.right + 4, window.innerWidth - FLYOUT_WIDTH - 8)
                 setChild({
-                  ...item,
+                  label: item.label,
                   root,
                   pos: { top: top - rootRect.top, left: left - rootRect.left, maxHeight },
                 })
@@ -115,13 +116,14 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
         createPortal(
           <motion.div
             ref={warmChildRef}
-            className="dialkit-select-dropdown panel-menu-flyout"
+            className="dialkit-select-dropdown preset-menu"
             style={{ position: 'absolute', ...child.pos }}
             {...popoverMotion()}
-            // after the row's own handler: a pick closes the whole menu
-            onClick={close}
+            // after the row's own handler: a pick closes the whole menu, a
+            // click on the padding between rows doesn't
+            onClick={(e) => (e.target as Element).closest('button') && close()}
           >
-            {child.flyout}
+            {items.find((item): item is FlyoutItem => 'flyout' in item && item.label === child.label)?.flyout}
           </motion.div>,
           child.root
         )}
