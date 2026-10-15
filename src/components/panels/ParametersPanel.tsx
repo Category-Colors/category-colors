@@ -6,6 +6,7 @@ import {
   fittedTo,
   DEFAULT_PARAMS,
   defaultColorSpace,
+  withGamut,
   newEvaluatorSpec,
   newInitColor,
   parseParams,
@@ -17,7 +18,7 @@ import {
   type WorkingSpace,
 } from '@/lib/palette'
 import { hexValue } from '@/lib/color'
-import { SPACE_OPTIONS, spaceChannels, spaceDef } from '@/lib/color-spaces'
+import { GAMUT_OPTIONS, SPACE_OPTIONS, reachesWideGamut, spaceChannels, spaceDef, type Gamut } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
 import { PresetOptions } from './PresetOptions'
@@ -163,13 +164,22 @@ export function ParametersPanel({
           title="Color space"
           open={sections.open.space}
           onOpenChange={sections.setSection('space')}
-          summary={spaceDef(params.colorSpace.mode).label}
+          summary={[
+            spaceDef(params.colorSpace.mode).label,
+            GAMUT_OPTIONS.find((g) => g.value === params.colorSpace.gamut)?.short,
+          ].filter(Boolean).join(' · ')}
         >
           <SelectControl
             label="Space"
             value={params.colorSpace.mode}
             options={SPACE_OPTIONS}
-            onChange={(mode) => set('colorSpace', defaultColorSpace(mode as WorkingSpace))}
+            onChange={(mode) => set('colorSpace', withGamut(defaultColorSpace(mode as WorkingSpace), reachesWideGamut(mode as WorkingSpace) ? (params.colorSpace.gamut ?? 'srgb') : 'srgb'))}
+          />
+          <SelectControl
+            label="Gamut"
+            value={params.colorSpace.gamut ?? 'srgb'}
+            options={GAMUT_OPTIONS}
+            onChange={(gamut) => set('colorSpace', withGamut(params.colorSpace, gamut as Gamut))}
           />
           {spaceChannels(params.colorSpace.mode).map((channel, i) => (
             <RangeSlider

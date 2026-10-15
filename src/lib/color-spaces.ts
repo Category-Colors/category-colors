@@ -37,7 +37,21 @@ export interface WorkingSpaceDef {
   label: string
   geometry: Geometry
   channels: SpaceChannel[]
+  /** set on a space with no gamut of its own, which can reach past sRGB;
+      the rest are sRGB by construction */
+  wideGamut?: true
 }
+
+// The gamuts a palette may be held to: category-colors' colorSpace.gamut,
+// limited to the two wide ones displays actually ship. sRGB is the default
+// and is never stored (see ColorSpaceParams).
+export type Gamut = 'srgb' | 'display-p3' | 'rec2020'
+export const GAMUT_OPTIONS: { value: Gamut; label: string; short: string }[] = [
+  { value: 'srgb', label: 'sRGB', short: 'sRGB' },
+  { value: 'display-p3', label: 'Display P3', short: 'P3' },
+  { value: 'rec2020', label: 'Rec. 2020', short: 'Rec. 2020' },
+]
+export const isGamut = (v: unknown): v is Gamut => GAMUT_OPTIONS.some((g) => g.value === v)
 
 const HUE: SpaceChannel = {
   key: 'h',
@@ -94,6 +108,7 @@ export const WORKING_SPACES: WorkingSpaceDef[] = [
       { key: 'c', label: 'Chroma', short: 'C', min: 0, max: 0.4, step: 0.01, initial: [0.02, 0.32] },
       HUE,
     ],
+    wideGamut: true,
   },
   {
     mode: 'oklab',
@@ -105,6 +120,7 @@ export const WORKING_SPACES: WorkingSpaceDef[] = [
       { key: 'a', label: 'Green–red', short: 'A', min: -0.4, max: 0.4, step: 0.01, initial: [-0.2, 0.2] },
       { key: 'b', label: 'Blue–yellow', short: 'B', min: -0.4, max: 0.4, step: 0.01, initial: [-0.2, 0.2] },
     ],
+    wideGamut: true,
   },
 ]
 
@@ -120,6 +136,8 @@ export const isWorkingSpace = (v: unknown): v is WorkingSpace =>
 export const spaceDef = (mode: WorkingSpace): WorkingSpaceDef => BY_MODE.get(mode)!
 
 export const spaceChannels = (mode: WorkingSpace) => spaceDef(mode).channels
+
+export const reachesWideGamut = (mode: WorkingSpace) => spaceDef(mode).wideGamut === true
 
 export const spaceInitialRanges = (mode: WorkingSpace): [number, number][] =>
   spaceChannels(mode).map((c) => [...c.initial] as [number, number])

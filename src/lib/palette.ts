@@ -1,9 +1,9 @@
 import { converter, parse } from 'culori'
 import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
-import { isWorkingSpace, spaceChannels, spaceInitialRanges, type WorkingSpace } from './color-spaces'
+import { isGamut, isWorkingSpace, reachesWideGamut, spaceChannels, spaceInitialRanges, type Gamut, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
 
-export type { WorkingSpace }
+export type { Gamut, WorkingSpace }
 
 // Parameter shapes, defaults, and (de)serialization only — no algorithm.
 // Driving category-colors lives in algorithm.ts so the app shell can import
@@ -90,10 +90,22 @@ export interface TargetColor {
 export type ChannelWindow = [number, number]
 
 // The annealer's working space and per-channel windows. Channel order follows
-// the mode (okhsl = h/s/l, oklch = l/c/h, …) — see color-spaces.ts.
+// the mode (okhsl = h/s/l, oklch = l/c/h, …) — see color-spaces.ts. gamut is
+// the colors a palette may use, set only when wider than sRGB and only on a
+// space that can reach past it, so settings and links from before it existed
+// compare equal to today's defaults.
 export interface ColorSpaceParams {
   mode: WorkingSpace
   ranges: ChannelWindow[][]
+  gamut?: Exclude<Gamut, 'srgb'>
+}
+
+// A space with this gamut: sRGB drops the field, and a wide gamut on a space
+// confined to sRGB moves it to OKLCH, the space it was asked of
+export function withGamut(space: ColorSpaceParams, gamut: Gamut): ColorSpaceParams {
+  const { gamut: _, ...rest } = space
+  if (gamut === 'srgb') return rest
+  return reachesWideGamut(space.mode) ? { ...rest, gamut } : { ...defaultColorSpace('oklch'), gamut }
 }
 
 export const defaultColorSpace = (mode: WorkingSpace): ColorSpaceParams => ({
@@ -170,7 +182,7 @@ export function colorSpaceContaining(space: ColorSpaceParams, colors: string[]):
   const toMode = converter(space.mode)
   const points = colors.map((css) => toMode(parse(css)) as Record<string, number | undefined> | undefined)
   return {
-    mode: space.mode,
+    ...space,
     ranges: spaceChannels(space.mode).map((channel, i) => {
       const windows = space.ranges[i].map((w): ChannelWindow => [...w])
       const gap = (from: number, to: number) => {
@@ -369,10 +381,14 @@ const normalizedHex = (value: unknown, fallback: string) => {
 function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
   if (!isWorkingSpace(space?.mode)) return defaultColorSpace('okhsl')
   const channels = spaceChannels(space.mode)
+  // A wide gamut the space can't reach is dropped: see withGamut
+  const asked: unknown = space.gamut
+  const gamut = isGamut(asked) && asked !== 'srgb' && reachesWideGamut(space.mode) ? { gamut: asked } : {}
   if (!Array.isArray(space.ranges) || space.ranges.length !== channels.length) {
-    return defaultColorSpace(space.mode)
+    return { ...defaultColorSpace(space.mode), ...gamut }
   }
   return {
+    ...gamut,
     mode: space.mode,
     ranges: channels.map((channel, i) => {
       const raw: unknown = space.ranges![i]

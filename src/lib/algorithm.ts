@@ -73,6 +73,7 @@ export function buildConfig(params: PaletteParams): Config {
   config.colorSpace = {
     mode: params.colorSpace.mode,
     ranges: params.colorSpace.ranges.map((windows) => windows.map((w) => [...w])),
+    gamut: params.colorSpace.gamut ?? 'srgb',
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
   const active = params.evaluators.filter((spec) => spec.weight > 0)

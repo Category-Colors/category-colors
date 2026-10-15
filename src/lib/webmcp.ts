@@ -156,7 +156,7 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
           return describe({ ...version, params: input.jnd === undefined ? withContrast(version.params, input) : params })
         }
         const colors = readColors(input.colors, 2)
-        return { colors: colors.map(swatch), report: report(scratch(colors, params)), config: params }
+        return { colors: colors.map((css) => swatch(css, params.colorSpace.gamut)), report: report(scratch(colors, params)), config: params }
       },
     },
     {

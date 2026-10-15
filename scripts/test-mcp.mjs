@@ -112,6 +112,25 @@ export async function testMcp(server) {
   out = await tool('generate_palette', { colorCount: 3, seed: 3, config: { maxIterations: 1000, evaluators: [{ type: 'jnd', weight: 1 }, { type: 'contrast', weight: 1, background: '#ffffff', ratio: 3 }] } })
   assert.equal(out.structuredContent.report.contrast[0].ratios.length, 3)
 
+  // A wide gamut: colors past sRGB come flagged, written in the gamut, with a
+  // note on the report; the default stays sRGB and unflagged
+  const wide = { colorCount: 8, seed: 2, config: { maxIterations: 4000, colorSpace: { mode: 'oklch', ranges: [[0.4, 0.9], [0.15, 0.4], [0, 360]], gamut: 'display-p3' } } }
+  out = await tool('generate_palette', wide)
+  assert.equal(out.structuredContent.config.colorSpace.gamut, 'display-p3')
+  const past = out.structuredContent.colors.filter((c) => c.outsideSrgb)
+  assert.ok(past.length > 0, JSON.stringify(out.structuredContent.colors))
+  for (const c of past) assert.match(c.gamutCss, /^color\(display-p3 [\d.]+ [\d.]+ [\d.]+\)$/)
+  assert.match(out.structuredContent.report.note, /outside sRGB/)
+  out = await tool('generate_palette', { ...wide, config: { ...wide.config, colorSpace: { ...wide.config.colorSpace, gamut: 'srgb' } } })
+  assert.equal(out.structuredContent.config.colorSpace.gamut, undefined)
+  assert.ok(out.structuredContent.colors.every((c) => !c.outsideSrgb))
+  assert.equal(out.structuredContent.report.note, undefined)
+  // a wide gamut on a space confined to sRGB is refused, naming the fix
+  out = await tool('generate_palette', { config: { colorSpace: { mode: 'okhsl', ranges: [[0, 360], [0, 1], [0, 1]], gamut: 'rec2020' } } })
+  assert.equal(out.isError, true)
+  assert.match(out.content[0].text, /needs colorSpace\.mode oklch or oklab/)
+  assert.equal((await tool('generate_palette', { config: { colorSpace: { mode: 'oklch', ranges: [[0, 1], [0, 0.4], [0, 360]], gamut: 'prophoto' } } })).isError, true)
+
   // lockedChannels holds a seed's hue while the rest of it moves
   out = await tool('generate_palette', {
     seed: 5,

@@ -33,6 +33,19 @@ try {
     hex: '#AABBCC',
   })
 
+  // Gamut: never stored as sRGB, moved to OKLCH from a space that can't reach
+  // past it, and dropped on import where the space can't use it
+  const okhsl = palette.defaultColorSpace('okhsl')
+  assert.deepEqual(palette.withGamut(okhsl, 'srgb'), okhsl)
+  assert.deepEqual(palette.withGamut(okhsl, 'display-p3'), { ...palette.defaultColorSpace('oklch'), gamut: 'display-p3' })
+  assert.deepEqual(palette.withGamut({ ...palette.defaultColorSpace('oklab'), gamut: 'rec2020' }, 'srgb'), palette.defaultColorSpace('oklab'))
+  const parsedSpace = (colorSpace) => palette.parseParams(JSON.stringify({ initColors: [], targets: [], evaluators: [], colorSpace })).colorSpace
+  assert.equal(parsedSpace({ ...palette.defaultColorSpace('oklch'), gamut: 'display-p3' }).gamut, 'display-p3')
+  assert.equal('gamut' in parsedSpace({ ...okhsl, gamut: 'display-p3' }), false)
+  assert.equal('gamut' in parsedSpace({ ...palette.defaultColorSpace('oklch'), gamut: 'srgb' }), false)
+  assert.equal(color.outsideSrgb('oklch(0.7 0.3 150)'), true)
+  assert.equal(color.outsideSrgb('#00FF00'), false)
+
   const imported = palette.parseParams(
     JSON.stringify({
       colorCount: 99,

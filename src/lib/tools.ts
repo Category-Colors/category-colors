@@ -1,5 +1,7 @@
 import { wcagContrast } from 'culori'
-import { convertValue, parseCssColor, valueToCss } from './color'
+import { formatColor } from 'category-colors'
+import { convertValue, outsideSrgb, parseCssColor, valueToCss } from './color'
+import { GAMUT_OPTIONS } from './color-spaces'
 import { WORKING_SPACES, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
 import { BEHAVIOR_NAMES, MAX_WINDOWS, PARAM_PRESETS, newEvaluatorSpec, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
@@ -36,11 +38,19 @@ export function readColors(value: unknown, minItems: number): string[] {
   return value.map((c: string) => c.trim())
 }
 
-export function swatch(css: string) {
+// Under a wide gamut, a color outside sRGB also comes as color(display-p3 …)
+// or color(rec2020 …), and is flagged: its hex is the nearest sRGB color.
+export function swatch(css: string, gamut?: PaletteParams['colorSpace']['gamut']) {
   const value = parseCssColor(css)
   if (!value) return { css }
-  return { css, hex: valueToCss(convertValue(value, 'hex')), oklch: valueToCss(convertValue(value, 'oklch')) }
+  const wide = gamut && outsideSrgb(css) ? { outsideSrgb: true, gamutCss: formatColor(css, gamut) } : {}
+  return { css, hex: valueToCss(convertValue(value, 'hex')), oklch: valueToCss(convertValue(value, 'oklch')), ...wide }
 }
+
+// The report's caveat when colors leave sRGB, which the CVD simulations and
+// WCAG contrast are defined in. Shared with the report tab.
+export const OUTSIDE_SRGB_NOTE =
+  'Colors outside sRGB: the CVD simulations and WCAG contrast are defined for sRGB, so their numbers for those colors are extrapolations.'
 
 const round = (n: number) => Math.round(n * 10) / 10
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -94,6 +104,7 @@ export function report(version: PaletteVersion) {
     totalIssues: result.totalIssues,
     tests,
     ...(contrast.length ? { contrast } : {}),
+    ...(version.colors.some(outsideSrgb) ? { note: OUTSIDE_SRGB_NOTE } : {}),
   }
 }
 
@@ -103,7 +114,7 @@ export function report(version: PaletteVersion) {
 // it in the app. Generated palettes carry the optimizer's final cost too.
 export async function summarize(version: PaletteVersion) {
   return {
-    colors: version.colors.map(swatch),
+    colors: version.colors.map((css) => swatch(css, version.params.colorSpace.gamut)),
     report: report(version),
     config: version.params,
     ...(version.iterations ? { cost: version.cost } : {}),
@@ -165,6 +176,11 @@ export const CONFIG_SCHEMA = {
         '. Each channel takes one [min, max] window or a list of them, such as [[0, 60], [180, 240]] to allow two hue bands; on hue, [300, 60] is the arc through zero.',
       properties: {
         mode: { type: 'string', enum: WORKING_SPACES.map((s) => s.mode) },
+        gamut: {
+          type: 'string',
+          enum: GAMUT_OPTIONS.map((g) => g.value),
+          description: 'The colors the palette may use; default srgb. display-p3 and rec2020 need mode oklch or oklab, and widen the room the optimizer has, slightly (at 12 colors, min ΔE about 23.5 in sRGB, 24.0 in P3, 24.7 in Rec. 2020). Colors outside sRGB come back flagged outsideSrgb, with gamutCss beside css; their hex is clipped.',
+        },
         ranges: {
           type: 'array',
           items: { anyOf: [WINDOW_SCHEMA, { type: 'array', items: WINDOW_SCHEMA, minItems: 1, maxItems: MAX_WINDOWS }] },
@@ -333,5 +349,14 @@ export function generateParams(input: Record<string, unknown>, base: PalettePara
   }
   const params = parseParams(JSON.stringify(draft))
   if (!params) throw new Error('Those settings could not be turned into a valid configuration.')
+  // The importer drops a gamut it can't use; an agent asked for it, so say why
+  const gamut: unknown = draft.colorSpace?.gamut
+  if (gamut !== undefined && gamut !== 'srgb' && params.colorSpace.gamut !== gamut) {
+    throw new Error(
+      GAMUT_OPTIONS.some((g) => g.value === gamut)
+        ? `colorSpace.gamut ${gamut} needs colorSpace.mode oklch or oklab; ${params.colorSpace.mode} only covers sRGB.`
+        : `colorSpace.gamut must be one of ${GAMUT_OPTIONS.map((g) => g.value).join(', ')}.`
+    )
+  }
   return params
 }
