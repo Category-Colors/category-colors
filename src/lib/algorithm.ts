@@ -12,7 +12,7 @@ import {
 import names from 'category-colors/evaluators/names'
 import { oklchCss, toCulori, valueToCss } from '@/lib/color'
 import { evaluateFix, scheduleFor, toSeed, type FixOptions } from './fix'
-import { BEHAVIORS, cvdSeverityFor, isPaused, ordersColors } from './palette'
+import { BEHAVIORS, cvdSeverityFor, ordersColors, pausesWhenRepairing } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
 import { buildJndReport } from './report'
 
@@ -55,7 +55,9 @@ function fixEvalFunctions(active: EvaluatorSpec[], params: PaletteParams): EvalF
       spec.type === 'jnd' ? [null] : spec.type === 'cvd' ? [{ type: spec.cvd, severity: cvdSeverityFor(spec) }] : []
     ),
   }
-  const rest = active.filter((spec) => spec.type !== 'jnd' && spec.type !== 'cvd' && !isPaused(spec, 'fix'))
+  const rest = active.filter(
+    (spec) => spec.type !== 'jnd' && spec.type !== 'cvd' && !(pausesWhenRepairing(spec) && !spec.fixEnabled)
+  )
   return [{ function: evaluateFix, weight: 1, ...options }, ...rest.map(toEvalFunction)]
 }
 
@@ -86,7 +88,7 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
   // Nothing runs: the seeds come back as written, for the report to score
   const rules = BEHAVIORS[params.behavior]
   if (!rules.runs) {
-    if (params.initColors.length < 2) throw new Error('Add at least two initial colors to evaluate them.')
+    if (params.initColors.length < 2) throw new Error(`Add at least two initial colors to ${rules.action.toLowerCase()}.`)
     return unrun(params.initColors.map((c) => valueToCss(c.value)), seed)
   }
   const config = buildConfig(params)

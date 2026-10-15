@@ -21,7 +21,7 @@ const VALUE_CSS_RIGHT = 10
 // Bounds are addressed by their index in the flattened windows: bound i is
 // window i >> 1, lower (0) or upper (1) end i & 1.
 //
-// On a channel that wraps (hue), an arc through zero is stored as two windows,
+// On a channel with a period (hue), an arc through zero is stored as two windows,
 // one from the bottom and one to the top. It shows as the one range it is: one
 // row, numbered "350–60", with both bands on its track, and the two bounds at
 // the seam left out of reach.
@@ -32,7 +32,7 @@ export function RangeSlider({
   min = 0,
   max = 1,
   step = 0.01,
-  wraps = false,
+  period,
 }: {
   label: string
   value: ChannelWindow[]
@@ -40,7 +40,8 @@ export function RangeSlider({
   min?: number
   max?: number
   step?: number
-  wraps?: boolean
+  // set on a cyclic channel, whose ends are the same point
+  period?: number
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLSpanElement>(null)
@@ -62,7 +63,7 @@ export function RangeSlider({
   // range that opens or closes the seam mid-drag doesn't regroup under the hand.
   const groupsOf = (windows: ChannelWindow[]) => {
     const n = windows.length
-    if (!wraps || n < 2 || windows[0][0] !== min || windows[n - 1][1] !== max) return windows.map((_, w) => [w])
+    if (period === undefined || n < 2 || windows[0][0] !== min || windows[n - 1][1] !== max) return windows.map((_, w) => [w])
     return [...windows.slice(1, -1).map((_, w) => [w + 1]), [n - 1, 0]]
   }
   const dragGroups = useRef<number[][]>([])
@@ -94,7 +95,13 @@ export function RangeSlider({
     const window = windows[i >> 1]
     if (!window) return windows
     const end = i & 1
-    const v = roundValue(Math.max(end ? window[0] : min, Math.min(end ? max : window[1], raw)), step)
+    // An arc's outer ends stop a step short of each other instead of the
+    // channel's ends: meeting would close it into the whole circle
+    const arc = groups.find((group) => group.length > 1 && ends(group).includes(i))
+    const across = arc && windows.flat()[ends(arc).find((j) => j !== i)!]
+    const lo = end ? window[0] : across !== undefined ? across + step : min
+    const hi = end ? (across !== undefined ? across - step : max) : window[1]
+    const v = roundValue(Math.max(lo, Math.min(hi, raw)), step)
     if (v === window[end]) return windows
     return windows.map((w, j): ChannelWindow => (j === i >> 1 ? (end ? [w[0], v] : [v, w[1]]) : w))
   }
@@ -143,15 +150,22 @@ export function RangeSlider({
   }
 
   // Another window: in the widest gap, taking its middle third; with no gap
-  // worth the name, the widest window splits into its outer thirds instead
+  // worth the name, the widest window splits into its outer thirds instead.
+  // With a period, the space above the last window and below the first is
+  // one gap through zero, and a window there is stored as an arc.
   const addWindow = () => {
     if (value.length >= MAX_WINDOWS) return
-    const gaps: ChannelWindow[] = [[min, value[0][0]], ...value.slice(1).map((w, i): ChannelWindow => [value[i][1], w[0]]), [value.at(-1)![1], max]]
+    const inner = value.slice(1).map((w, i): ChannelWindow => [value[i][1], w[0]])
+    const gaps: ChannelWindow[] =
+      period !== undefined
+        ? [[value.at(-1)![1], value[0][0] + period], ...inner]
+        : [[min, value[0][0]], ...inner, [value.at(-1)![1], max]]
+    const wrap = (v: number) => (period !== undefined && v > period ? v - period : v)
     const widest = (spans: ChannelWindow[]) => spans.reduce((a, b) => (b[1] - b[0] > a[1] - a[0] ? b : a))
     const gap = widest(gaps)
     if (gap[1] - gap[0] >= 3 * step) {
       const third = (gap[1] - gap[0]) / 3
-      return onChange(tidyWindows([...value, [roundValue(gap[0] + third, step), roundValue(gap[1] - third, step)]]))
+      return onChange(tidyWindows([...value, [wrap(roundValue(gap[0] + third, step)), wrap(roundValue(gap[1] - third, step))]], period))
     }
     const window = widest(value)
     const third = (window[1] - window[0]) / 3
@@ -159,7 +173,7 @@ export function RangeSlider({
     const rest = value.filter((w) => w !== window)
     // Around a whole circle the outer thirds would meet at the seam, one arc
     // again, so the second one stops a half third short of the top instead
-    const shift = wraps && window[0] === min && window[1] === max ? third / 2 : 0
+    const shift = period !== undefined && window[0] === min && window[1] === max ? third / 2 : 0
     onChange(tidyWindows([...rest, [window[0], roundValue(window[0] + third, step)], [roundValue(window[1] - third - shift, step), roundValue(window[1] - shift, step)]]))
   }
 
