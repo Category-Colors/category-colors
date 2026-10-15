@@ -46,10 +46,10 @@ export interface WorkingSpaceDef {
 // limited to the two wide ones displays actually ship. sRGB is the default
 // and is never stored (see ColorSpaceParams).
 export type Gamut = 'srgb' | 'display-p3' | 'rec2020'
-export const GAMUT_OPTIONS: { value: Gamut; label: string; short: string }[] = [
-  { value: 'srgb', label: 'sRGB', short: 'sRGB' },
-  { value: 'display-p3', label: 'Display P3', short: 'P3' },
-  { value: 'rec2020', label: 'Rec. 2020', short: 'Rec. 2020' },
+export const GAMUT_OPTIONS: { value: Gamut; label: string; short: string; description: string }[] = [
+  { value: 'srgb', label: 'sRGB', short: 'sRGB', description: 'Every screen' },
+  { value: 'display-p3', label: 'Display P3', short: 'P3', description: 'Recent phones, laptops and monitors' },
+  { value: 'rec2020', label: 'Rec. 2020', short: 'Rec. 2020', description: 'HDR TVs' },
 ]
 export const isGamut = (v: unknown): v is Gamut => GAMUT_OPTIONS.some((g) => g.value === v)
 
