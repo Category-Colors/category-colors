@@ -12,7 +12,7 @@ import {
 import names from 'category-colors/evaluators/names'
 import { oklchCss, toCulori, valueToCss } from '@/lib/color'
 import { evaluateFix, scheduleFor, toSeed, type FixOptions } from './fix'
-import { cvdSeverityFor, isPaused } from './palette'
+import { BEHAVIORS, cvdSeverityFor, isPaused, ordersColors } from './palette'
 import type { EvaluatorSpec, PaletteParams } from './palette'
 import { buildJndReport } from './report'
 
@@ -73,7 +73,7 @@ export function buildConfig(params: PaletteParams): Config {
   }
   config.similarityTarget = params.targets.map((t) => toCulori(t.value))
   const active = params.evaluators.filter((spec) => spec.weight > 0)
-  config.evalFunctions = params.behavior === 'fix' ? fixEvalFunctions(active, params) : active.map(toEvalFunction)
+  config.evalFunctions = BEHAVIORS[params.behavior].repairs ? fixEvalFunctions(active, params) : active.map(toEvalFunction)
   return config
 }
 
@@ -83,8 +83,9 @@ const unrun = (colors: string[], seed: number) => ({ colors, cost: 0, iterations
 // Every run is seeded, so a palette can be made again: the seed drawn here is
 // returned with the result for the caller to keep.
 export function generatePalette(params: PaletteParams, seed = Math.floor(Math.random() * 2 ** 31)) {
-  // Evaluate runs nothing: the seeds come back as written, for the report to score
-  if (params.behavior === 'evaluate') {
+  // Nothing runs: the seeds come back as written, for the report to score
+  const rules = BEHAVIORS[params.behavior]
+  if (!rules.runs) {
     if (params.initColors.length < 2) throw new Error('Add at least two initial colors to evaluate them.')
     return unrun(params.initColors.map((c) => valueToCss(c.value)), seed)
   }
@@ -105,12 +106,11 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
   // A fix starts partway down the schedule (see scheduleFor). Only the
   // temperature drops: initialTemperature stays the full one, since the step
   // size is scaled against it, so steps start partway down too.
-  if (params.behavior === 'fix') {
+  if (rules.repairs) {
     const { cutoff } = config
     initialState.temperature = cutoff * (initialState.temperature / cutoff) ** scheduleFor(params.fixStrength)
   }
-  // Fixing keeps every color where it was; reordering would undo that
-  const run = params.orderOptimization && params.behavior !== 'fix' ? runWithOrderOptimization : runSimulatedAnnealing
+  const run = ordersColors(params) ? runWithOrderOptimization : runSimulatedAnnealing
   const finalState = run(initialState, config)
 
   // Fixed colors come back as the person wrote them; the rest as OKLCH
@@ -126,7 +126,7 @@ export function generatePalette(params: PaletteParams, seed = Math.floor(Math.ra
   // the color space or rounding them to OKLCH can tip a pair that just passed.
   // Then the seeds come back as if nothing ran, without the discarded run's
   // cost and curve. Only when they're a whole palette to fall back to.
-  if (params.behavior === 'fix' && params.initColors.length === colors.length) {
+  if (rules.repairs && params.initColors.length === colors.length) {
     const seeds = params.initColors.map((c) => valueToCss(c.value))
     const issues = (palette: string[]) => buildJndReport({ params, colors: palette })?.totalIssues ?? 0
     if (issues(colors) > issues(seeds)) return unrun(seeds, seed)

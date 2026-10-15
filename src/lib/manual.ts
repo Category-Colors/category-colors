@@ -170,7 +170,7 @@ export const MANUAL: ManualSection[] = [
       {
         term: 'Channel range',
         where: 'Configuration › Color space',
-        body: 'A floor and ceiling on one channel, and the main way to give a palette a character. Narrow lightness for a palette that reads evenly on a chart; narrow saturation to keep it muted; leave hue wide open. Colors are only ever generated inside these bounds. A channel can have more than one window: the + beside the numbers opens another in the widest gap, and the channel then lists a compact slider per window under its name; its × or dragging it shut removes it, and every window is a hard bound, so two hue windows mean two hue families and nothing in between.',
+        body: 'A floor and ceiling on one channel, and the main way to give a palette a character. Narrow lightness for a palette that reads evenly on a chart; narrow saturation to keep it muted; leave hue wide open. Colors are only ever generated inside these bounds. A channel can have more than one window: the + beside the numbers opens another in the widest gap, and the channel then lists a compact slider per window under its name (a hue window through zero, such as 300–60, is one window, with its two halves on one slider); its × or dragging it shut removes it, and every window is a hard bound, so two hue windows mean two hue families and nothing in between.',
       },
       {
         term: 'RGB',
