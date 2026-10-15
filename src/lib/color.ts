@@ -175,6 +175,16 @@ export const hsvToHex = (hsv: Hsv) =>
 // display can show, where 8-bit hex would round the optimizer's result.
 // Takes any culori-shaped color, including category-colors' own, which carry
 // extra fields culori's types don't know.
+// Whether a CSS color falls outside sRGB, past the rounding oklchCss adds (a
+// color written at 4 decimals can land a hair outside the cube): those are
+// the colors hex, rgb() and hsl() clip
+export function outsideSrgb(css: string): boolean {
+  const color = parse(css)
+  if (!color) return false
+  const { r, g, b } = toRgbMode(color)
+  return [r, g, b].some((v) => v < -0.001 || v > 1.001)
+}
+
 export function oklchCss(color: { mode: string } | string): string {
   const { l, c, h } = toOklchMode(resolve(color as Color | string))
   return `oklch(${round(l, 4)} ${round(c, 4)} ${round(h ?? 0, 4)})`

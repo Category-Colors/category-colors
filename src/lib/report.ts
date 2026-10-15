@@ -2,10 +2,16 @@
 // without pulling in the optimizer or its saliency table (see MainTabs).
 import { reportJndIssues, type CvdSimulation, type JndReport, type JndTest } from 'category-colors/report'
 import { hexValue, parseCssColor, valueToCss } from './color'
-import { cvdSeverityFor, fittedTo, newInitColor } from './palette'
+import { cvdSeverityFor, fittedTo, newInitColor, ordersColors } from './palette'
 import type { PaletteParams, PaletteVersion } from './palette'
 
 export type { JndReport }
+
+// The caveat when colors leave sRGB, which the CVD simulations and WCAG
+// contrast are defined in: the report tab shows it, and agents get it as
+// report.note
+export const OUTSIDE_SRGB_NOTE =
+  'Some colors are outside sRGB. Color vision simulations and contrast ratios are defined for sRGB, so their numbers for those colors are estimates.'
 
 // 'normal' → 'No CVD'; CVD labels use the type name alone, adding the
 // severity only when two simulations of the same type would collide.
@@ -84,17 +90,25 @@ function colorsToFree(version: Pick<PaletteVersion, 'params' | 'colors'>, pinned
 // moved before the run starts. Seeds the person fixed stay fixed; they come
 // back from a run exactly as written, so they're found by value. With nothing
 // failing, everything is fixed and a fix has nothing to do.
-export function refineParams(version: Pick<PaletteVersion, 'params' | 'colors'>): PaletteParams {
+// `keep` names more positions (0-based) to hold, such as fix_palette's pinned.
+export function refineParams(version: Pick<PaletteVersion, 'params' | 'colors'>, keep: number[] = []): PaletteParams {
   const pinnedCss = new Set(version.params.initColors.filter((c) => c.fixedColor).map((c) => valueToCss(c.value)))
-  const pinned = new Set(version.colors.flatMap((css, i) => (pinnedCss.has(css) ? [i] : [])))
+  const pinned = new Set([...keep, ...version.colors.flatMap((css, i) => (pinnedCss.has(css) ? [i] : []))])
   const free = colorsToFree(version, pinned)
   return {
     ...fittedTo(structuredClone(version.params), version.colors),
     behavior: 'fix',
-    initColors: version.colors.map((css, i) => ({
-      ...newInitColor(parseCssColor(css) ?? hexValue('#888888')),
-      fixedColor: !free.has(i),
-      fixedOrder: true,
-    })),
+    initColors: version.colors.map((css, i) => {
+      // A seed's channel locks carry over when it's still the color in its
+      // slot: nothing reordered the result, or its position was pinned
+      const seed = version.params.initColors[i]
+      const kept = seed && (seed.fixedOrder || !ordersColors(version.params))
+      return {
+        ...newInitColor(parseCssColor(css) ?? hexValue('#888888')),
+        fixedColor: !free.has(i),
+        fixedOrder: true,
+        lockedChannels: kept ? [...seed.lockedChannels] : [],
+      }
+    }),
   }
 }

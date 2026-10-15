@@ -1,7 +1,7 @@
 import { formatPalette, EXPORT_FORMATS } from './exporters'
 import type { PaletteParams, PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
-import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, describe, fixParams, generateParams, readColors, readSeed, report, scratch, swatch } from './tools'
+import { CONTRAST_INPUT, FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, describe, fixParams, generateParams, readColors, readSeed, report, scratch, swatch, withContrast } from './tools'
 
 // WebMCP (https://webmachinelearning.github.io/webmcp/): the page registers
 // tools on document.modelContext, and an agent in the browser calls them
@@ -143,17 +143,20 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       name: 'check_palette',
       title: 'Check palette',
       description:
-        'Checks whether every pair of colors stays distinguishable under normal vision and simulated color vision deficiencies. Uses the given jnd threshold, or the app\'s current one, and echoes the settings used as `config`. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Checks the given colors, or the current palette when none are given. Does not change anything.',
+        'Checks whether every pair of colors stays distinguishable under normal vision and simulated color vision deficiencies. Uses the given jnd threshold, or the app\'s current one, and echoes the settings used as `config`. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. With a background, the report adds each color\'s WCAG contrast against it. Checks the given colors, or the current palette when none are given. Does not change anything.',
       inputSchema: {
         type: 'object',
-        properties: { colors: colorList('Colors to check. Omit to check the current palette.', 2), jnd: GENERATE_INPUT.jnd },
+        properties: { colors: colorList('Colors to check. Omit to check the current palette.', 2), jnd: GENERATE_INPUT.jnd, ...CONTRAST_INPUT },
       },
       annotations: { readOnlyHint: true },
       async execute(input) {
-        const params = generateParams({ jnd: input.jnd }, api().getState().params)
-        if (input.colors === undefined) return describe(input.jnd === undefined ? current() : { ...current(), params })
+        // The current palette is checked under its own settings unless given a jnd
+        const given = input.colors !== undefined
+        const base = !given && input.jnd === undefined ? current().params : generateParams({ jnd: input.jnd }, api().getState().params)
+        const params = withContrast(base, input)
+        if (!given) return describe({ ...current(), params })
         const colors = readColors(input.colors, 2)
-        return { colors: colors.map(swatch), report: report(scratch(colors, params)), config: params }
+        return { colors: colors.map((css) => swatch(css, params.colorSpace.gamut)), report: report(scratch(colors, params)), config: params }
       },
     },
     {

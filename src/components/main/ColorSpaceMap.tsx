@@ -148,7 +148,8 @@ export function ColorSpaceMap({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
+    // P3, so colors past sRGB plot as themselves where the display can show them
+    const ctx = canvas.getContext('2d', { colorSpace: 'display-p3' })
     if (!ctx) return
 
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches

@@ -1,9 +1,9 @@
 import { converter, parse } from 'culori'
 import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
-import { isWorkingSpace, spaceChannels, spaceInitialRanges, type WorkingSpace } from './color-spaces'
+import { GAMUT_OPTIONS, isGamut, isWorkingSpace, reachesWideGamut, spaceChannels, spaceInitialRanges, type Gamut, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
 
-export type { WorkingSpace }
+export type { Gamut, WorkingSpace }
 
 // Parameter shapes, defaults, and (de)serialization only — no algorithm.
 // Driving category-colors lives in algorithm.ts so the app shell can import
@@ -66,12 +66,17 @@ export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) => isPausable(
 export const MAX_WINDOWS = 20
 
 // Seeds state.colors: fixedColor pins the value through annealing,
-// fixedOrder pins the position through order optimization.
+// fixedOrder pins the position through order optimization, and
+// lockedChannels holds the named channels of the working space (such as 'h')
+// at the seed's value while the rest move. Names, not the package's channel
+// indexes, so a lock survives a change of space that keeps the channel and
+// drops out of one that doesn't.
 export interface InitColor {
   id: number
   value: ColorValue
   fixedColor: boolean
   fixedOrder: boolean
+  lockedChannels: string[]
 }
 
 // Feeds config.similarityTarget; only the similarity evaluator reads it.
@@ -85,11 +90,51 @@ export interface TargetColor {
 export type ChannelWindow = [number, number]
 
 // The annealer's working space and per-channel windows. Channel order follows
-// the mode (okhsl = h/s/l, oklch = l/c/h, …) — see color-spaces.ts.
+// the mode (okhsl = h/s/l, oklch = l/c/h, …) — see color-spaces.ts. gamut is
+// the colors a palette may use, set only when wider than sRGB and only on a
+// space that can reach past it, so settings and links from before it existed
+// compare equal to today's defaults.
 export interface ColorSpaceParams {
   mode: WorkingSpace
   ranges: ChannelWindow[][]
+  gamut?: Exclude<Gamut, 'srgb'>
 }
+
+// Settings moved to another space. Seed locks go by channel name, and a name
+// can mean another channel there ('b' is Blue in rgb and Blue–yellow in
+// oklab), so only a lock on a channel of the same name and label survives.
+export function inSpace(params: PaletteParams, colorSpace: ColorSpaceParams): PaletteParams {
+  const label = (mode: WorkingSpace, key: string) => spaceChannels(mode).find((c) => c.key === key)?.label
+  const same = (key: string) => label(params.colorSpace.mode, key) === label(colorSpace.mode, key) && label(colorSpace.mode, key) !== undefined
+  return {
+    ...params,
+    colorSpace,
+    initColors: params.initColors.map((c) => ({ ...c, lockedChannels: c.lockedChannels.filter(same) })),
+  }
+}
+
+// Why a space can't hold this gamut, or null when it can. The rule lives here
+// alone: the importer drops a gamut with a problem (fitGamut), agents are told
+// it, and the panel moves to OKLCH instead (withGamut).
+export function gamutProblem(mode: WorkingSpace, gamut: unknown): string | null {
+  if (gamut === undefined || gamut === 'srgb') return null
+  if (!isGamut(gamut)) return `colorSpace.gamut must be one of ${GAMUT_OPTIONS.map((g) => g.value).join(', ')}.`
+  return reachesWideGamut(mode) ? null : `colorSpace.gamut ${gamut} needs colorSpace.mode oklch or oklab; ${mode} only covers sRGB.`
+}
+
+// The space with this gamut where it can hold it, and sRGB (no field) where
+// it can't
+export function fitGamut(space: ColorSpaceParams, gamut: unknown): ColorSpaceParams {
+  const { gamut: _, ...rest } = space
+  return gamut === undefined || gamut === 'srgb' || gamutProblem(space.mode, gamut)
+    ? rest
+    : { ...rest, gamut: gamut as ColorSpaceParams['gamut'] }
+}
+
+// The space with this gamut, moved to OKLCH, the space it was asked of, when
+// it's confined to sRGB
+export const withGamut = (space: ColorSpaceParams, gamut: Gamut): ColorSpaceParams =>
+  gamutProblem(space.mode, gamut) ? { ...defaultColorSpace('oklch'), gamut: gamut as ColorSpaceParams['gamut'] } : fitGamut(space, gamut)
 
 export const defaultColorSpace = (mode: WorkingSpace): ColorSpaceParams => ({
   mode,
@@ -165,7 +210,7 @@ export function colorSpaceContaining(space: ColorSpaceParams, colors: string[]):
   const toMode = converter(space.mode)
   const points = colors.map((css) => toMode(parse(css)) as Record<string, number | undefined> | undefined)
   return {
-    mode: space.mode,
+    ...space,
     ranges: spaceChannels(space.mode).map((channel, i) => {
       const windows = space.ranges[i].map((w): ChannelWindow => [...w])
       const gap = (from: number, to: number) => {
@@ -249,7 +294,7 @@ export function newEvaluatorSpec(
 
 export function newInitColor(value: ColorValue = hexValue('#888888')): InitColor {
   nextId += 1
-  return { id: nextId, value, fixedColor: false, fixedOrder: false }
+  return { id: nextId, value, fixedColor: false, fixedOrder: false, lockedChannels: [] }
 }
 
 export function newTargetColor(value: ColorValue = hexValue('#888888')): TargetColor {
@@ -361,7 +406,10 @@ const normalizedHex = (value: unknown, fallback: string) => {
 // hand-edited file can't put the annealer outside the space. A channel's entry
 // is a list of windows, or a single [min, max] as files before 3.3 wrote it;
 // tidyWindows reads them the way the package will.
-function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
+// A gamut the space can't hold is dropped (see gamutProblem).
+const parseColorSpace = (space: Partial<ColorSpaceParams> | undefined) => fitGamut(parseSpace(space), space?.gamut)
+
+function parseSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
   if (!isWorkingSpace(space?.mode)) return defaultColorSpace('okhsl')
   const channels = spaceChannels(space.mode)
   if (!Array.isArray(space.ranges) || space.ranges.length !== channels.length) {
@@ -426,7 +474,14 @@ export function parseParams(text: string): PaletteParams | null {
         .flatMap((c) => {
           const value = normalizeColorValue(c?.value)
           return value
-            ? [{ ...newInitColor(value), fixedColor: !!c.fixedColor, fixedOrder: !!c.fixedOrder }]
+            ? [{
+                ...newInitColor(value),
+                fixedColor: !!c.fixedColor,
+                fixedOrder: !!c.fixedOrder,
+                lockedChannels: Array.isArray(c.lockedChannels)
+                  ? [...new Set(c.lockedChannels.filter((k): k is string => typeof k === 'string' && k.length <= 8))].slice(0, 4)
+                  : [],
+              }]
             : []
         }),
       targets: raw.targets

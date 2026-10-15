@@ -7,6 +7,7 @@ import {
   convertValue,
   hexValue,
   parseCssColor,
+  outsideSrgb,
   valueToCss,
   type ColorValue,
   type Space,
@@ -53,6 +54,7 @@ const COLOR_FORMATS: { value: Space; label: string }[] = [
   { value: 'oklch', label: 'OKLCH' },
   { value: 'oklab', label: 'OKLAB' },
 ]
+const SRGB_FORMATS: Space[] = ['hex', 'rgb', 'hsl']
 
 function VersionRow({
   version,
@@ -183,10 +185,15 @@ export function HistoryPanel({
   // when the user has mixed formats; picking a space converts every row
   const spaces = new Set(items.map((item) => item.value.space))
   const formatValue = spaces.size === 1 ? [...spaces][0] : spaces.size === 0 ? 'hex' : 'multiple'
+  // hex, rgb() and hsl() are sRGB: converting a wider color clips it
+  const clips = items.some((item) => outsideSrgb(valueToCss(item.value)))
+  const formats = clips
+    ? COLOR_FORMATS.map((f) => (SRGB_FORMATS.includes(f.value) ? { ...f, label: `${f.label} (clips)` } : f))
+    : COLOR_FORMATS
   const formatOptions =
     formatValue === 'multiple'
-      ? [{ value: 'multiple', label: 'Multiple' }, ...COLOR_FORMATS]
-      : COLOR_FORMATS
+      ? [{ value: 'multiple', label: 'Multiple' }, ...formats]
+      : formats
   const convertAll = (space: string) => {
     if (space === 'multiple') return
     commit(items.map((item) => ({ ...item, value: convertValue(item.value, space as Space) })))

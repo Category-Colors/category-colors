@@ -6,6 +6,9 @@ import {
   fittedTo,
   DEFAULT_PARAMS,
   defaultColorSpace,
+  withGamut,
+  fitGamut,
+  inSpace,
   newEvaluatorSpec,
   newInitColor,
   parseParams,
@@ -17,7 +20,7 @@ import {
   type WorkingSpace,
 } from '@/lib/palette'
 import { hexValue } from '@/lib/color'
-import { SPACE_OPTIONS, spaceChannels, spaceDef } from '@/lib/color-spaces'
+import { GAMUT_OPTIONS, SPACE_OPTIONS, spaceChannels, spaceDef, type Gamut } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
 import { PresetOptions } from './PresetOptions'
@@ -72,6 +75,7 @@ export function ParametersPanel({
 
   const rules = BEHAVIORS[params.behavior]
 
+  const channels = spaceChannels(params.colorSpace.mode)
   const set = <K extends keyof PaletteParams>(key: K, value: PaletteParams[K]) =>
     onParamsChange({ ...params, [key]: value })
 
@@ -163,13 +167,22 @@ export function ParametersPanel({
           title="Color space"
           open={sections.open.space}
           onOpenChange={sections.setSection('space')}
-          summary={spaceDef(params.colorSpace.mode).label}
+          summary={[
+            spaceDef(params.colorSpace.mode).label,
+            GAMUT_OPTIONS.find((g) => g.value === params.colorSpace.gamut)?.short,
+          ].filter(Boolean).join(' · ')}
         >
           <SelectControl
             label="Space"
             value={params.colorSpace.mode}
             options={SPACE_OPTIONS}
-            onChange={(mode) => set('colorSpace', defaultColorSpace(mode as WorkingSpace))}
+            onChange={(mode) => onParamsChange(inSpace(params, fitGamut(defaultColorSpace(mode as WorkingSpace), params.colorSpace.gamut)))}
+          />
+          <SelectControl
+            label="Gamut"
+            value={params.colorSpace.gamut ?? 'srgb'}
+            options={GAMUT_OPTIONS}
+            onChange={(gamut) => onParamsChange(inSpace(params, withGamut(params.colorSpace, gamut as Gamut)))}
           />
           {spaceChannels(params.colorSpace.mode).map((channel, i) => (
             <RangeSlider
@@ -227,6 +240,11 @@ export function ParametersPanel({
                 fixedOrder={color.fixedOrder}
                 onFixedOrderChange={(fixedOrder) =>
                   set('initColors', replaceAt(params.initColors, i, { ...color, fixedOrder }))
+                }
+                channels={channels}
+                lockedChannels={color.lockedChannels}
+                onLockedChannelsChange={(lockedChannels) =>
+                  set('initColors', replaceAt(params.initColors, i, { ...color, lockedChannels }))
                 }
                 onRemove={() => set('initColors', removeAt(params.initColors, i))}
               />

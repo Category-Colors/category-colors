@@ -88,6 +88,67 @@ export async function testMcp(server) {
   assert.equal(out.structuredContent.config.behavior, 'fix')
   assert.ok(out.structuredContent.report.totalIssues < out.structuredContent.issuesBefore, JSON.stringify(out.structuredContent.report.totalIssues))
   assert.equal((await tool('fix_palette', { colors: okabe, strength: -1 })).isError, true)
+  // pinned positions come back unchanged, every one of them
+  const pinned = [1, 2, 3, 4, 5, 6, 7]
+  out = await tool('fix_palette', { colors: okabe, pinned, seed: 1 })
+  for (const p of pinned) assert.equal(out.structuredContent.colors[p - 1].hex, okabe[p - 1], `position ${p}`)
+  assert.equal((await tool('fix_palette', { colors: okabe, pinned: [9] })).isError, true)
+  // No limit bound, no rateLimit in the result
+  assert.equal(out.structuredContent.rateLimit, undefined)
+
+  // check_palette with a background reports contrast, failures by position
+  out = await tool('check_palette', { colors: ['#000000', '#FFFF00', '#777777'], background: 'white', ratio: 4.5 })
+  const [contrast] = out.structuredContent.report.contrast
+  assert.equal(contrast.background, '#FFFFFF')
+  assert.equal(contrast.targetRatio, 4.5)
+  assert.equal(contrast.ratios[0], 21)
+  assert.equal(contrast.pass, false)
+  assert.deepEqual(contrast.failing.map((f) => f.positions), [[2], [3]])
+  // under checkAdjacent the background still counts, as it does in the evaluator
+  out = await tool('generate_palette', { config: { behavior: 'evaluate', initColors: ['#000000', '#111111'].map((hex) => ({ value: { space: 'hex', hex } })), evaluators: [{ type: 'contrast', weight: 1, background: '#ffffff', ratio: 3, checkAdjacent: true }] } })
+  const adjacent = out.structuredContent.report.contrast[0]
+  assert.deepEqual([adjacent.ratios.length, adjacent.adjacentRatios.length], [2, 1])
+  assert.deepEqual(adjacent.failing.map((f) => f.positions), [[1, 2]])
+  assert.equal((await tool('check_palette', { colors: ['red', 'blue'] })).structuredContent.report.contrast, undefined)
+  assert.equal((await tool('check_palette', { colors: ['red', 'blue'], ratio: 3 })).isError, true)
+  assert.equal((await tool('check_palette', { colors: ['red', 'blue'], background: 'nope' })).isError, true)
+  // and so does a generated palette whose config asks for contrast
+  out = await tool('generate_palette', { colorCount: 3, seed: 3, config: { maxIterations: 1000, evaluators: [{ type: 'jnd', weight: 1 }, { type: 'contrast', weight: 1, background: '#ffffff', ratio: 3 }] } })
+  assert.equal(out.structuredContent.report.contrast[0].ratios.length, 3)
+
+  // A wide gamut: colors past sRGB come flagged, written in the gamut, with a
+  // note on the report; the default stays sRGB and unflagged
+  const wide = { colorCount: 8, seed: 2, config: { maxIterations: 4000, colorSpace: { mode: 'oklch', ranges: [[0.4, 0.9], [0.15, 0.4], [0, 360]], gamut: 'display-p3' } } }
+  out = await tool('generate_palette', wide)
+  assert.equal(out.structuredContent.config.colorSpace.gamut, 'display-p3')
+  const past = out.structuredContent.colors.filter((c) => c.outsideSrgb)
+  assert.ok(past.length > 0, JSON.stringify(out.structuredContent.colors))
+  for (const c of past) assert.match(c.gamutCss, /^color\(display-p3 [\d.]+ [\d.]+ [\d.]+\)$/)
+  assert.match(out.structuredContent.report.note, /outside sRGB/)
+  out = await tool('generate_palette', { ...wide, config: { ...wide.config, colorSpace: { ...wide.config.colorSpace, gamut: 'srgb' } } })
+  assert.equal(out.structuredContent.config.colorSpace.gamut, undefined)
+  assert.ok(out.structuredContent.colors.every((c) => !c.outsideSrgb))
+  assert.equal(out.structuredContent.report.note, undefined)
+  // a wide gamut on a space confined to sRGB is refused, naming the fix
+  out = await tool('generate_palette', { config: { colorSpace: { mode: 'okhsl', ranges: [[0, 360], [0, 1], [0, 1]], gamut: 'rec2020' } } })
+  assert.equal(out.isError, true)
+  assert.match(out.content[0].text, /needs colorSpace\.mode oklch or oklab/)
+  assert.equal((await tool('generate_palette', { config: { colorSpace: { mode: 'oklch', ranges: [[0, 1], [0, 0.4], [0, 360]], gamut: 'prophoto' } } })).isError, true)
+
+  // lockedChannels holds a seed's hue while the rest of it moves
+  out = await tool('generate_palette', {
+    seed: 5,
+    config: {
+      colorCount: 4,
+      maxIterations: 2000,
+      orderOptimization: false,
+      colorSpace: { mode: 'oklch', ranges: [[0.3, 0.9], [0, 0.15], [0, 360]] },
+      initColors: [{ value: { space: 'oklch', l: 0.7, c: 0.12, h: 55 }, lockedChannels: ['h', 'nope'] }],
+    },
+  })
+  assert.deepEqual(out.structuredContent.config.initColors[0].lockedChannels, ['h', 'nope'])
+  const hue = Number(out.structuredContent.colors[0].oklch.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)/)[1])
+  assert.ok(Math.abs(hue - 55) < 1, out.structuredContent.colors[0].oklch)
 
   // A 2025-era client: initialize, then a sessionless call
   const init = await result(post({}, { method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }))
@@ -98,7 +159,13 @@ export async function testMcp(server) {
   // Rate limits, with a stand-in for workers/limits that allows `quota` calls
   // per action and client IP
   const seen = []
-  const limited = (quota) => ({ ...env, LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), seen.filter((s) => s === `${action} ${key}`).length <= quota) } })
+  const verdict = (allowed, remaining = 0) => (allowed ? { allowed, remaining } : { allowed, retryAfter: 42, limit: 20, scope: 'client' })
+  // a stand-in allowing `quota` of `action` per IP (every action, if none named)
+  const limited = (quota, only, remaining) => ({
+    ...env,
+    LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), verdict((only && action !== only) || seen.filter((s) => s === `${action} ${key}`).length <= quota, remaining)) },
+  })
+  const read = async (request, environment) => JSON.parse((await (await call(request, environment)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
   const from = (ip, request) => (request.headers.set('CF-Connecting-IP', ip), request)
   const generate = (args) => modern('tools/call', { name: 'generate_palette', arguments: args })
   // Past the request limit an IP gets 429
@@ -107,28 +174,30 @@ export async function testMcp(server) {
   assert.equal((await call(from('1.1.1.1', modern('tools/list')), strict)).status, 200)
   const response = await call(from('1.1.1.1', modern('tools/list')), strict)
   assert.equal(response.status, 429)
-  assert.equal(response.headers.get('Retry-After'), '60')
+  assert.equal(response.headers.get('Retry-After'), '42')
   assert.equal((await call(from('2.2.2.2', modern('tools/list')), strict)).status, 200)
   // Past the generation limit, generate_palette says so in a result the agent
   // can read; bad arguments don't use up the quota, and other tools still work
   seen.length = 0
-  const once = limited(100)
-  once.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 1)
-  const read = async (request) => JSON.parse((await (await call(request, once)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
-  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 99 })))).isError, true)
+  const once = limited(1, 'generate', 7)
+  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 99 })), once)).isError, true)
   assert.equal(seen.filter((s) => s.startsWith('generate')).length, 0)
-  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 2 })))).structuredContent.colors.length, 2)
-  out = await read(from('3.3.3.3', generate({ colorCount: 2 })))
+  out = await read(from('3.3.3.3', generate({ colorCount: 2 })), once)
+  assert.equal(out.structuredContent.colors.length, 2)
+  assert.deepEqual(out.structuredContent.rateLimit, { remaining: 7 })
+  out = await read(from('3.3.3.3', generate({ colorCount: 2 })), once)
   assert.equal(out.isError, true)
-  assert.match(out.content[0].text, /Too many palettes/)
-  assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })))).isError, undefined)
+  assert.match(out.content[0].text, /20 generations a minute per client\. Retry in 42 s/)
+  assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })), once)).isError, undefined)
   assert.deepEqual(seen.filter((s) => s.startsWith('generate')), ['generate 3.3.3.3', 'generate 3.3.3.3'])
+  // the global cap names itself
+  const busy = { ...env, LIMITS: { allow: async (action) => (action === 'generate' ? { allowed: false, retryAfter: 9, limit: 60, scope: 'everyone' } : { allowed: true }) } }
+  out = await read(from('5.5.5.5', generate({ colorCount: 2 })), busy)
+  assert.match(out.content[0].text, /60 generations a minute across all clients\. Retry in 9 s/)
   // runs: n spends one generation per run and keeps the cheapest; past the
   // limit it returns what it has
   seen.length = 0
-  const twice = limited(100)
-  twice.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 2)
-  out = JSON.parse((await (await call(from('4.4.4.4', generate({ colorCount: 2, runs: 3, config: { maxIterations: 1000 } })), twice)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  out = await read(from('4.4.4.4', generate({ colorCount: 2, runs: 3, config: { maxIterations: 1000 } })), limited(2, 'generate'))
   assert.equal(out.isError, undefined)
   assert.equal(out.structuredContent.runs, 2)
   assert.equal(seen.filter((s) => s === 'generate 4.4.4.4').length, 3)

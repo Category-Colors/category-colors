@@ -3,7 +3,7 @@ import { generatePalette } from '../src/lib/algorithm'
 import { EXPORT_FORMATS, formatPalette } from '../src/lib/exporters'
 import { DEFAULT_PARAMS } from '../src/lib/palette'
 import { PRESET_PALETTES } from '../src/lib/presets'
-import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, fixParams, generateParams, readColors, readSeed, report, scratch, summarize } from '../src/lib/tools'
+import { CONTRAST_INPUT, FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, fixParams, generateParams, readColors, readSeed, report, scratch, summarize, withContrast } from '../src/lib/tools'
 
 // The remote MCP server (docs/mcp-server-plan.md): the WebMCP tools without
 // the page, so every call stands alone and takes its colors as input. It
@@ -17,7 +17,9 @@ import { FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAMES, colorList, fi
 // the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
 // and deploy.
 
-interface Limits { allow(action: 'request' | 'generate', key: string): Promise<boolean> }
+// workers/limits' answer; without the binding (local runs) everything is allowed
+type Verdict = { allowed: true; remaining?: number } | { allowed: false; retryAfter: number; limit: number; scope: 'client' | 'everyone' }
+interface Limits { allow(action: 'request' | 'generate', key: string): Promise<Verdict> }
 interface Env { MCP_ENABLED?: string; LIMITS?: Limits }
 interface Context { request: Request; env: Env }
 
@@ -25,7 +27,17 @@ interface Context { request: Request; env: Env }
 const ALLOWED_ORIGINS = ['categorycolors.com', 'localhost', '127.0.0.1']
 // Five of the heaviest generations fit the 30 s CPU cap in wrangler.jsonc
 const MAX_RUNS = 5
+// workers/limits' POLICY, for the tool descriptions, which an agent reads
+// before it has a verdict to go by. Refusals take their numbers from the Worker.
+const GENERATION_LIMIT = 'Rate limited to 20 generations a minute per client, and 60 a minute across everyone (each run and each fix counts, checks and exports don\'t); results report `rateLimit.remaining`, and a refusal says which limit and how many seconds until it resets.'
+type Refusal = Extract<Verdict, { allowed: false }>
+// What refused and when to come back, from the Worker's verdict
+const limitText = ({ limit, scope, retryAfter }: Refusal, what: string) =>
+  `Rate limited: ${limit} ${what} a minute ${scope === 'everyone' ? 'across all clients' : 'per client'}. Retry in ${retryAfter} s (retryAfter: ${retryAfter}).`
+const refusal = (verdict: Refusal) => new Error(limitText(verdict, 'generations'))
 
+// A verdict's quota for the result; none when no limit is bound
+const rateLimit = (verdict: Verdict) => (verdict.allowed && verdict.remaining !== undefined ? { rateLimit: { remaining: verdict.remaining } } : {})
 const ok = (result: object) => ({ content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result as Record<string, unknown> })
 const object = (properties: object, required: string[] = []) =>
   fromJsonSchema<Record<string, unknown>>({ type: 'object', properties, required, additionalProperties: false } as never)
@@ -49,6 +61,21 @@ const PALETTE_OUTPUT = {
       jndThreshold: { type: 'number' },
       minDeltaE: { type: 'number', description: 'The closest pair under any condition. Higher is better.' },
       totalIssues: { type: 'integer' },
+      contrast: {
+        type: 'array',
+        description: 'One entry per contrast evaluator (or check_palette background): each color\'s WCAG ratio against the background, aligned to colors, with neighbor pairs\' ratios under checkAdjacent, and the positions below targetRatio.',
+        items: {
+          type: 'object',
+          properties: {
+            background: { type: 'string' },
+            targetRatio: { type: 'number' },
+            pass: { type: 'boolean' },
+            ratios: { type: 'array', items: { type: 'number' } },
+            adjacentRatios: { type: 'array', items: { type: 'number' }, description: 'checkAdjacent only: ratios between colors 1–2, 2–3, …' },
+            failing: { type: 'array', items: { type: 'object', properties: { positions: { type: 'array', items: { type: 'integer' } }, ratio: { type: 'number' } } } },
+          },
+        },
+      },
       tests: {
         type: 'array',
         items: {
@@ -66,6 +93,7 @@ const PALETTE_OUTPUT = {
   config: { type: 'object', description: 'The settings used, in the shape generate_palette\'s config takes.' },
   cost: { type: 'number', description: 'The optimizer\'s final cost; lower is better. Generated palettes only.' },
   seed: { type: 'integer', description: 'The seed this palette was made with; pass it back with the same config to make it again. Generated palettes only.' },
+  rateLimit: { type: 'object', properties: { remaining: { type: 'integer', description: 'Generations left this minute.' } }, description: 'Generations and fixes only, where a rate limit applies.' },
   link: { type: 'string', description: 'Opens the palette, with these settings, in the app.' },
 }
 const paletteOutput = (extra: object = {}) => object({ ...PALETTE_OUTPUT, ...extra }, ['colors', 'report', 'config', 'link'])
@@ -78,11 +106,11 @@ const tool = (run: (input: Record<string, unknown>) => Promise<object> | object)
   }
 }
 
-function server(allowGeneration: () => Promise<boolean>) {
+function server(allowGeneration: () => Promise<Verdict>) {
   const mcp = new McpServer({ name: 'category-colors', title: 'Category Colors', version: '1.0.0' }, { maxToolInputElements: 200 })
   mcp.registerTool('generate_palette', {
     title: 'Generate palette',
-    description: 'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Takes the full configuration as `config` (the shape the app\'s Configure panel imports), or the shortcuts, over the defaults; echoes the settings used as `config` and the random `seed`, which with the same config reproduces the result. Returns each color as CSS, hex and OKLCH, an accessibility report, and a link that opens the palette in the Category Colors app. Takes about a second per run.',
+    description: 'Optimizes a new categorical color palette (for chart series, map categories, tags) with simulated annealing, maximizing perceptual distance between colors, including under color vision deficiency. Takes the full configuration as `config` (the shape the app\'s Configure panel imports), or the shortcuts, over the defaults; echoes the settings used as `config` and the random `seed`, which with the same config reproduces the result. Returns each color as CSS, hex and OKLCH, an accessibility report, and a link that opens the palette in the Category Colors app. Takes about a second per run. ' + GENERATION_LIMIT,
     inputSchema: object({
       ...GENERATE_INPUT,
       runs: { type: 'integer', minimum: 1, maximum: MAX_RUNS, description: `Run up to ${MAX_RUNS} times (seed, seed+1, …) and return the lowest-cost palette with its seed. Each run counts toward the rate limit.` },
@@ -95,40 +123,44 @@ function server(allowGeneration: () => Promise<boolean>) {
     const wanted = typeof input.runs === 'number' ? Math.min(MAX_RUNS, Math.max(1, Math.round(input.runs))) : 1
     let best: ReturnType<typeof generatePalette> | null = null
     let runs = 0
+    let verdict: Verdict = { allowed: true }
     // Past the limit, the runs already made are still worth returning
-    while (runs < wanted && (await allowGeneration())) {
+    while (runs < wanted && (verdict = await allowGeneration()).allowed) {
       const result = generatePalette(params, seed + runs)
       if (!best || result.cost < best.cost) best = result
       runs += 1
     }
-    if (!best) throw new Error('Too many palettes generated in the last minute. Wait a minute and try again.')
-    return { runs, ...(await summarize({ id: 1, params, ...best, createdAt: Date.now() })) }
+    // No palette means the first ask was refused
+    if (!best) throw refusal(verdict as Refusal)
+    return { runs, ...(await summarize({ id: 1, params, ...best, createdAt: Date.now() })), ...rateLimit(verdict) }
   }))
   mcp.registerTool('check_palette', {
     title: 'Check palette',
-    description: 'Checks whether every pair of colors stays distinguishable under normal vision and simulated protanomaly, deuteranomaly and tritanomaly, flagging pairs whose CIEDE2000 distance falls below the threshold. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Returns the report, the settings used, and a link that opens the palette in the Category Colors app.',
+    description: 'Checks whether every pair of colors stays distinguishable under normal vision and simulated protanomaly, deuteranomaly and tritanomaly, flagging pairs whose CIEDE2000 distance falls below the threshold. The report\'s minDeltaE is the closest pair under any condition, a score for comparing candidates. Given a background, the report also lists each color\'s WCAG contrast ratio against it and which fall below `ratio`. Returns the report, the settings used, and a link that opens the palette in the Category Colors app.',
     inputSchema: object({
       colors: colorList('The palette to check, in order.', 2),
       jnd: GENERATE_INPUT.jnd,
+      ...CONTRAST_INPUT,
     }, ['colors']),
     outputSchema: paletteOutput(),
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, tool(async (input) => {
-    const params = generateParams({ jnd: input.jnd }, DEFAULT_PARAMS)
+    const params = withContrast(generateParams({ jnd: input.jnd }, DEFAULT_PARAMS), input)
     return summarize(scratch(readColors(input.colors, 2), params))
   }))
   mcp.registerTool('fix_palette', {
     title: 'Fix palette',
-    description: `${FIX_DESCRIPTION} Returns the fixed palette with the report, the settings used, the seed, and a link that opens it in the Category Colors app. Counts toward the generation rate limit.`,
+    description: `${FIX_DESCRIPTION} Returns the fixed palette with the report, the settings used, the seed, and a link that opens it in the Category Colors app. ${GENERATION_LIMIT}`,
     inputSchema: object({ colors: colorList('The palette to fix, in order.', 2), ...FIX_INPUT, seed: GENERATE_INPUT.seed }, ['colors']),
     outputSchema: paletteOutput({ issuesBefore: { type: 'integer', description: 'Failing pairs before the fix, counted like report.totalIssues.' } }),
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, tool(async (input) => {
     const colors = readColors(input.colors, 2)
     const params = fixParams(input, colors, DEFAULT_PARAMS)
-    if (!(await allowGeneration())) throw new Error('Too many palettes generated in the last minute. Wait a minute and try again.')
+    const verdict = await allowGeneration()
+    if (!verdict.allowed) throw refusal(verdict)
     const issuesBefore = report(scratch(colors, params))?.totalIssues ?? 0
-    return { issuesBefore, ...(await summarize({ id: 1, params, ...generatePalette(params, readSeed(input.seed)), createdAt: Date.now() })) }
+    return { issuesBefore, ...(await summarize({ id: 1, params, ...generatePalette(params, readSeed(input.seed)), createdAt: Date.now() })), ...rateLimit(verdict) }
   }))
   mcp.registerTool('get_preset_palette', {
     title: 'Get preset palette',
@@ -161,9 +193,11 @@ function server(allowGeneration: () => Promise<boolean>) {
 export async function onRequest({ request, env }: Context): Promise<Response> {
   if (env.MCP_ENABLED !== 'true') return new Response('Not found', { status: 404 })
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-  if (env.LIMITS && !(await env.LIMITS.allow('request', ip))) {
-    return new Response('Too many requests', { status: 429, headers: { 'Retry-After': '60' } })
+  const ask = async (action: 'request' | 'generate'): Promise<Verdict> => (env.LIMITS ? env.LIMITS.allow(action, ip) : { allowed: true })
+  const verdict = await ask('request')
+  if (!verdict.allowed) {
+    return new Response(limitText(verdict, 'requests'), { status: 429, headers: { 'Retry-After': String(verdict.retryAfter) } })
   }
-  const allowGeneration = async () => !env.LIMITS || env.LIMITS.allow('generate', ip)
+  const allowGeneration = () => ask('generate')
   return originValidationResponse(request, ALLOWED_ORIGINS) ?? createMcpHandler(() => server(allowGeneration)).fetch(request)
 }

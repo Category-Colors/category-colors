@@ -69,7 +69,7 @@
         <h2>What it does</h2>
         <p>Category Colors generates palettes of 2 to 20 colors with simulated annealing, maximizing the perceptual distance between every pair. You can fix brand colors and let it choose the rest, limit the color space, lightness and saturation, require contrast against a background, and avoid particular colors. It checks every pair under normal vision and simulated protanomaly, deuteranomaly, tritanomaly and grayscale, previews the palette on live charts, and exports it as CSS custom properties or W3C design tokens.</p>
         <h2>How to use it</h2>
-        <p>The app needs JavaScript. Developers can use the same optimizer through the open-source <a href="https://www.npmjs.com/package/category-colors">category-colors npm package</a>. AI agents can read <a href="/llms.txt">llms.txt</a>, and in browsers that support WebMCP the page registers tools to generate, check and export palettes.</p>
+        <p>The app needs JavaScript. Developers can use the same optimizer through the open-source <a href="https://www.npmjs.com/package/category-colors">category-colors npm package</a>. AI agents can read <a href="/llms.txt">llms.txt</a>, or connect to the MCP server at <code>https://categorycolors.com/mcp</code> (Streamable HTTP, no auth) to generate, fix, check and export palettes. In a browser that supports WebMCP (<code>document.modelContext</code>), this page registers the same tools, plus ones that load a palette into the app, so the person can watch it change.</p>
         <p>The method is explained in <a href="https://mattstromawn.com/writing/how-to-pick-the-least-wrong-colors/">How to pick the least wrong colors</a>, by Matt Ström-Awn.</p>
       </main>
     </div>
