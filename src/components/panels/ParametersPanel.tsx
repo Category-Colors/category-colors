@@ -7,6 +7,7 @@ import {
   DEFAULT_PARAMS,
   defaultColorSpace,
   withGamut,
+  fitGamut,
   inSpace,
   newEvaluatorSpec,
   newInitColor,
@@ -19,7 +20,7 @@ import {
   type WorkingSpace,
 } from '@/lib/palette'
 import { hexValue } from '@/lib/color'
-import { GAMUT_OPTIONS, SPACE_OPTIONS, reachesWideGamut, spaceChannels, spaceDef, type Gamut } from '@/lib/color-spaces'
+import { GAMUT_OPTIONS, SPACE_OPTIONS, spaceChannels, spaceDef, type Gamut } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
 import { PresetOptions } from './PresetOptions'
@@ -74,6 +75,7 @@ export function ParametersPanel({
 
   const rules = BEHAVIORS[params.behavior]
 
+  const channels = spaceChannels(params.colorSpace.mode)
   const set = <K extends keyof PaletteParams>(key: K, value: PaletteParams[K]) =>
     onParamsChange({ ...params, [key]: value })
 
@@ -174,7 +176,7 @@ export function ParametersPanel({
             label="Space"
             value={params.colorSpace.mode}
             options={SPACE_OPTIONS}
-            onChange={(mode) => onParamsChange(inSpace(params, withGamut(defaultColorSpace(mode as WorkingSpace), reachesWideGamut(mode as WorkingSpace) ? (params.colorSpace.gamut ?? 'srgb') : 'srgb')))}
+            onChange={(mode) => onParamsChange(inSpace(params, fitGamut(defaultColorSpace(mode as WorkingSpace), params.colorSpace.gamut)))}
           />
           <SelectControl
             label="Gamut"
@@ -239,7 +241,7 @@ export function ParametersPanel({
                 onFixedOrderChange={(fixedOrder) =>
                   set('initColors', replaceAt(params.initColors, i, { ...color, fixedOrder }))
                 }
-                channels={spaceChannels(params.colorSpace.mode)}
+                channels={channels}
                 lockedChannels={color.lockedChannels}
                 onLockedChannelsChange={(lockedChannels) =>
                   set('initColors', replaceAt(params.initColors, i, { ...color, lockedChannels }))

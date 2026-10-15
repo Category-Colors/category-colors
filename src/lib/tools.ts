@@ -1,9 +1,9 @@
 import { wcagContrast } from 'culori'
 import { formatColor } from 'category-colors'
 import { convertValue, outsideSrgb, parseCssColor, valueToCss } from './color'
-import { GAMUT_OPTIONS, WORKING_SPACES, isGamut, spaceChannels } from './color-spaces'
+import { GAMUT_OPTIONS, WORKING_SPACES, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
-import { BEHAVIOR_NAMES, MAX_WINDOWS, PARAM_PRESETS, newEvaluatorSpec, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
+import { BEHAVIOR_NAMES, MAX_WINDOWS, gamutProblem, PARAM_PRESETS, newEvaluatorSpec, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
 import { OUTSIDE_SRGB_NOTE, buildJndReport, refineParams, testTitles } from './report'
 import { linkFor } from './share'
@@ -48,30 +48,32 @@ export function swatch(css: string, gamut?: PaletteParams['colorSpace']['gamut']
   return { css, hex: valueToCss(convertValue(value, 'hex')), oklch: valueToCss(convertValue(value, 'oklch')), ...wide }
 }
 
-const round = (n: number) => Math.round(n * 10) / 10
-const round2 = (n: number) => Math.round(n * 100) / 100
+const round = (n: number, decimals = 1) => Math.round(n * 10 ** decimals) / 10 ** decimals
 
 // One entry per contrast evaluator: the WCAG ratio of every color against its
-// background (or of each neighbor pair, under checkAdjacent) and the ones
-// under the target. The evaluator is a penalty the optimizer weighs against
+// background (and, under checkAdjacent, of each neighbor pair, both of which
+// the evaluator scores) and the ones under the target. The evaluator is a penalty the optimizer weighs against
 // the rest, not a floor, so a generated palette can miss it; this is where an
 // agent finds out.
 function contrastReport(version: PaletteVersion) {
   const specs = version.params.evaluators.filter((e) => e.type === 'contrast' && e.weight > 0)
   const { colors } = version
   return specs.map((spec) => {
-    // Compared unrounded: WCAG doesn't let 2.996 round up to pass 3
-    const pairs = spec.checkAdjacent
-      ? colors.slice(1).map((css, i) => ({ positions: [i + 1, i + 2], ratio: wcagContrast(colors[i], css) }))
-      : colors.map((css, i) => ({ positions: [i + 1], ratio: wcagContrast(css, spec.background) }))
-    const shown = (list: typeof pairs) => list.map((p) => ({ ...p, ratio: round2(p.ratio) }))
+    // Compared unrounded, then rounded: WCAG doesn't let 2.996 round up to pass 3
+    const measure = (positions: number[], a: string, b: string) => {
+      const ratio = wcagContrast(a, b)
+      return { positions, ratio: round(ratio, 2), below: ratio < spec.ratio }
+    }
+    const ratios = colors.map((css, i) => measure([i + 1], css, spec.background))
+    const adjacent = spec.checkAdjacent ? colors.slice(1).map((css, i) => measure([i + 1, i + 2], colors[i], css)) : []
+    const failing = [...ratios, ...adjacent].filter((c) => c.below).map(({ positions, ratio }) => ({ positions, ratio }))
     return {
-      ...(spec.checkAdjacent ? { checkAdjacent: true } : { background: spec.background }),
+      background: spec.background,
       targetRatio: spec.ratio,
-      minRatio: round2(Math.min(...pairs.map((p) => p.ratio))),
-      pass: pairs.every((p) => p.ratio >= spec.ratio),
-      ratios: pairs.map((p) => round2(p.ratio)),
-      failing: shown(pairs.filter((p) => p.ratio < spec.ratio)),
+      pass: failing.length === 0,
+      ratios: ratios.map((c) => c.ratio),
+      ...(spec.checkAdjacent ? { adjacentRatios: adjacent.map((c) => c.ratio) } : {}),
+      failing,
     }
   })
 }
@@ -285,7 +287,7 @@ export const FIX_INPUT = {
 // check_palette's contrast inputs
 export const CONTRAST_INPUT = {
   background: { type: 'string', description: 'A CSS color the palette will sit on. Adds report.contrast: each color\'s WCAG contrast ratio against it, and which fall below `ratio`.' },
-  ratio: { type: 'number', minimum: 1, maximum: 21, description: 'The WCAG contrast ratio each color should reach against `background`; the default is 3, the minimum for graphical objects.' },
+  ratio: { type: 'number', minimum: 1, maximum: 7, description: 'The WCAG contrast ratio each color should reach against `background`; the default is 3, the minimum for graphical objects.' },
 }
 
 // The panel's params with a contrast row for check_palette's background, so
@@ -298,7 +300,7 @@ export function withContrast(params: PaletteParams, input: Record<string, unknow
   const background = typeof input.background === 'string' ? parseCssColor(input.background) : null
   if (!background) throw new Error(`background is not a valid CSS color: ${JSON.stringify(input.background)}.`)
   const ratio = input.ratio ?? 3
-  if (typeof ratio !== 'number' || !(ratio >= 1 && ratio <= 21)) throw new Error('ratio must be a number from 1 to 21.')
+  if (typeof ratio !== 'number' || !(ratio >= 1 && ratio <= 7)) throw new Error('ratio must be a number from 1 to 7, as the contrast evaluator takes.')
   const hex = valueToCss(convertValue(background, 'hex'))
   return { ...params, evaluators: [...params.evaluators, newEvaluatorSpec('contrast', { background: hex, ratio })] }
 }
@@ -348,13 +350,7 @@ export function generateParams(input: Record<string, unknown>, base: PalettePara
   const params = parseParams(JSON.stringify(draft))
   if (!params) throw new Error('Those settings could not be turned into a valid configuration.')
   // The importer drops a gamut it can't use; an agent asked for it, so say why
-  const gamut: unknown = draft.colorSpace?.gamut
-  if (gamut !== undefined && gamut !== 'srgb' && params.colorSpace.gamut !== gamut) {
-    throw new Error(
-      isGamut(gamut)
-        ? `colorSpace.gamut ${gamut} needs colorSpace.mode oklch or oklab; ${params.colorSpace.mode} only covers sRGB.`
-        : `colorSpace.gamut must be one of ${GAMUT_OPTIONS.map((g) => g.value).join(', ')}.`
-    )
-  }
+  const problem = gamutProblem(params.colorSpace.mode, draft.colorSpace?.gamut)
+  if (problem) throw new Error(problem)
   return params
 }

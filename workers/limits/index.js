@@ -1,19 +1,19 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 
 // Called by the site's /mcp function: env.LIMITS.allow('request' | 'generate', ip)
-// resolves to { allowed, remaining, retryAfter, limit, scope }. Each action is
-// a list of [counter, limit per minute, key]; a call is allowed only while
-// every counter is under its limit. remaining is the fewest calls left on any
-// counter this minute; on a refusal, retryAfter is the seconds until the
-// refusing counter resets, and limit and scope ('client' or 'everyone') name it.
+// resolves to { allowed, remaining } or, refused, { allowed, retryAfter, limit,
+// scope }. Each action is a list of [counter, limit per minute, key, scope]; a
+// call is allowed only while every counter is under its limit. remaining is
+// the fewest calls left on any counter this minute; retryAfter is the seconds
+// until the refusing counter resets, and limit and scope name it.
 const POLICY = {
   // Every /mcp request, per client IP
-  request: (ip) => [['request', 60, ip]],
+  request: (ip) => [['request', 60, ip, 'client']],
   // Palette generations, per client IP and from everyone; the second caps the
   // CPU bill. Measured in production on 2026-10-15: about 1 s of CPU for a
   // generation, 3 s for a fix, 6 s for the worst fix (20 crowded colors at
   // Strength 1), so 60 a minute is at most 6 CPU-minutes a minute.
-  generate: (ip) => [['generate', 20, ip], ['generate', 60, 'all']],
+  generate: (ip) => [['generate', 20, ip, 'client'], ['generate', 60, 'all', 'everyone']],
 }
 
 export default class Limits extends WorkerEntrypoint {
@@ -21,13 +21,13 @@ export default class Limits extends WorkerEntrypoint {
     const counters = POLICY[action]?.(ip)
     if (!counters) throw new Error(`Unknown action: ${action}`)
     let remaining = Infinity
-    for (const [name, limit, key] of counters) {
+    for (const [name, limit, key, scope] of counters) {
       const counter = this.env.COUNTERS.get(this.env.COUNTERS.idFromName(`${name}:${key}`))
       const hit = await counter.hit(limit)
-      if (!hit.allowed) return { allowed: false, remaining: 0, retryAfter: hit.retryAfter, limit, scope: key === 'all' ? 'everyone' : 'client' }
-      remaining = Math.min(remaining, hit.remaining)
+      if (!hit.allowed) return { allowed: false, retryAfter: hit.retryAfter, limit, scope }
+      remaining = Math.min(remaining, limit - hit.count)
     }
-    return { allowed: true, remaining, retryAfter: 0 }
+    return { allowed: true, remaining }
   }
 
   fetch() {
@@ -50,10 +50,7 @@ export class Counter extends DurableObject {
       this.count = 0
     }
     this.count += 1
-    return {
-      allowed: this.count <= limit,
-      remaining: Math.max(0, limit - this.count),
-      retryAfter: Math.ceil((this.start + 60_000 - now) / 1000),
-    }
+    if (this.count <= limit) return { allowed: true, count: this.count }
+    return { allowed: false, retryAfter: Math.ceil((this.start + 60_000 - now) / 1000) }
   }
 }

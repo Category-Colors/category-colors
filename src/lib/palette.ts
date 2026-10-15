@@ -1,6 +1,6 @@
 import { converter, parse } from 'culori'
 import { hexValue, normalizeColorValue, type ColorValue } from '@/lib/color'
-import { isGamut, isWorkingSpace, reachesWideGamut, spaceChannels, spaceInitialRanges, type Gamut, type WorkingSpace } from './color-spaces'
+import { GAMUT_OPTIONS, isGamut, isWorkingSpace, reachesWideGamut, spaceChannels, spaceInitialRanges, type Gamut, type WorkingSpace } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES } from './evaluators'
 
 export type { Gamut, WorkingSpace }
@@ -113,13 +113,28 @@ export function inSpace(params: PaletteParams, colorSpace: ColorSpaceParams): Pa
   }
 }
 
-// A space with this gamut: sRGB drops the field, and a wide gamut on a space
-// confined to sRGB moves it to OKLCH, the space it was asked of
-export function withGamut(space: ColorSpaceParams, gamut: Gamut): ColorSpaceParams {
-  const { gamut: _, ...rest } = space
-  if (gamut === 'srgb') return rest
-  return reachesWideGamut(space.mode) ? { ...rest, gamut } : { ...defaultColorSpace('oklch'), gamut }
+// Why a space can't hold this gamut, or null when it can. The rule lives here
+// alone: the importer drops a gamut with a problem (fitGamut), agents are told
+// it, and the panel moves to OKLCH instead (withGamut).
+export function gamutProblem(mode: WorkingSpace, gamut: unknown): string | null {
+  if (gamut === undefined || gamut === 'srgb') return null
+  if (!isGamut(gamut)) return `colorSpace.gamut must be one of ${GAMUT_OPTIONS.map((g) => g.value).join(', ')}.`
+  return reachesWideGamut(mode) ? null : `colorSpace.gamut ${gamut} needs colorSpace.mode oklch or oklab; ${mode} only covers sRGB.`
 }
+
+// The space with this gamut where it can hold it, and sRGB (no field) where
+// it can't
+export function fitGamut(space: ColorSpaceParams, gamut: unknown): ColorSpaceParams {
+  const { gamut: _, ...rest } = space
+  return gamut === undefined || gamut === 'srgb' || gamutProblem(space.mode, gamut)
+    ? rest
+    : { ...rest, gamut: gamut as ColorSpaceParams['gamut'] }
+}
+
+// The space with this gamut, moved to OKLCH, the space it was asked of, when
+// it's confined to sRGB
+export const withGamut = (space: ColorSpaceParams, gamut: Gamut): ColorSpaceParams =>
+  gamutProblem(space.mode, gamut) ? { ...defaultColorSpace('oklch'), gamut: gamut as ColorSpaceParams['gamut'] } : fitGamut(space, gamut)
 
 export const defaultColorSpace = (mode: WorkingSpace): ColorSpaceParams => ({
   mode,
@@ -391,17 +406,16 @@ const normalizedHex = (value: unknown, fallback: string) => {
 // hand-edited file can't put the annealer outside the space. A channel's entry
 // is a list of windows, or a single [min, max] as files before 3.3 wrote it;
 // tidyWindows reads them the way the package will.
-function parseColorSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
+// A gamut the space can't hold is dropped (see gamutProblem).
+const parseColorSpace = (space: Partial<ColorSpaceParams> | undefined) => fitGamut(parseSpace(space), space?.gamut)
+
+function parseSpace(space: Partial<ColorSpaceParams> | undefined): ColorSpaceParams {
   if (!isWorkingSpace(space?.mode)) return defaultColorSpace('okhsl')
   const channels = spaceChannels(space.mode)
-  // A wide gamut the space can't reach is dropped: see withGamut
-  const asked: unknown = space.gamut
-  const gamut = isGamut(asked) && asked !== 'srgb' && reachesWideGamut(space.mode) ? { gamut: asked } : {}
   if (!Array.isArray(space.ranges) || space.ranges.length !== channels.length) {
-    return { ...defaultColorSpace(space.mode), ...gamut }
+    return defaultColorSpace(space.mode)
   }
   return {
-    ...gamut,
     mode: space.mode,
     ranges: channels.map((channel, i) => {
       const raw: unknown = space.ranges![i]

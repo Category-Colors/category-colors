@@ -24,7 +24,7 @@ export function ColorRow({
   fixedOrder,
   onFixedOrderChange,
   channels,
-  lockedChannels,
+  lockedChannels = [],
   onLockedChannelsChange,
   defaultPickerOpen = false,
 }: {
@@ -106,17 +106,18 @@ export function ColorRow({
         {onLockedChannelsChange &&
           !fixedColor &&
           channels?.map((channel) => {
-            const locked = !!lockedChannels?.includes(channel.key)
+            const locked = lockedChannels.includes(channel.key)
+            const action = `${locked ? 'Unlock' : 'Lock'} ${channel.label.toLowerCase()}`
             return (
               <button
                 key={channel.key}
                 className="color-row-icon color-row-channel"
                 data-active={String(locked)}
-                aria-label={`${locked ? 'Unlock' : 'Lock'} ${channel.label.toLowerCase()}`}
-                title={`${locked ? 'Unlock' : 'Lock'} ${channel.label.toLowerCase()}`}
+                aria-label={action}
+                title={action}
                 onClick={() =>
                   onLockedChannelsChange(
-                    locked ? lockedChannels!.filter((k) => k !== channel.key) : [...(lockedChannels ?? []), channel.key]
+                    locked ? lockedChannels.filter((k) => k !== channel.key) : [...lockedChannels, channel.key]
                   )
                 }
               >

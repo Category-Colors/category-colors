@@ -17,15 +17,9 @@ import { CONTRAST_INPUT, FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAME
 // the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
 // and deploy.
 
-interface Verdict { allowed: boolean; remaining?: number; retryAfter?: number; limit?: number; scope?: 'client' | 'everyone' }
-// A limits Worker from before 2026-10-15 answers with a bare boolean; read
-// both, so the site and the Worker can deploy in either order
-interface Limits { allow(action: 'request' | 'generate', key: string): Promise<Verdict | boolean> }
-const ask = async (limits: Limits | undefined, action: 'request' | 'generate', key: string): Promise<Verdict> => {
-  if (!limits) return { allowed: true }
-  const answer = await limits.allow(action, key)
-  return typeof answer === 'boolean' ? { allowed: answer } : answer
-}
+// workers/limits' answer; without the binding (local runs) everything is allowed
+type Verdict = { allowed: true; remaining?: number } | { allowed: false; retryAfter: number; limit: number; scope: 'client' | 'everyone' }
+interface Limits { allow(action: 'request' | 'generate', key: string): Promise<Verdict> }
 interface Env { MCP_ENABLED?: string; LIMITS?: Limits }
 interface Context { request: Request; env: Env }
 
@@ -36,15 +30,14 @@ const MAX_RUNS = 5
 // workers/limits' POLICY, for the tool descriptions, which an agent reads
 // before it has a verdict to go by. Refusals take their numbers from the Worker.
 const GENERATION_LIMIT = 'Rate limited to 20 generations a minute per client, and 60 a minute across everyone (each run and each fix counts, checks and exports don\'t); results report `rateLimit.remaining`, and a refusal says which limit and how many seconds until it resets.'
+type Refusal = Extract<Verdict, { allowed: false }>
 // What refused and when to come back, from the Worker's verdict
-const limitText = ({ limit, scope, retryAfter }: Verdict, what: string) => {
-  const which = limit ? `${limit} ${what} a minute ${scope === 'everyone' ? 'across all clients' : 'per client'}` : `too many ${what} this minute`
-  return `Rate limited: ${which}. Retry in ${retryAfter ?? 60} s (retryAfter: ${retryAfter ?? 60}).`
-}
-const refusal = (verdict: Verdict) => new Error(limitText(verdict, 'generations'))
+const limitText = ({ limit, scope, retryAfter }: Refusal, what: string) =>
+  `Rate limited: ${limit} ${what} a minute ${scope === 'everyone' ? 'across all clients' : 'per client'}. Retry in ${retryAfter} s (retryAfter: ${retryAfter}).`
+const refusal = (verdict: Refusal) => new Error(limitText(verdict, 'generations'))
 
 // A verdict's quota for the result; none when no limit is bound
-const rateLimit = ({ remaining }: Verdict) => (remaining === undefined ? {} : { rateLimit: { remaining } })
+const rateLimit = (verdict: Verdict) => (verdict.allowed && verdict.remaining !== undefined ? { rateLimit: { remaining: verdict.remaining } } : {})
 const ok = (result: object) => ({ content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result as Record<string, unknown> })
 const object = (properties: object, required: string[] = []) =>
   fromJsonSchema<Record<string, unknown>>({ type: 'object', properties, required, additionalProperties: false } as never)
@@ -70,16 +63,15 @@ const PALETTE_OUTPUT = {
       totalIssues: { type: 'integer' },
       contrast: {
         type: 'array',
-        description: 'One entry per contrast evaluator (or check_palette background): WCAG ratios by position, aligned to colors (or to neighbor pairs under checkAdjacent), and those below targetRatio.',
+        description: 'One entry per contrast evaluator (or check_palette background): each color\'s WCAG ratio against the background, aligned to colors, with neighbor pairs\' ratios under checkAdjacent, and the positions below targetRatio.',
         items: {
           type: 'object',
           properties: {
             background: { type: 'string' },
-            checkAdjacent: { type: 'boolean' },
             targetRatio: { type: 'number' },
-            minRatio: { type: 'number' },
             pass: { type: 'boolean' },
             ratios: { type: 'array', items: { type: 'number' } },
+            adjacentRatios: { type: 'array', items: { type: 'number' }, description: 'checkAdjacent only: ratios between colors 1–2, 2–3, …' },
             failing: { type: 'array', items: { type: 'object', properties: { positions: { type: 'array', items: { type: 'integer' } }, ratio: { type: 'number' } } } },
           },
         },
@@ -138,7 +130,8 @@ function server(allowGeneration: () => Promise<Verdict>) {
       if (!best || result.cost < best.cost) best = result
       runs += 1
     }
-    if (!best) throw refusal(verdict)
+    // No palette means the first ask was refused
+    if (!best) throw refusal(verdict as Refusal)
     return { runs, ...(await summarize({ id: 1, params, ...best, createdAt: Date.now() })), ...rateLimit(verdict) }
   }))
   mcp.registerTool('check_palette', {
@@ -200,10 +193,11 @@ function server(allowGeneration: () => Promise<Verdict>) {
 export async function onRequest({ request, env }: Context): Promise<Response> {
   if (env.MCP_ENABLED !== 'true') return new Response('Not found', { status: 404 })
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-  const verdict = await ask(env.LIMITS, 'request', ip)
+  const ask = async (action: 'request' | 'generate'): Promise<Verdict> => (env.LIMITS ? env.LIMITS.allow(action, ip) : { allowed: true })
+  const verdict = await ask('request')
   if (!verdict.allowed) {
-    return new Response(limitText(verdict, 'requests'), { status: 429, headers: { 'Retry-After': String(verdict.retryAfter ?? 60) } })
+    return new Response(limitText(verdict, 'requests'), { status: 429, headers: { 'Retry-After': String(verdict.retryAfter) } })
   }
-  const allowGeneration = () => ask(env.LIMITS, 'generate', ip)
+  const allowGeneration = () => ask('generate')
   return originValidationResponse(request, ALLOWED_ORIGINS) ?? createMcpHandler(() => server(allowGeneration)).fetch(request)
 }

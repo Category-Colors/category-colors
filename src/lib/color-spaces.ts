@@ -1,3 +1,6 @@
+import { getMode } from 'culori'
+import type { Gamut as PackageGamut } from 'category-colors'
+
 // The spaces the annealer can work in — one table describing each mode's
 // channels, their UI bounds, and the slice of the space a fresh run starts
 // from. The optimizer itself is mode-agnostic (it reads channels and gamut
@@ -37,15 +40,12 @@ export interface WorkingSpaceDef {
   label: string
   geometry: Geometry
   channels: SpaceChannel[]
-  /** set on a space with no gamut of its own, which can reach past sRGB;
-      the rest are sRGB by construction */
-  wideGamut?: true
 }
 
 // The gamuts a palette may be held to: category-colors' colorSpace.gamut,
 // limited to the two wide ones displays actually ship. sRGB is the default
 // and is never stored (see ColorSpaceParams).
-export type Gamut = 'srgb' | 'display-p3' | 'rec2020'
+export type Gamut = Extract<PackageGamut, 'srgb' | 'display-p3' | 'rec2020'>
 export const GAMUT_OPTIONS: { value: Gamut; label: string; short: string; description: string }[] = [
   { value: 'srgb', label: 'sRGB', short: 'sRGB', description: 'Every screen' },
   { value: 'display-p3', label: 'Display P3', short: 'P3', description: 'Recent phones, laptops and monitors' },
@@ -108,7 +108,6 @@ export const WORKING_SPACES: WorkingSpaceDef[] = [
       { key: 'c', label: 'Chroma', short: 'C', min: 0, max: 0.4, step: 0.01, initial: [0.02, 0.32] },
       HUE,
     ],
-    wideGamut: true,
   },
   {
     mode: 'oklab',
@@ -120,7 +119,6 @@ export const WORKING_SPACES: WorkingSpaceDef[] = [
       { key: 'a', label: 'Green–red', short: 'A', min: -0.4, max: 0.4, step: 0.01, initial: [-0.2, 0.2] },
       { key: 'b', label: 'Blue–yellow', short: 'B', min: -0.4, max: 0.4, step: 0.01, initial: [-0.2, 0.2] },
     ],
-    wideGamut: true,
   },
 ]
 
@@ -137,7 +135,10 @@ export const spaceDef = (mode: WorkingSpace): WorkingSpaceDef => BY_MODE.get(mod
 
 export const spaceChannels = (mode: WorkingSpace) => spaceDef(mode).channels
 
-export const reachesWideGamut = (mode: WorkingSpace) => spaceDef(mode).wideGamut === true
+// Whether a space can reach past sRGB, by category-colors' rule: culori
+// bounds okhsl, hsl and rgb to sRGB, and gives oklch and oklab no gamut
+// (culori's types leave the field out)
+export const reachesWideGamut = (mode: WorkingSpace) => !(getMode(mode) as { gamut?: unknown } | undefined)?.gamut
 
 export const spaceInitialRanges = (mode: WorkingSpace): [number, number][] =>
   spaceChannels(mode).map((c) => [...c.initial] as [number, number])

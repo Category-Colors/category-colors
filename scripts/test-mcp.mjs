@@ -104,7 +104,11 @@ export async function testMcp(server) {
   assert.equal(contrast.ratios[0], 21)
   assert.equal(contrast.pass, false)
   assert.deepEqual(contrast.failing.map((f) => f.positions), [[2], [3]])
-  assert.equal(contrast.minRatio, contrast.ratios[1])
+  // under checkAdjacent the background still counts, as it does in the evaluator
+  out = await tool('generate_palette', { config: { behavior: 'evaluate', initColors: ['#000000', '#111111'].map((hex) => ({ value: { space: 'hex', hex } })), evaluators: [{ type: 'contrast', weight: 1, background: '#ffffff', ratio: 3, checkAdjacent: true }] } })
+  const adjacent = out.structuredContent.report.contrast[0]
+  assert.deepEqual([adjacent.ratios.length, adjacent.adjacentRatios.length], [2, 1])
+  assert.deepEqual(adjacent.failing.map((f) => f.positions), [[1, 2]])
   assert.equal((await tool('check_palette', { colors: ['red', 'blue'] })).structuredContent.report.contrast, undefined)
   assert.equal((await tool('check_palette', { colors: ['red', 'blue'], ratio: 3 })).isError, true)
   assert.equal((await tool('check_palette', { colors: ['red', 'blue'], background: 'nope' })).isError, true)
@@ -155,8 +159,13 @@ export async function testMcp(server) {
   // Rate limits, with a stand-in for workers/limits that allows `quota` calls
   // per action and client IP
   const seen = []
-  const verdict = (allowed, remaining = 0) => (allowed ? { allowed, remaining, retryAfter: 0 } : { allowed, remaining: 0, retryAfter: 42, limit: 20, scope: 'client' })
-  const limited = (quota) => ({ ...env, LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), verdict(seen.filter((s) => s === `${action} ${key}`).length <= quota)) } })
+  const verdict = (allowed, remaining = 0) => (allowed ? { allowed, remaining } : { allowed, retryAfter: 42, limit: 20, scope: 'client' })
+  // a stand-in allowing `quota` of `action` per IP (every action, if none named)
+  const limited = (quota, only, remaining) => ({
+    ...env,
+    LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), verdict((only && action !== only) || seen.filter((s) => s === `${action} ${key}`).length <= quota, remaining)) },
+  })
+  const read = async (request, environment) => JSON.parse((await (await call(request, environment)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
   const from = (ip, request) => (request.headers.set('CF-Connecting-IP', ip), request)
   const generate = (args) => modern('tools/call', { name: 'generate_palette', arguments: args })
   // Past the request limit an IP gets 429
@@ -170,34 +179,25 @@ export async function testMcp(server) {
   // Past the generation limit, generate_palette says so in a result the agent
   // can read; bad arguments don't use up the quota, and other tools still work
   seen.length = 0
-  const once = limited(100)
-  once.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), verdict(action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 1, 7))
-  const read = async (request) => JSON.parse((await (await call(request, once)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
-  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 99 })))).isError, true)
+  const once = limited(1, 'generate', 7)
+  assert.equal((await read(from('3.3.3.3', generate({ colorCount: 99 })), once)).isError, true)
   assert.equal(seen.filter((s) => s.startsWith('generate')).length, 0)
-  out = await read(from('3.3.3.3', generate({ colorCount: 2 })))
+  out = await read(from('3.3.3.3', generate({ colorCount: 2 })), once)
   assert.equal(out.structuredContent.colors.length, 2)
   assert.deepEqual(out.structuredContent.rateLimit, { remaining: 7 })
-  out = await read(from('3.3.3.3', generate({ colorCount: 2 })))
+  out = await read(from('3.3.3.3', generate({ colorCount: 2 })), once)
   assert.equal(out.isError, true)
   assert.match(out.content[0].text, /20 generations a minute per client\. Retry in 42 s/)
-  assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })))).isError, undefined)
+  assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })), once)).isError, undefined)
   assert.deepEqual(seen.filter((s) => s.startsWith('generate')), ['generate 3.3.3.3', 'generate 3.3.3.3'])
-  // the global cap names itself, and a limits Worker that still answers with
-  // booleans is read too
-  const busy = { ...env, LIMITS: { allow: async (action) => (action === 'generate' ? { allowed: false, remaining: 0, retryAfter: 9, limit: 60, scope: 'everyone' } : true) } }
-  out = JSON.parse((await (await call(from('5.5.5.5', generate({ colorCount: 2 })), busy)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  // the global cap names itself
+  const busy = { ...env, LIMITS: { allow: async (action) => (action === 'generate' ? { allowed: false, retryAfter: 9, limit: 60, scope: 'everyone' } : { allowed: true }) } }
+  out = await read(from('5.5.5.5', generate({ colorCount: 2 })), busy)
   assert.match(out.content[0].text, /60 generations a minute across all clients\. Retry in 9 s/)
-  const legacyLimits = { ...env, LIMITS: { allow: async () => false } }
-  const refused = await call(from('5.5.5.5', modern('tools/list')), legacyLimits)
-  assert.equal(refused.status, 429)
-  assert.equal(refused.headers.get('Retry-After'), '60')
   // runs: n spends one generation per run and keeps the cheapest; past the
   // limit it returns what it has
   seen.length = 0
-  const twice = limited(100)
-  twice.LIMITS.allow = async (action, key) => (seen.push(`${action} ${key}`), verdict(action !== 'generate' || seen.filter((s) => s === `generate ${key}`).length <= 2))
-  out = JSON.parse((await (await call(from('4.4.4.4', generate({ colorCount: 2, runs: 3, config: { maxIterations: 1000 } })), twice)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  out = await read(from('4.4.4.4', generate({ colorCount: 2, runs: 3, config: { maxIterations: 1000 } })), limited(2, 'generate'))
   assert.equal(out.isError, undefined)
   assert.equal(out.structuredContent.runs, 2)
   assert.equal(seen.filter((s) => s === 'generate 4.4.4.4').length, 3)
