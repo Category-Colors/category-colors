@@ -150,11 +150,13 @@ export function webMcpTools(api: () => WebMcpApi): ModelContextTool[] {
       },
       annotations: { readOnlyHint: true },
       async execute(input) {
-        const params = withContrast(generateParams({ jnd: input.jnd }, api().getState().params), input)
+        // The current palette is checked under its own settings unless given a jnd
+        const panel = () => generateParams({ jnd: input.jnd }, api().getState().params)
         if (input.colors === undefined) {
           const version = current()
-          return describe({ ...version, params: input.jnd === undefined ? withContrast(version.params, input) : params })
+          return describe({ ...version, params: withContrast(input.jnd === undefined ? version.params : panel(), input) })
         }
+        const params = withContrast(panel(), input)
         const colors = readColors(input.colors, 2)
         return { colors: colors.map((css) => swatch(css, params.colorSpace.gamut)), report: report(scratch(colors, params)), config: params }
       },

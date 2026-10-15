@@ -2,10 +2,16 @@
 // without pulling in the optimizer or its saliency table (see MainTabs).
 import { reportJndIssues, type CvdSimulation, type JndReport, type JndTest } from 'category-colors/report'
 import { hexValue, parseCssColor, valueToCss } from './color'
-import { cvdSeverityFor, fittedTo, newInitColor } from './palette'
+import { cvdSeverityFor, fittedTo, newInitColor, ordersColors } from './palette'
 import type { PaletteParams, PaletteVersion } from './palette'
 
 export type { JndReport }
+
+// The caveat when colors leave sRGB, which the CVD simulations and WCAG
+// contrast are defined in: the report tab shows it, and agents get it as
+// report.note
+export const OUTSIDE_SRGB_NOTE =
+  'Some colors are outside sRGB. Color vision simulations and contrast ratios are defined for sRGB, so their numbers for those colors are estimates.'
 
 // 'normal' → 'No CVD'; CVD labels use the type name alone, adding the
 // severity only when two simulations of the same type would collide.
@@ -92,10 +98,17 @@ export function refineParams(version: Pick<PaletteVersion, 'params' | 'colors'>,
   return {
     ...fittedTo(structuredClone(version.params), version.colors),
     behavior: 'fix',
-    initColors: version.colors.map((css, i) => ({
-      ...newInitColor(parseCssColor(css) ?? hexValue('#888888')),
-      fixedColor: !free.has(i),
-      fixedOrder: true,
-    })),
+    initColors: version.colors.map((css, i) => {
+      // A seed's channel locks carry over when it's still the color in its
+      // slot: nothing reordered the result, or its position was pinned
+      const seed = version.params.initColors[i]
+      const kept = seed && (seed.fixedOrder || !ordersColors(version.params))
+      return {
+        ...newInitColor(parseCssColor(css) ?? hexValue('#888888')),
+        fixedColor: !free.has(i),
+        fixedOrder: true,
+        lockedChannels: kept ? [...seed.lockedChannels] : [],
+      }
+    }),
   }
 }

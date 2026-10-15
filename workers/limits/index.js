@@ -1,10 +1,11 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 
 // Called by the site's /mcp function: env.LIMITS.allow('request' | 'generate', ip)
-// resolves to { allowed, remaining, retryAfter }. Each action is a list of
-// [counter, limit per minute, key]; a call is allowed only while every counter
-// is under its limit. remaining is the fewest calls left on any counter this
-// minute, and retryAfter the seconds until the one that refused resets.
+// resolves to { allowed, remaining, retryAfter, limit, scope }. Each action is
+// a list of [counter, limit per minute, key]; a call is allowed only while
+// every counter is under its limit. remaining is the fewest calls left on any
+// counter this minute; on a refusal, retryAfter is the seconds until the
+// refusing counter resets, and limit and scope ('client' or 'everyone') name it.
 const POLICY = {
   // Every /mcp request, per client IP
   request: (ip) => [['request', 60, ip]],
@@ -23,7 +24,7 @@ export default class Limits extends WorkerEntrypoint {
     for (const [name, limit, key] of counters) {
       const counter = this.env.COUNTERS.get(this.env.COUNTERS.idFromName(`${name}:${key}`))
       const hit = await counter.hit(limit)
-      if (!hit.allowed) return { allowed: false, remaining: 0, retryAfter: hit.retryAfter }
+      if (!hit.allowed) return { allowed: false, remaining: 0, retryAfter: hit.retryAfter, limit, scope: key === 'all' ? 'everyone' : 'client' }
       remaining = Math.min(remaining, hit.remaining)
     }
     return { allowed: true, remaining, retryAfter: 0 }

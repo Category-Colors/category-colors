@@ -7,6 +7,7 @@ import {
   DEFAULT_PARAMS,
   defaultColorSpace,
   withGamut,
+  inSpace,
   newEvaluatorSpec,
   newInitColor,
   parseParams,
@@ -173,13 +174,13 @@ export function ParametersPanel({
             label="Space"
             value={params.colorSpace.mode}
             options={SPACE_OPTIONS}
-            onChange={(mode) => set('colorSpace', withGamut(defaultColorSpace(mode as WorkingSpace), reachesWideGamut(mode as WorkingSpace) ? (params.colorSpace.gamut ?? 'srgb') : 'srgb'))}
+            onChange={(mode) => onParamsChange(inSpace(params, withGamut(defaultColorSpace(mode as WorkingSpace), reachesWideGamut(mode as WorkingSpace) ? (params.colorSpace.gamut ?? 'srgb') : 'srgb')))}
           />
           <SelectControl
             label="Gamut"
             value={params.colorSpace.gamut ?? 'srgb'}
             options={GAMUT_OPTIONS}
-            onChange={(gamut) => set('colorSpace', withGamut(params.colorSpace, gamut as Gamut))}
+            onChange={(gamut) => onParamsChange(inSpace(params, withGamut(params.colorSpace, gamut as Gamut)))}
           />
           {spaceChannels(params.colorSpace.mode).map((channel, i) => (
             <RangeSlider

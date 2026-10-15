@@ -1,5 +1,5 @@
 import { outsideSrgb } from '@/lib/color'
-import { testTitles } from '@/lib/report'
+import { OUTSIDE_SRGB_NOTE, testTitles } from '@/lib/report'
 import type { JndReport } from '@/lib/report'
 import type { PaletteVersion } from '@/lib/palette'
 import { ColorSpaceMap } from './ColorSpaceMap'
@@ -64,9 +64,7 @@ export function ReportView({
           <PairGrid report={report} version={version} />
         </div>
         {version.colors.some(outsideSrgb) && (
-          <p className="text-[11px] text-ink/50">
-            Some colors are outside sRGB. Color vision simulations and contrast ratios are defined for sRGB, so their numbers for those colors are estimates.
-          </p>
+          <p className="text-[11px] text-ink/50">{OUTSIDE_SRGB_NOTE}</p>
         )}
       </section>
 

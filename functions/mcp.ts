@@ -17,8 +17,15 @@ import { CONTRAST_INPUT, FIX_DESCRIPTION, FIX_INPUT, GENERATE_INPUT, PRESET_NAME
 // the endpoint down, set MCP_ENABLED to anything but "true" in wrangler.jsonc
 // and deploy.
 
-interface Verdict { allowed: boolean; remaining?: number; retryAfter?: number }
-interface Limits { allow(action: 'request' | 'generate', key: string): Promise<Verdict> }
+interface Verdict { allowed: boolean; remaining?: number; retryAfter?: number; limit?: number; scope?: 'client' | 'everyone' }
+// A limits Worker from before 2026-10-15 answers with a bare boolean; read
+// both, so the site and the Worker can deploy in either order
+interface Limits { allow(action: 'request' | 'generate', key: string): Promise<Verdict | boolean> }
+const ask = async (limits: Limits | undefined, action: 'request' | 'generate', key: string): Promise<Verdict> => {
+  if (!limits) return { allowed: true }
+  const answer = await limits.allow(action, key)
+  return typeof answer === 'boolean' ? { allowed: answer } : answer
+}
 interface Env { MCP_ENABLED?: string; LIMITS?: Limits }
 interface Context { request: Request; env: Env }
 
@@ -26,10 +33,15 @@ interface Context { request: Request; env: Env }
 const ALLOWED_ORIGINS = ['categorycolors.com', 'localhost', '127.0.0.1']
 // Five of the heaviest generations fit the 30 s CPU cap in wrangler.jsonc
 const MAX_RUNS = 5
-// workers/limits' POLICY, for the tool descriptions. Keep the two in step.
-const GENERATION_LIMIT = 'Rate limited to 20 generations a minute per client (each run and each fix counts, checks and exports don\'t); results report `rateLimit.remaining`, and a refusal says how many seconds until the next minute starts.'
-const refusal = (verdict: Verdict) =>
-  new Error(`Rate limited: 20 generations a minute per client. Retry in ${verdict.retryAfter ?? 60} s (retryAfter: ${verdict.retryAfter ?? 60}).`)
+// workers/limits' POLICY, for the tool descriptions, which an agent reads
+// before it has a verdict to go by. Refusals take their numbers from the Worker.
+const GENERATION_LIMIT = 'Rate limited to 20 generations a minute per client, and 60 a minute across everyone (each run and each fix counts, checks and exports don\'t); results report `rateLimit.remaining`, and a refusal says which limit and how many seconds until it resets.'
+// What refused and when to come back, from the Worker's verdict
+const limitText = ({ limit, scope, retryAfter }: Verdict, what: string) => {
+  const which = limit ? `${limit} ${what} a minute ${scope === 'everyone' ? 'across all clients' : 'per client'}` : `too many ${what} this minute`
+  return `Rate limited: ${which}. Retry in ${retryAfter ?? 60} s (retryAfter: ${retryAfter ?? 60}).`
+}
+const refusal = (verdict: Verdict) => new Error(limitText(verdict, 'generations'))
 
 // A verdict's quota for the result; none when no limit is bound
 const rateLimit = ({ remaining }: Verdict) => (remaining === undefined ? {} : { rateLimit: { remaining } })
@@ -188,11 +200,10 @@ function server(allowGeneration: () => Promise<Verdict>) {
 export async function onRequest({ request, env }: Context): Promise<Response> {
   if (env.MCP_ENABLED !== 'true') return new Response('Not found', { status: 404 })
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-  const verdict = env.LIMITS && (await env.LIMITS.allow('request', ip))
-  if (verdict && !verdict.allowed) {
-    const after = String(verdict.retryAfter ?? 60)
-    return new Response(`Too many requests: 60 a minute per client. Retry in ${after} s.`, { status: 429, headers: { 'Retry-After': after } })
+  const verdict = await ask(env.LIMITS, 'request', ip)
+  if (!verdict.allowed) {
+    return new Response(limitText(verdict, 'requests'), { status: 429, headers: { 'Retry-After': String(verdict.retryAfter ?? 60) } })
   }
-  const allowGeneration = async (): Promise<Verdict> => (env.LIMITS ? env.LIMITS.allow('generate', ip) : { allowed: true })
+  const allowGeneration = () => ask(env.LIMITS, 'generate', ip)
   return originValidationResponse(request, ALLOWED_ORIGINS) ?? createMcpHandler(() => server(allowGeneration)).fetch(request)
 }

@@ -1,12 +1,11 @@
 import { wcagContrast } from 'culori'
 import { formatColor } from 'category-colors'
 import { convertValue, outsideSrgb, parseCssColor, valueToCss } from './color'
-import { GAMUT_OPTIONS } from './color-spaces'
-import { WORKING_SPACES, spaceChannels } from './color-spaces'
+import { GAMUT_OPTIONS, WORKING_SPACES, isGamut, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
 import { BEHAVIOR_NAMES, MAX_WINDOWS, PARAM_PRESETS, newEvaluatorSpec, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
-import { buildJndReport, refineParams, testTitles } from './report'
+import { OUTSIDE_SRGB_NOTE, buildJndReport, refineParams, testTitles } from './report'
 import { linkFor } from './share'
 
 // What the browser's WebMCP tools (webmcp.ts) and the remote MCP server
@@ -38,19 +37,16 @@ export function readColors(value: unknown, minItems: number): string[] {
   return value.map((c: string) => c.trim())
 }
 
-// Under a wide gamut, a color outside sRGB also comes as color(display-p3 …)
-// or color(rec2020 …), and is flagged: its hex is the nearest sRGB color.
+// A color outside sRGB is flagged, whatever the settings (check_palette takes
+// any CSS color), and also comes as color(display-p3 …) or color(rec2020 …):
+// the palette's gamut, or Rec. 2020, which holds the other. Its hex is the
+// nearest sRGB color.
 export function swatch(css: string, gamut?: PaletteParams['colorSpace']['gamut']) {
   const value = parseCssColor(css)
   if (!value) return { css }
-  const wide = gamut && outsideSrgb(css) ? { outsideSrgb: true, gamutCss: formatColor(css, gamut) } : {}
+  const wide = outsideSrgb(css) ? { outsideSrgb: true, gamutCss: formatColor(css, gamut ?? 'rec2020') } : {}
   return { css, hex: valueToCss(convertValue(value, 'hex')), oklch: valueToCss(convertValue(value, 'oklch')), ...wide }
 }
-
-// The report's caveat when colors leave sRGB, which the CVD simulations and
-// WCAG contrast are defined in. Shared with the report tab.
-export const OUTSIDE_SRGB_NOTE =
-  'Colors outside sRGB: the CVD simulations and WCAG contrast are defined for sRGB, so their numbers for those colors are extrapolations.'
 
 const round = (n: number) => Math.round(n * 10) / 10
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -64,16 +60,18 @@ function contrastReport(version: PaletteVersion) {
   const specs = version.params.evaluators.filter((e) => e.type === 'contrast' && e.weight > 0)
   const { colors } = version
   return specs.map((spec) => {
+    // Compared unrounded: WCAG doesn't let 2.996 round up to pass 3
     const pairs = spec.checkAdjacent
-      ? colors.slice(1).map((css, i) => ({ positions: [i + 1, i + 2], ratio: round2(wcagContrast(colors[i], css)) }))
-      : colors.map((css, i) => ({ positions: [i + 1], ratio: round2(wcagContrast(css, spec.background)) }))
+      ? colors.slice(1).map((css, i) => ({ positions: [i + 1, i + 2], ratio: wcagContrast(colors[i], css) }))
+      : colors.map((css, i) => ({ positions: [i + 1], ratio: wcagContrast(css, spec.background) }))
+    const shown = (list: typeof pairs) => list.map((p) => ({ ...p, ratio: round2(p.ratio) }))
     return {
       ...(spec.checkAdjacent ? { checkAdjacent: true } : { background: spec.background }),
       targetRatio: spec.ratio,
-      minRatio: Math.min(...pairs.map((p) => p.ratio)),
+      minRatio: round2(Math.min(...pairs.map((p) => p.ratio))),
       pass: pairs.every((p) => p.ratio >= spec.ratio),
-      ratios: pairs.map((p) => p.ratio),
-      failing: pairs.filter((p) => p.ratio < spec.ratio),
+      ratios: pairs.map((p) => round2(p.ratio)),
+      failing: shown(pairs.filter((p) => p.ratio < spec.ratio)),
     }
   })
 }
@@ -353,7 +351,7 @@ export function generateParams(input: Record<string, unknown>, base: PalettePara
   const gamut: unknown = draft.colorSpace?.gamut
   if (gamut !== undefined && gamut !== 'srgb' && params.colorSpace.gamut !== gamut) {
     throw new Error(
-      GAMUT_OPTIONS.some((g) => g.value === gamut)
+      isGamut(gamut)
         ? `colorSpace.gamut ${gamut} needs colorSpace.mode oklch or oklab; ${params.colorSpace.mode} only covers sRGB.`
         : `colorSpace.gamut must be one of ${GAMUT_OPTIONS.map((g) => g.value).join(', ')}.`
     )

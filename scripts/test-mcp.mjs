@@ -155,7 +155,7 @@ export async function testMcp(server) {
   // Rate limits, with a stand-in for workers/limits that allows `quota` calls
   // per action and client IP
   const seen = []
-  const verdict = (allowed, remaining = 0) => ({ allowed, remaining, retryAfter: allowed ? 0 : 42 })
+  const verdict = (allowed, remaining = 0) => (allowed ? { allowed, remaining, retryAfter: 0 } : { allowed, remaining: 0, retryAfter: 42, limit: 20, scope: 'client' })
   const limited = (quota) => ({ ...env, LIMITS: { allow: async (action, key) => (seen.push(`${action} ${key}`), verdict(seen.filter((s) => s === `${action} ${key}`).length <= quota)) } })
   const from = (ip, request) => (request.headers.set('CF-Connecting-IP', ip), request)
   const generate = (args) => modern('tools/call', { name: 'generate_palette', arguments: args })
@@ -180,9 +180,18 @@ export async function testMcp(server) {
   assert.deepEqual(out.structuredContent.rateLimit, { remaining: 7 })
   out = await read(from('3.3.3.3', generate({ colorCount: 2 })))
   assert.equal(out.isError, true)
-  assert.match(out.content[0].text, /20 generations a minute .*Retry in 42 s/)
+  assert.match(out.content[0].text, /20 generations a minute per client\. Retry in 42 s/)
   assert.equal((await read(from('3.3.3.3', modern('tools/call', { name: 'export_palette', arguments: { colors: ['red'], format: 'raw' } })))).isError, undefined)
   assert.deepEqual(seen.filter((s) => s.startsWith('generate')), ['generate 3.3.3.3', 'generate 3.3.3.3'])
+  // the global cap names itself, and a limits Worker that still answers with
+  // booleans is read too
+  const busy = { ...env, LIMITS: { allow: async (action) => (action === 'generate' ? { allowed: false, remaining: 0, retryAfter: 9, limit: 60, scope: 'everyone' } : true) } }
+  out = JSON.parse((await (await call(from('5.5.5.5', generate({ colorCount: 2 })), busy)).text()).replace(/^event:[\s\S]*?^data: /m, '')).result
+  assert.match(out.content[0].text, /60 generations a minute across all clients\. Retry in 9 s/)
+  const legacyLimits = { ...env, LIMITS: { allow: async () => false } }
+  const refused = await call(from('5.5.5.5', modern('tools/list')), legacyLimits)
+  assert.equal(refused.status, 429)
+  assert.equal(refused.headers.get('Retry-After'), '60')
   // runs: n spends one generation per run and keeps the cheapest; past the
   // limit it returns what it has
   seen.length = 0

@@ -43,6 +43,16 @@ try {
   assert.equal(parsedSpace({ ...palette.defaultColorSpace('oklch'), gamut: 'display-p3' }).gamut, 'display-p3')
   assert.equal('gamut' in parsedSpace({ ...okhsl, gamut: 'display-p3' }), false)
   assert.equal('gamut' in parsedSpace({ ...palette.defaultColorSpace('oklch'), gamut: 'srgb' }), false)
+  // Locks survive a change of space only on the same channel: hue and
+  // lightness carry from okhsl to oklch; rgb's Blue isn't oklab's Blue–yellow
+  const locked = (mode, lockedChannels) => ({ ...palette.DEFAULT_PARAMS, colorSpace: palette.defaultColorSpace(mode), initColors: [{ ...palette.newInitColor(), lockedChannels }] })
+  assert.deepEqual(palette.inSpace(locked('okhsl', ['h', 's', 'l']), palette.defaultColorSpace('oklch')).initColors[0].lockedChannels, ['h', 'l'])
+  assert.deepEqual(palette.inSpace(locked('rgb', ['b']), palette.defaultColorSpace('oklab')).initColors[0].lockedChannels, [])
+  // and through Refine, while the seed is still the color in its slot
+  const report = await server.ssrLoadModule('/src/lib/report.ts')
+  const seeded = { ...locked('okhsl', ['h']), orderOptimization: false }
+  assert.deepEqual(report.refineParams({ params: seeded, colors: ['#ff0000', '#00ff00'] }).initColors.map((c) => c.lockedChannels), [['h'], []])
+  assert.deepEqual(report.refineParams({ params: { ...seeded, orderOptimization: true }, colors: ['#ff0000', '#00ff00'] }).initColors[0].lockedChannels, [])
   assert.equal(color.outsideSrgb('oklch(0.7 0.3 150)'), true)
   assert.equal(color.outsideSrgb('#00FF00'), false)
 

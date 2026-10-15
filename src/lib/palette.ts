@@ -100,6 +100,19 @@ export interface ColorSpaceParams {
   gamut?: Exclude<Gamut, 'srgb'>
 }
 
+// Settings moved to another space. Seed locks go by channel name, and a name
+// can mean another channel there ('b' is Blue in rgb and Blue–yellow in
+// oklab), so only a lock on a channel of the same name and label survives.
+export function inSpace(params: PaletteParams, colorSpace: ColorSpaceParams): PaletteParams {
+  const label = (mode: WorkingSpace, key: string) => spaceChannels(mode).find((c) => c.key === key)?.label
+  const same = (key: string) => label(params.colorSpace.mode, key) === label(colorSpace.mode, key) && label(colorSpace.mode, key) !== undefined
+  return {
+    ...params,
+    colorSpace,
+    initColors: params.initColors.map((c) => ({ ...c, lockedChannels: c.lockedChannels.filter(same) })),
+  }
+}
+
 // A space with this gamut: sRGB drops the field, and a wide gamut on a space
 // confined to sRGB moves it to OKLCH, the space it was asked of
 export function withGamut(space: ColorSpaceParams, gamut: Gamut): ColorSpaceParams {
