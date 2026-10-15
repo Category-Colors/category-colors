@@ -12,7 +12,7 @@ import { valueToCss } from '@/lib/color'
 import { spaceChannels } from '@/lib/color-spaces'
 import { decimalsForStep } from '@/components/dialkit/shortcut-utils'
 import { evaluatorLabel } from '@/lib/evaluators'
-import type { PaletteVersion } from '@/lib/palette'
+import { BEHAVIORS, type PaletteVersion } from '@/lib/palette'
 
 export interface HistoryPopoverHandle {
   show(version: PaletteVersion, el: Element): void
@@ -92,7 +92,7 @@ function VersionDetail({ version }: { version: PaletteVersion }) {
               ))}
               <Row label="JND threshold" value={params.jnd} />
               <Row label="Order optimization" value={params.orderOptimization ? 'on' : 'off'} />
-              <Row label="Behavior" value={params.behavior === 'fix' ? `fix issues, strength ${params.fixStrength.toFixed(2)}` : params.behavior} />
+              <Row label="Behavior" value={`${BEHAVIORS[params.behavior].label}${BEHAVIORS[params.behavior].repairs ? `, strength ${params.fixStrength.toFixed(2)}` : ''}`} />
               <ChipsRow label="Seeds" hexes={params.initColors.map((c) => valueToCss(c.value))} />
               <ChipsRow label="Targets" hexes={params.targets.map((t) => valueToCss(t.value))} />
             </Group>

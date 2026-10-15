@@ -2,15 +2,15 @@ import { useRef, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Slider, Toggle, Folder, SelectControl } from '@/components/dialkit'
 import {
-  BEHAVIOR_ACTIONS,
+  BEHAVIOR_NAMES,
+  BEHAVIORS,
   fittedTo,
   DEFAULT_PARAMS,
   defaultColorSpace,
   newEvaluatorSpec,
   newInitColor,
   parseParams,
-  isPaused,
-  SPREADING_TYPES,
+  ordersColors,
   type Behavior,
   type CvdType,
   type EvaluatorType,
@@ -21,7 +21,7 @@ import { hexValue } from '@/lib/color'
 import { SPACE_OPTIONS, spaceChannels, spaceDef } from '@/lib/color-spaces'
 import { downloadText } from '@/lib/exporters'
 import { AddColorBar } from './AddColorBar'
-import { PRESET_PALETTES } from '@/lib/presets'
+import { PresetOptions } from './PresetOptions'
 import { AddEvaluatorMenu } from './AddEvaluatorMenu'
 import { ColorRow } from './ColorRow'
 import { EvaluatorEditor } from './EvaluatorEditor'
@@ -39,11 +39,7 @@ const SECTIONS = ['space', 'init', 'evals'] as const
 
 const MAX_CONFIG_BYTES = 1_000_000
 
-const BEHAVIOR_OPTIONS = [
-  { value: 'optimize', label: 'Generate & optimize', description: 'Builds a new palette from scratch' },
-  { value: 'fix', label: 'Fix issues', description: 'Repairs failing pairs with small changes' },
-  { value: 'evaluate', label: 'Evaluate', description: 'Evaluates the initialized colors' },
-]
+const BEHAVIOR_OPTIONS = BEHAVIOR_NAMES.map((value) => ({ value, label: BEHAVIORS[value].label, description: BEHAVIORS[value].description }))
 
 const replaceAt = <T,>(list: T[], index: number, item: T) =>
   list.map((entry, i) => (i === index ? item : entry))
@@ -75,8 +71,7 @@ export function ParametersPanel({
   const sections = useSections(SECTIONS)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const fixing = params.behavior === 'fix'
-  const evaluating = params.behavior === 'evaluate'
+  const rules = BEHAVIORS[params.behavior]
 
   const set = <K extends keyof PaletteParams>(key: K, value: PaletteParams[K]) =>
     onParamsChange({ ...params, [key]: value })
@@ -129,10 +124,7 @@ export function ParametersPanel({
           <>
             <PanelMenu
               items={[
-                {
-                  label: 'Load a preset',
-                  items: PRESET_PALETTES.map((p) => ({ label: p.name, swatches: p.colors, onClick: () => loadPreset(p.colors) })),
-                },
+                { label: 'Load a preset', flyout: <PresetOptions onPick={loadPreset} /> },
                 { label: 'Reset all', onClick: () => onParamsChange(DEFAULT_PARAMS) },
                 {
                   label: 'Export configuration',
@@ -194,6 +186,7 @@ export function ParametersPanel({
               min={channel.min}
               max={channel.max}
               step={channel.step}
+              wraps={channel.period !== undefined}
             />
           ))}
         </Folder>
@@ -272,8 +265,7 @@ export function ParametersPanel({
                 <ListRow key={spec.id}>
                   <EvaluatorEditor
                     spec={spec}
-                    mutable={fixing && SPREADING_TYPES.includes(spec.type)}
-                    paused={isPaused(spec, params.behavior)}
+                    behavior={params.behavior}
                     onChange={(next) => set('evaluators', replaceAt(params.evaluators, i, next))}
                     onRemove={() => set('evaluators', removeAt(params.evaluators, i))}
                     targets={params.targets}
@@ -299,7 +291,7 @@ export function ParametersPanel({
             options={BEHAVIOR_OPTIONS}
             onChange={(v) => set('behavior', v as Behavior)}
           />
-          {fixing && (
+          {rules.repairs && (
             <Slider
               label="Strength"
               value={params.fixStrength}
@@ -317,8 +309,8 @@ export function ParametersPanel({
             max={40}
             step={1}
           />
-          {/* Evaluate runs nothing, so it has no run length or order pass */}
-          {!evaluating && (
+          {/* a behavior that runs nothing has no run length or order pass */}
+          {rules.runs && (
             <>
               <Slider
                 label="Iterations"
@@ -332,9 +324,9 @@ export function ParametersPanel({
                   runs; the stored setting comes back with Generate & optimize */}
               <Toggle
                 label="Optimize order"
-                checked={params.orderOptimization && !fixing}
+                checked={ordersColors(params)}
                 onChange={(v) => set('orderOptimization', v)}
-                disabled={fixing}
+                disabled={rules.repairs}
               />
             </>
           )}
@@ -354,7 +346,7 @@ export function ParametersPanel({
             onClick={() => onGenerate()}
           >
             {busy && <span className="button-spinner" />}
-            {busy ? busyLabel : BEHAVIOR_ACTIONS[params.behavior]}
+            {busy ? busyLabel : rules.action}
           </button>
           {busy && (
             <button

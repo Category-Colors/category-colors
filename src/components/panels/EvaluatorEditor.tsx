@@ -3,7 +3,7 @@ import { AnimatePresence } from 'motion/react'
 import { Slider, Toggle, ColorControl, SelectControl, Folder } from '@/components/dialkit'
 import { hexValue } from '@/lib/color'
 import { CVD_OPTIONS, TYPE_HINTS, evaluatorLabel } from '@/lib/evaluators'
-import { newTargetColor, type CvdType, type EvaluatorSpec, type TargetColor } from '@/lib/palette'
+import { isPausable, isPaused, newTargetColor, type Behavior, type CvdType, type EvaluatorSpec, type TargetColor } from '@/lib/palette'
 import { AddColorBar } from './AddColorBar'
 import { ColorRow } from './ColorRow'
 import { ListEmptyState, ListRow } from './ReorderList'
@@ -86,15 +86,14 @@ export function EvaluatorEditor({
   targets,
   onTargetsChange,
   defaultOpen = false,
-  mutable = false,
-  paused = false,
+  behavior = 'optimize',
 }: {
   spec: EvaluatorSpec
   onChange: (spec: EvaluatorSpec) => void
   onRemove: () => void
-  // Fix issues pauses the spreading terms; a mutable row can be switched back on
-  mutable?: boolean
-  paused?: boolean
+  // The panel's behavior: under one that repairs, the spreading terms pause,
+  // and their rows can be switched back on
+  behavior?: Behavior
   // Shared target list, edited inside similarity evaluators (the algorithm
   // has a single global similarityTarget)
   targets?: TargetColor[]
@@ -103,6 +102,8 @@ export function EvaluatorEditor({
 }) {
   const set = <K extends keyof EvaluatorSpec>(key: K, value: EvaluatorSpec[K]) =>
     onChange({ ...spec, [key]: value })
+  const pausable = isPausable(spec, behavior)
+  const paused = isPaused(spec, behavior)
 
   return (
     <div className="evaluator" data-paused={String(paused)}>
@@ -114,7 +115,7 @@ export function EvaluatorEditor({
       keepActionsWhenClosed
       actions={
         <>
-          {mutable && (
+          {pausable && (
             // highlighted while paused, like the lock and pin on seed rows
             <button
               className="color-row-icon"

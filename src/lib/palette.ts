@@ -56,8 +56,10 @@ export interface EvaluatorSpec {
 // The terms that only spread colors apart. A palette being fixed has nothing
 // to spread, and on a finished one they are what made colors wander.
 export const SPREADING_TYPES: EvaluatorType[] = ['energy', 'range']
-export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) =>
-  behavior === 'fix' && SPREADING_TYPES.includes(spec.type) && !spec.fixEnabled
+// Whether a row can be paused under this behavior, and whether it is
+export const isPausable = (spec: EvaluatorSpec, behavior: Behavior) =>
+  BEHAVIORS[behavior].repairs && SPREADING_TYPES.includes(spec.type)
+export const isPaused = (spec: EvaluatorSpec, behavior: Behavior) => isPausable(spec, behavior) && !spec.fixEnabled
 
 // Windows a channel may carry; the importer keeps this many and the slider
 // stops adding at it
@@ -113,14 +115,45 @@ export function tidyWindows(windows: ChannelWindow[], period?: number): ChannelW
   return wide.length ? wide : merged.slice(0, 1)
 }
 
-export type Behavior = 'optimize' | 'fix' | 'evaluate'
+// What a run is for. Everything that differs between behaviors reads one of
+// these rules, rather than checking a behavior by name:
+// - runs: false runs nothing, and the seeds become the palette as they are,
+//   so run length and the order pass don't apply
+// - repairs: the seeds are a palette to fix, not a starting point. Scored by
+//   failing pairs and distance from each seed (fix.ts), started partway down
+//   the schedule by Strength, never handed back with more issues, positions
+//   kept (no order pass), spreading terms paused, and its output seeds the
+//   next run
+export const BEHAVIORS = {
+  optimize: {
+    label: 'Generate & optimize',
+    description: 'Builds a new palette from scratch',
+    action: 'Generate',
+    runs: true,
+    repairs: false,
+  },
+  fix: {
+    label: 'Fix issues',
+    description: 'Repairs failing pairs with small changes',
+    action: 'Fix issues',
+    runs: true,
+    repairs: true,
+  },
+  evaluate: {
+    label: 'Evaluate',
+    description: 'Evaluates the initialized colors',
+    action: 'Evaluate',
+    runs: false,
+    repairs: false,
+  },
+} as const
+export type Behavior = keyof typeof BEHAVIORS
+export const BEHAVIOR_NAMES = Object.keys(BEHAVIORS) as Behavior[]
 
-// What the run button says under each behavior
-export const BEHAVIOR_ACTIONS: Record<Behavior, string> = {
-  optimize: 'Generate',
-  fix: 'Fix issues',
-  evaluate: 'Evaluate',
-}
+// Whether the order pass runs: asked for, and the behavior both runs and lets
+// positions change
+export const ordersColors = (params: PaletteParams) =>
+  params.orderOptimization && BEHAVIORS[params.behavior].runs && !BEHAVIORS[params.behavior].repairs
 
 // The same windows, each stretched just far enough to take in every one of
 // these colors. The package snaps a seed outside every window to the nearest
@@ -166,9 +199,7 @@ export interface PaletteParams {
   jnd: number
   maxIterations: number
   orderOptimization: boolean
-  // 'optimize' makes the best palette the evaluators describe. 'fix' repairs
-  // the seeds instead: JND and CVD rows score only failing pairs, the spreading
-  // terms pause, and colors are held near their seeds (see fix.ts).
+  // see BEHAVIORS
   behavior: Behavior
   // Fix issues only: 1 clears the most failing pairs, 0 keeps colors closest
   // to their seeds (see scheduleFor in fix.ts)
@@ -393,7 +424,7 @@ export function parseParams(text: string): PaletteParams | null {
         boundedNumber(raw.maxIterations, d.maxIterations, 1_000, 100_000)
       ),
       orderOptimization: raw.orderOptimization !== false,
-      behavior: raw.behavior === 'fix' || raw.behavior === 'evaluate' ? raw.behavior : 'optimize',
+      behavior: BEHAVIOR_NAMES.find((name) => name === raw.behavior) ?? 'optimize',
       fixStrength: boundedNumber(raw.fixStrength, d.fixStrength, 0, 1),
       initColors: raw.initColors
         .slice(0, IMPORT_LIMITS.initColors)

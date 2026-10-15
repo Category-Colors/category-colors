@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MotionConfig, motion, useMotionValue, useTransform } from 'motion/react'
 import type { MotionStyle } from 'motion/react'
 import {
-  BEHAVIOR_ACTIONS,
+  BEHAVIORS,
   paletteParams,
   type PaletteParams,
   type PaletteVersion,
@@ -126,7 +126,7 @@ export default function App() {
         // A fix's output seeds the next fix, so pressing again picks up what's
         // left. Only while the panel is still on Fix issues; its other
         // settings, changed during the run or not, are kept.
-        if (snapshot.behavior === 'fix' && paramsRef.current.behavior === 'fix') {
+        if (BEHAVIORS[snapshot.behavior].repairs && BEHAVIORS[paramsRef.current.behavior].repairs) {
           setParams(refineParams({ ...version, params: paramsRef.current }))
         }
         return version
@@ -329,7 +329,7 @@ export default function App() {
           onOpen={setSheet}
           onGenerate={generate}
           onCancel={cancelPaletteGeneration}
-          action={BEHAVIOR_ACTIONS[params.behavior]}
+          action={BEHAVIORS[params.behavior].action}
         />
       )}
       <TooltipLayer />

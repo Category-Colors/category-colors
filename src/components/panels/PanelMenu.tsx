@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { popoverMotion } from '@/components/dialkit'
@@ -6,20 +6,19 @@ import { useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 import { getDialKitPortalRoot } from '@/components/dialkit/dropdown-position'
 import { EllipsisIcon } from './icons'
 
-// .preset-menu's width
+// .panel-menu-flyout's width
 const FLYOUT_WIDTH = 216
 
 interface Action {
   label: string
   onClick: () => void
-  // drawn as a strip under the label, as in the presets menu
-  swatches?: string[]
 }
 
-// An item with `items` opens a child menu that flies out beside it on hover
-// (or on click, for touch). The flyout is portaled to the panel's dock, which
-// sits outside the panel's clipping, so it can hang past the panel's edge.
-export type MenuItem = Action | { label: string; items: Action[] }
+// An item with `flyout` opens a child menu of those rows beside it on hover
+// (or on click, for touch); a click on any of them closes the whole menu. The
+// flyout is portaled to the panel's dock, which sits outside the panel's
+// clipping, so it can hang past the panel's edge.
+export type MenuItem = Action | { label: string; flyout: ReactNode }
 
 // "…" overflow menu with DialKit dropdown chrome, anchored to its trigger.
 export function PanelMenu({ items }: { items: MenuItem[] }) {
@@ -27,7 +26,7 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
   // the open child menu, and where it goes in its portal root
   const [child, setChild] = useState<{
     label: string
-    items: Action[]
+    flyout: ReactNode
     root: HTMLElement
     pos: { top: number; left: number; maxHeight: number }
   } | null>(null)
@@ -44,7 +43,7 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
   const action = (item: Action, onMouseEnter?: () => void) => (
     <button
       key={item.label}
-      className={item.swatches ? 'dialkit-select-option preset-option' : 'dialkit-select-option'}
+      className="dialkit-select-option"
       data-selected="false"
       onMouseEnter={onMouseEnter}
       onClick={() => {
@@ -52,14 +51,7 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
         item.onClick()
       }}
     >
-      <span>{item.label}</span>
-      {item.swatches && (
-        <span className="preset-swatches">
-          {item.swatches.map((hex) => (
-            <i key={hex} style={{ backgroundColor: hex }} />
-          ))}
-        </span>
-      )}
+      {item.label}
     </button>
   )
 
@@ -81,7 +73,7 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
             {...popoverMotion()}
           >
             {items.map((item) => {
-              if (!('items' in item)) return action(item, () => setChild(null))
+              if (!('flyout' in item)) return action(item, () => setChild(null))
               const show = (e: React.MouseEvent<HTMLButtonElement>) => {
                 const root = getDialKitPortalRoot(e.currentTarget) ?? document.body
                 const rootRect = root.getBoundingClientRect()
@@ -123,11 +115,13 @@ export function PanelMenu({ items }: { items: MenuItem[] }) {
         createPortal(
           <motion.div
             ref={warmChildRef}
-            className="dialkit-select-dropdown preset-menu"
+            className="dialkit-select-dropdown panel-menu-flyout"
             style={{ position: 'absolute', ...child.pos }}
             {...popoverMotion()}
+            // after the row's own handler: a pick closes the whole menu
+            onClick={close}
           >
-            {child.items.map((item) => action(item))}
+            {child.flyout}
           </motion.div>,
           child.root
         )}

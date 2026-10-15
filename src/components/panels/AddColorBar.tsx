@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'motion/react'
 import { popoverMotion } from '@/components/dialkit'
 import { useAnchoredPortal, useDismiss, useWarmHover } from '@/components/dialkit/use-dropdown'
 import { extractColors } from '@/lib/extract-colors'
-import { PRESET_PALETTES } from '@/lib/presets'
 import { PhotoIcon, PlusIcon, SwatchesIcon } from './icons'
+import { PresetOptions } from './PresetOptions'
 
 interface Extracted {
   url: string
@@ -233,24 +233,12 @@ export function AddColorBar({
                   maxHeight: menuPos.maxHeight,
                 }}
               >
-                {PRESET_PALETTES.map((preset) => (
-                  <button
-                    key={preset.name}
-                    className="dialkit-select-option preset-option"
-                    data-selected="false"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onReplace?.(preset.colors)
-                    }}
-                  >
-                    <span>{preset.name}</span>
-                    <span className="preset-swatches">
-                      {preset.colors.map((hex) => (
-                        <i key={hex} style={{ backgroundColor: hex }} />
-                      ))}
-                    </span>
-                  </button>
-                ))}
+                <PresetOptions
+                  onPick={(colors) => {
+                    setMenuOpen(false)
+                    onReplace?.(colors)
+                  }}
+                />
               </motion.div>
             )}
           </AnimatePresence>,

@@ -20,6 +20,11 @@ const VALUE_CSS_RIGHT = 10
 //
 // Bounds are addressed by their index in the flattened windows: bound i is
 // window i >> 1, lower (0) or upper (1) end i & 1.
+//
+// On a channel that wraps (hue), an arc through zero is stored as two windows,
+// one from the bottom and one to the top. It shows as the one range it is: one
+// row, numbered "350–60", with both bands on its track, and the two bounds at
+// the seam left out of reach.
 export function RangeSlider({
   label,
   value,
@@ -27,6 +32,7 @@ export function RangeSlider({
   min = 0,
   max = 1,
   step = 0.01,
+  wraps = false,
 }: {
   label: string
   value: ChannelWindow[]
@@ -34,6 +40,7 @@ export function RangeSlider({
   min?: number
   max?: number
   step?: number
+  wraps?: boolean
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLSpanElement>(null)
@@ -50,9 +57,21 @@ export function RangeSlider({
   const [inputValue, setInputValue] = useState('')
   const bound = useRef(0)
   const rect = useRef<DOMRect | null>(null)
+  // The ranges as rows, each a list of window indices: one window, or the two
+  // halves of an arc through zero (top half first). Held through a drag, so a
+  // range that opens or closes the seam mid-drag doesn't regroup under the hand.
+  const groupsOf = (windows: ChannelWindow[]) => {
+    const n = windows.length
+    if (!wraps || n < 2 || windows[0][0] !== min || windows[n - 1][1] !== max) return windows.map((_, w) => [w])
+    return [...windows.slice(1, -1).map((_, w) => [w + 1]), [n - 1, 0]]
+  }
+  const dragGroups = useRef<number[][]>([])
 
   const shown = drag ?? value
   const flat = shown.flat()
+  const groups = drag ? dragGroups.current : groupsOf(value)
+  // A range's two outer bounds: its first window's lower, its last's upper
+  const ends = (group: number[]) => [2 * group[0], 2 * group[group.length - 1] + 1]
   const activeTrack = dragTrack ?? hovered
   const fmt = (v: number) => v.toFixed(decimalsForStep(step))
   const pct = (v: number) => ((v - min) / (max - min)) * 100
@@ -107,6 +126,7 @@ export function RangeSlider({
       const d = Math.abs(v - flat[i])
       if (d < distance || (d === distance && (v < flat[i] ? !(i & 1) : i & 1))) [bound.current, distance] = [i, d]
     }
+    dragGroups.current = groupsOf(value)
     setDrag(value)
     setDragTrack(key)
     apply(value, v)
@@ -137,7 +157,10 @@ export function RangeSlider({
     const third = (window[1] - window[0]) / 3
     if (third < step) return
     const rest = value.filter((w) => w !== window)
-    onChange(tidyWindows([...rest, [window[0], roundValue(window[0] + third, step)], [roundValue(window[1] - third, step), window[1]]]))
+    // Around a whole circle the outer thirds would meet at the seam, one arc
+    // again, so the second one stops a half third short of the top instead
+    const shift = wraps && window[0] === min && window[1] === max ? third / 2 : 0
+    onChange(tidyWindows([...rest, [window[0], roundValue(window[0] + third, step)], [roundValue(window[1] - third - shift, step), roundValue(window[1] - shift, step)]]))
   }
 
   const startEdit = (i: number) => {
@@ -178,8 +201,8 @@ export function RangeSlider({
         )
       : Array.from({ length: 9 }, (_, i) => (i + 1) * 10)
 
-  // The given bounds as editable numbers, "lo–hi"
-  const bounds = (indices: number[]) =>
+  // A range's bounds as editable numbers, "lo–hi"
+  const bounds = (indices: number[], row: number) =>
     indices.map((i) => (
       <Fragment key={i}>
         {i & 1 ? <span className="range-slider-dash">–</span> : null}
@@ -202,7 +225,7 @@ export function RangeSlider({
           <button
             type="button"
             className="range-slider-num"
-            aria-label={`Edit ${i & 1 ? 'upper' : 'lower'} ${label.toLowerCase()} bound${shown.length > 1 ? ` of window ${(i >> 1) + 1}` : ''}`}
+            aria-label={`Edit ${i & 1 ? 'upper' : 'lower'} ${label.toLowerCase()} bound${groups.length > 1 ? ` of window ${row + 1}` : ''}`}
             onClick={() => startEdit(i)}
           >
             {fmt(flat[i])}
@@ -223,11 +246,12 @@ export function RangeSlider({
     </button>
   )
 
-  // A track: the whole channel, with a band per window it draws. `dodge`
-  // gives the handle thresholds for text laid over the track, if any.
+  // A track: the whole channel, with a band per window of its range and a
+  // handle on each of the range's ends. `dodge` gives the handle thresholds
+  // for text laid over the track, if any.
   const track = (key: number, windows: number[], children: ReactNode, dodge?: [number, number]) => {
     const isActive = activeTrack === key
-    const indices = windows.flatMap((w) => [2 * w, 2 * w + 1])
+    const indices = ends(windows)
     return (
       <div
         ref={key === -1 ? trackRef : undefined}
@@ -272,19 +296,19 @@ export function RangeSlider({
     )
   }
 
-  // One window is the full dial, label and numbers laid over the track.
-  // Several are a group under the label, a compact row per window with its
+  // One range is the full dial, label and numbers laid over the track.
+  // Several are a group under the label, a compact row per range with its
   // track on the left and its numbers on the right.
-  if (shown.length === 1) {
+  if (groups.length === 1) {
     return track(
       -1,
-      [0],
+      groups[0],
       <>
         <span ref={labelRef} className="range-slider-label">
           {label}
         </span>
         <span ref={valueRef} className="range-slider-value range-slider-nums" onMouseDown={stop} onPointerDown={stop}>
-          {bounds([0, 1])}
+          {bounds(ends(groups[0]), 0)}
           {addButton}
         </span>
       </>,
@@ -302,14 +326,14 @@ export function RangeSlider({
           </button>
         )}
       </div>
-      {shown.map((_, w) => (
-        <div key={w} className="range-slider-row">
-          {track(w, [w], null)}
-          <span className="range-slider-nums range-slider-row-value">{bounds([2 * w, 2 * w + 1])}</span>
+      {groups.map((group, row) => (
+        <div key={row} className="range-slider-row">
+          {track(row, group, null)}
+          <span className="range-slider-nums range-slider-row-value">{bounds(ends(group), row)}</span>
           <button
             className="color-row-icon"
-            aria-label={`Remove ${label.toLowerCase()} window ${w + 1}`}
-            onClick={() => onChange(value.filter((_, j) => j !== w))}
+            aria-label={`Remove ${label.toLowerCase()} window ${row + 1}`}
+            onClick={() => onChange(value.filter((_, j) => !group.includes(j)))}
           >
             <XIcon />
           </button>

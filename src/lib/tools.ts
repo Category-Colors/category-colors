@@ -1,7 +1,7 @@
 import { convertValue, parseCssColor, valueToCss } from './color'
 import { WORKING_SPACES, spaceChannels } from './color-spaces'
 import { CVD_TYPES, EVALUATOR_TYPES, TYPE_HINTS } from './evaluators'
-import { MAX_WINDOWS, PARAM_PRESETS, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
+import { BEHAVIOR_NAMES, MAX_WINDOWS, PARAM_PRESETS, newInitColor, parseParams, presetParams, type PaletteParams, type PaletteVersion } from './palette'
 import { PRESET_PALETTES } from './presets'
 import { buildJndReport, refineParams, testTitles } from './report'
 import { linkFor } from './share'
@@ -130,7 +130,7 @@ export const CONFIG_SCHEMA = {
     maxIterations: { type: 'integer', minimum: 1000, maximum: 100000, description: 'Annealing steps. 60000 converges; fewer is faster but worse.' },
     orderOptimization: { type: 'boolean', description: 'Reorder the result so adjacent colors differ most.' },
     fixStrength: { type: 'number', minimum: 0, maximum: 1, description: 'behavior fix only, default 0.35: 1 clears the most failing pairs, 0 keeps colors closest to their seeds.' },
-    behavior: { type: 'string', enum: ['optimize', 'fix', 'evaluate'], description: 'optimize (default) makes the best palette the evaluators describe. evaluate runs nothing: the seeds (initColors) become the palette as they are, to read their report. fix repairs the seeds (initColors) instead: only pairs failing the JND and CVD evaluators count, energy and range pause (unless fixEnabled), and colors stay near their seeds. Pin positions with fixedOrder, and fix the seeds that already pass with fixedColor.' },
+    behavior: { type: 'string', enum: BEHAVIOR_NAMES, description: 'optimize (default) makes the best palette the evaluators describe. evaluate runs nothing: the seeds (initColors) become the palette as they are, to read their report. fix repairs the seeds (initColors) instead: only pairs failing the JND and CVD evaluators count, energy and range pause (unless fixEnabled), and colors stay near their seeds. Pin positions with fixedOrder, and fix the seeds that already pass with fixedColor.' },
     colorSpace: {
       type: 'object',
       description: 'The space the optimizer moves in, with hard bounds per channel in that space\'s channel order: ' +
